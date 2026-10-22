@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hr_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: hr_admin
+      POSTGRES_PASSWORD: hr_password_2026
+      POSTGRES_DB: hr_manage_db
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hr_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: hr_redis
+    restart: always
+    command: redis-server --requirepass hr_redis_2026 --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - hr_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: hr_minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin_2026
+      TZ: Asia/Shanghai
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    networks:
+      - hr_network
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  miniodata:
+    driver: local
+
+networks:
+  hr_network:
+    driver: bridge
