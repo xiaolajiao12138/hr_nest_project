@@ -9,12 +9,14 @@ import {
   Query,
   UseGuards,
   Patch,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import {
   CreateUserDto,
   UpdateUserDto,
   ResetPasswordDto,
+  ChangeUserStatusDto,
 } from '../dto/rbac.dto';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -98,9 +100,9 @@ export class UserController {
   @Permissions('system:user:edit')
   @OperLog({ title: '修改用户状态', businessType: 'UPDATE' })
   async changeStatus(
-    @Param('id') id: number,
-    @Body('status') status: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ChangeUserStatusDto,
   ) {
-    return this.userService.changeStatus(id, status);
+    return this.userService.changeStatus(id, dto.status);
   }
 }

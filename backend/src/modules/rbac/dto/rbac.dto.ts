@@ -137,3 +137,9 @@ export class CreateMenuDto {
   @IsOptional()
   isHidden?: boolean = false;
 }
+
+export class ChangeUserStatusDto {
+  @IsNotEmpty({ message: '状态值不能为空' })
+  @IsInt({ message: '状态值必须为数值 (1:启用, 0:停用)' })
+  status: number;
+}

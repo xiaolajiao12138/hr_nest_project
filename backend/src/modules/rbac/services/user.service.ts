@@ -123,8 +123,15 @@ export class UserService extends BaseService<User> {
    * 修改用户状态
    */
   async changeStatus(id: number, status: number): Promise<boolean> {
-    await this.findById(id);
-    await this.userRepo.update(id, { status });
+    const user = await this.findById(id);
+    if (!user) {
+      throw new BusinessException('待修改状态的用户不存在');
+    }
+    // 企业级核心防护：超级管理员禁止停用
+    if (user.username === 'admin' && Number(status) === 0) {
+      throw new BusinessException('系统安全保护：超级管理员账号禁止停用');
+    }
+    await this.userRepo.update(id, { status: Number(status) });
     return true;
   }
 }

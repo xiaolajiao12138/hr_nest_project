@@ -45,13 +45,14 @@
         </div>
       </template>
 
-      <!-- 状态插槽 -->
+      <!-- 状态插槽 (采用 before-change 异步钩子，仅在用户点击交互时触发，彻底避免初次加载误触发) -->
       <template #statusSlot="{ row }">
         <el-switch
           v-model="row.status"
           :active-value="1"
           :inactive-value="0"
-          @change="changeUserStatus(row)"
+          :disabled="row.username === 'admin'"
+          :before-change="() => handleBeforeStatusChange(row)"
         />
       </template>
 
@@ -266,12 +267,16 @@ const handleEdit = (row: any) => {
   dialogVisible.value = true;
 };
 
-const changeUserStatus = async (row: any) => {
+// 状态修改前钩子 (仅在用户真实点击切换时触发，支持异步防抖与自动阻止状态切换)
+const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
+  const targetStatus = row.status === 1 ? 0 : 1;
   try {
-    await changeUserStatusApi(row.id, row.status);
-    ElMessage.success('用户状态已更新');
-  } catch (e) {
-    row.status = row.status === 1 ? 0 : 1;
+    await changeUserStatusApi(row.id, targetStatus);
+    ElMessage.success(`用户【${row.username}】状态已${targetStatus === 1 ? '启用' : '停用'}`);
+    return true; // 请求成功，允许开关切换
+  } catch (e: any) {
+    // 请求失败 (被超级管理员保护拦截或网络异常)，返回 false 自动阻止切换，保持原状
+    return false;
   }
 };
 
