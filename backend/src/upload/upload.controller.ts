@@ -14,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import * as path from 'path';
 
 @Controller('upload')
 export class UploadController {
@@ -43,6 +44,19 @@ export class UploadController {
   ) {
     const filePath = `${folder}/${fileName}`;
     const stream = await this.uploadService.getFileStream(filePath);
+    const ext = (path.extname(fileName) || '').toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+    };
+    if (mimeMap[ext]) {
+      res.setHeader('Content-Type', mimeMap[ext]);
+    }
     stream.pipe(res);
   }
 

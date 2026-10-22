@@ -6,6 +6,7 @@ import * as Minio from 'minio';
 import { SysFile } from './entities/file.entity';
 import { BusinessException } from '../common/exceptions/business.exception';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -13,6 +14,8 @@ export class UploadService implements OnModuleInit {
   private readonly logger = new Logger(UploadService.name);
   private minioClient: Minio.Client;
   private bucketName: string;
+  // 本地磁盘降级存储目录
+  private readonly localUploadDir = path.join(process.cwd(), 'uploads');
 
   // 危险文件扩展名黑名单
   private readonly dangerousExtensions = [
@@ -58,12 +61,12 @@ export class UploadService implements OnModuleInit {
         this.logger.log(`成功自动初始化 MinIO 桶: ${this.bucketName}`);
       }
     } catch (error) {
-      this.logger.warn(`MinIO 连接初始化警告: ${error.message}`);
+      this.logger.warn(`MinIO 连接初始化提示: 未检测到运行中的 MinIO (${error.message})，文件存储将自动平稳降级为本地磁盘存储`);
     }
   }
 
   /**
-   * 上传单文件
+   * 上传单文件 (支持 MinIO 与本地磁盘自动平稳降级)
    * @param file Express.Multer.File
    * @param folder 自定义目录，如 avatar, idcard, cert
    */
@@ -88,6 +91,7 @@ export class UploadService implements OnModuleInit {
     const randomName = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`;
     const objectPath = `${folder}/${randomName}`;
 
+    // 优先尝试上传 MinIO，若 MinIO 离线/连接失败则自动降级存储至本地磁盘
     try {
       await this.minioClient.putObject(
         this.bucketName,
@@ -99,11 +103,21 @@ export class UploadService implements OnModuleInit {
         },
       );
     } catch (err) {
-      this.logger.error(`MinIO 文件上传失败: ${err.message}`);
-      throw new BusinessException(`对象存储上传异常: ${err.message}`);
+      this.logger.warn(`MinIO 上传不可用 (${err.message})，自动平稳降级保存至本地磁盘`);
+      try {
+        const targetDir = path.join(this.localUploadDir, folder);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        const localFilePath = path.join(targetDir, randomName);
+        await fs.promises.writeFile(localFilePath, file.buffer);
+      } catch (localErr) {
+        this.logger.error(`本地磁盘写入失败: ${localErr.message}`);
+        throw new BusinessException(`文件持久化失败: ${localErr.message}`);
+      }
     }
 
-    // 访问路径 (在生产环境或本地走后端中转预览或预签名URL)
+    // 访问路径 (通过后端统一中转代理预览)
     const fileUrl = `/api/upload/preview/${folder}/${randomName}`;
 
     // 保存至数据库 sys_file
@@ -132,7 +146,8 @@ export class UploadService implements OnModuleInit {
         expirySeconds,
       );
     } catch (err) {
-      throw new BusinessException(`获取临时预览链接失败: ${err.message}`);
+      // MinIO 不可用时降级返回本地中转预览 URL
+      return `/api/upload/preview/${filePath}`;
     }
   }
 
@@ -140,10 +155,17 @@ export class UploadService implements OnModuleInit {
    * 获取文件读取流（用于前端直接在浏览器预览或下载图片/PDF）
    */
   async getFileStream(filePath: string) {
+    // 优先检查本地磁盘是否存在降级存储的文件
+    const localFilePath = path.join(this.localUploadDir, filePath);
+    if (fs.existsSync(localFilePath)) {
+      return fs.createReadStream(localFilePath);
+    }
+
+    // 若本地没有，尝试从 MinIO 获取
     try {
       return await this.minioClient.getObject(this.bucketName, filePath);
     } catch (err) {
-      throw new BusinessException(`读取对象存储流失败: ${err.message}`);
+      throw new BusinessException(`读取存储文件流失败: ${err.message}`);
     }
   }
 
@@ -156,6 +178,17 @@ export class UploadService implements OnModuleInit {
       throw new BusinessException('待删除的文件记录不存在');
     }
 
+    // 清理本地降级存储的文件
+    const localFilePath = path.join(this.localUploadDir, fileRecord.filePath);
+    if (fs.existsSync(localFilePath)) {
+      try {
+        await fs.promises.unlink(localFilePath);
+      } catch (err) {
+        this.logger.warn(`本地文件删除失败: ${err.message}`);
+      }
+    }
+
+    // 尝试清理 MinIO
     try {
       await this.minioClient.removeObject(
         fileRecord.bucketName,

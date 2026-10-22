@@ -35,3 +35,7 @@ Thumbs.db
 
 # 本地环境变量备份
 *.local
+
+# 本地上传降级存储目录
+uploads/
+*/uploads/
