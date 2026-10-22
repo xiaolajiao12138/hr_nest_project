@@ -364,7 +364,7 @@ const handleReset = () => {
   fetchData();
 };
 
-const handleApply = () => {
+const handleApply = async () => {
   applyForm.empId = undefined;
   applyForm.leaveType = "ANNUAL";
   applyForm.timeRange = [];
@@ -372,6 +372,11 @@ const handleApply = () => {
   applyForm.reason = "";
   annualInfo.value = null;
   applyDialogVisible.value = true;
+
+  // 懒加载：首次打开请假弹窗时拉取员工下拉数据
+  if (employeeOptions.value.length === 0) {
+    await fetchEmployees();
+  }
 };
 
 const handleEmpChange = async () => {
@@ -452,7 +457,6 @@ const formatDateTime = (val: string) => {
 
 onMounted(() => {
   fetchData();
-  fetchEmployees();
 });
 </script>
 

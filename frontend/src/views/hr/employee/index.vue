@@ -538,7 +538,7 @@ const handleSubmit = async () => {
 const handleExport = async () => {
   exportLoading.value = true;
   try {
-    const res = await exportEmployeeExcelApi(searchForm);
+    const res: any = await exportEmployeeExcelApi(searchForm);
     const blob = new Blob([res], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
