@@ -15,6 +15,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -27,60 +28,6 @@
           @click="handleAdd"
         >
           新增用户
-        </el-button>
-      </template>
-
-      <!-- 角色插槽 -->
-      <template #rolesSlot="{ row }">
-        <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap">
-          <el-tag
-            v-for="r in row.roles"
-            :key="r.id"
-            size="small"
-            type="success"
-          >
-            {{ r.roleName }}
-          </el-tag>
-          <span v-if="!row.roles || row.roles.length === 0">-</span>
-        </div>
-      </template>
-
-      <!-- 状态插槽 (采用 before-change 异步钩子，仅在用户点击交互时触发，彻底避免初次加载误触发) -->
-      <template #statusSlot="{ row }">
-        <el-switch
-          v-model="row.status"
-          :active-value="1"
-          :inactive-value="0"
-          :disabled="row.username === 'admin'"
-          :before-change="() => handleBeforeStatusChange(row)"
-        />
-      </template>
-
-      <!-- 操作插槽 -->
-      <template #action="{ row }">
-        <el-button
-          v-hasPerm="['system:user:edit']"
-          type="primary"
-          link
-          @click="handleEdit(row)"
-        >
-          编辑
-        </el-button>
-        <el-button
-          v-hasPerm="['system:user:resetPwd']"
-          type="warning"
-          link
-          @click="handleResetPwd(row)"
-        >
-          重置密码
-        </el-button>
-        <el-button
-          v-hasPerm="['system:user:delete']"
-          type="danger"
-          link
-          @click="handleDelete(row)"
-        >
-          删除
         </el-button>
       </template>
     </BaseTable>
@@ -146,10 +93,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, h } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
-import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import { ElMessage, ElMessageBox, FormInstance, ElTag, ElSwitch } from 'element-plus';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import { usePagination } from '@/hooks/usePagination';
@@ -179,10 +126,69 @@ const columns: TableColumn[] = [
   { prop: 'realName', label: '姓名', width: 130 },
   { prop: 'phone', label: '手机号', width: 140 },
   { prop: 'dept', label: '所属部门', width: 140, formatter: (val) => val?.deptName || '-' },
-  { prop: 'roles', label: '分配角色', slot: 'rolesSlot', minWidth: 160 },
-  { prop: 'status', label: '启用状态', slot: 'statusSlot', width: 110 },
-  { prop: 'createdAt', label: '创建时间', width: 170, formatter: (val) => val ? new Date(val).toLocaleString() : '-' },
+  {
+    prop: 'roles',
+    label: '分配角色',
+    minWidth: 160,
+    render: ({ row }) => {
+      if (!row.roles || row.roles.length === 0) return '-';
+      return h(
+        'div',
+        { style: 'display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;' },
+        row.roles.map((r: any) =>
+          h(ElTag, { key: r.id, size: 'small', type: 'success' }, () => r.roleName),
+        ),
+      );
+    },
+  },
+  {
+    prop: 'status',
+    label: '启用状态',
+    width: 110,
+    render: ({ row }) =>
+      h(ElSwitch, {
+        modelValue: row.status,
+        activeValue: 1,
+        inactiveValue: 0,
+        disabled: row.username === 'admin',
+        beforeChange: () => handleBeforeStatusChange(row),
+      }),
+  },
+  {
+    prop: 'createdAt',
+    label: '创建时间',
+    width: 170,
+    formatter: (val) => (val ? new Date(val).toLocaleString() : '-'),
+  },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动，支持权限自动校验与防误删)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 200,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '编辑',
+      type: 'primary',
+      perm: ['system:user:edit'],
+      onClick: () => handleEdit(row),
+    },
+    {
+      label: '重置密码',
+      type: 'warning',
+      perm: ['system:user:resetPwd'],
+      onClick: () => handleResetPwd(row),
+    },
+    {
+      label: '删除',
+      type: 'danger',
+      perm: ['system:user:delete'],
+      show: row.username !== 'admin', // 超级管理员直接隐藏删除按钮，增加安全防线
+      onClick: () => handleDelete(row),
+    },
+  ],
+};
 
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增用户');
