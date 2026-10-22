@@ -15,6 +15,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -28,20 +29,6 @@
         >
           清空所有日志
         </el-button>
-      </template>
-
-      <template #statusSlot="{ row }">
-        <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-          {{ row.status === 1 ? '成功' : '异常' }}
-        </el-tag>
-      </template>
-
-      <template #costSlot="{ row }">
-        <el-tag size="small" type="info">{{ row.costTime }} ms</el-tag>
-      </template>
-
-      <template #action="{ row }">
-        <el-button type="primary" link @click="viewDetail(row)">详情</el-button>
       </template>
     </BaseTable>
 
@@ -71,9 +58,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import { ref, reactive, onMounted, h } from 'vue';
+import { ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import { usePagination } from '@/hooks/usePagination';
 import { getLogListApi, cleanLogApi } from '@/api/ops';
@@ -90,10 +77,44 @@ const columns: TableColumn[] = [
   { prop: 'operName', label: '操作人员', width: 120 },
   { prop: 'operIp', label: 'IP地址', width: 130 },
   { prop: 'operUrl', label: '请求URL', minWidth: 200 },
-  { prop: 'costTime', label: '耗时', slot: 'costSlot', width: 100 },
-  { prop: 'status', label: '状态', slot: 'statusSlot', width: 90 },
-  { prop: 'operTime', label: '操作时间', width: 170, formatter: (val) => val ? new Date(val).toLocaleString() : '-' },
+  {
+    prop: 'costTime',
+    label: '耗时',
+    width: 100,
+    render: ({ row }) => h(ElTag, { size: 'small', type: 'info' }, () => `${row.costTime} ms`),
+  },
+  {
+    prop: 'status',
+    label: '状态',
+    width: 90,
+    render: ({ row }) =>
+      h(
+        ElTag,
+        { type: row.status === 1 ? 'success' : 'danger', size: 'small' },
+        () => (row.status === 1 ? '成功' : '异常'),
+      ),
+  },
+  {
+    prop: 'operTime',
+    label: '操作时间',
+    width: 170,
+    formatter: (val) => (val ? new Date(val).toLocaleString() : '-'),
+  },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 100,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '详情',
+      type: 'primary',
+      onClick: () => viewDetail(row),
+    },
+  ],
+};
 
 const detailVisible = ref(false);
 const currentLog = ref<any>(null);

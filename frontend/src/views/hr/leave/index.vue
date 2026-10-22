@@ -39,6 +39,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -59,70 +60,6 @@
         <span style="font-family: monospace; font-weight: bold">{{
           row.leaveNo
         }}</span>
-      </template>
-
-      <!-- 请假类型插槽 -->
-      <template #typeSlot="{ row }">
-        <el-tag
-          :type="
-            row.leaveType === 'ANNUAL'
-              ? 'success'
-              : row.leaveType === 'SICK'
-                ? 'warning'
-                : 'info'
-          "
-        >
-          {{
-            row.leaveType === "ANNUAL"
-              ? "年假"
-              : row.leaveType === "SICK"
-                ? "病假"
-                : "事假"
-          }}
-        </el-tag>
-      </template>
-
-      <!-- 时间范围插槽 -->
-      <template #timeSlot="{ row }">
-        <div style="font-size: 12px">
-          {{ formatDateTime(row.startTime) }} 至
-          {{ formatDateTime(row.endTime) }}
-        </div>
-      </template>
-
-      <!-- 审批状态插槽 -->
-      <template #statusSlot="{ row }">
-        <el-tag
-          :type="
-            row.status === 'APPROVED'
-              ? 'success'
-              : row.status === 'REJECTED'
-                ? 'danger'
-                : 'warning'
-          "
-        >
-          {{
-            row.status === "APPROVED"
-              ? "已通过"
-              : row.status === "REJECTED"
-                ? "已驳回"
-                : "待审批"
-          }}
-        </el-tag>
-      </template>
-
-      <!-- 操作列插槽 -->
-      <template #action="{ row }">
-        <el-button
-          v-if="row.status === 'PENDING'"
-          v-hasPerm="['hr:leave:audit']"
-          type="primary"
-          link
-          @click="openAudit(row)"
-        >
-          审批
-        </el-button>
-        <span v-else style="color: #909399; font-size: 12px">已归档</span>
       </template>
     </BaseTable>
 
@@ -258,10 +195,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, h } from "vue";
 import { Plus } from "@element-plus/icons-vue";
-import { ElMessage, FormInstance } from "element-plus";
-import BaseTable, { TableColumn } from "@/components/BaseTable.vue";
+import { ElMessage, FormInstance, ElTag } from "element-plus";
+import BaseTable, { TableColumn, ActionColumnConfig } from "@/components/BaseTable.vue";
 import BaseSearch from "@/components/BaseSearch.vue";
 import BaseDialog from "@/components/BaseDialog.vue";
 import { usePagination } from "@/hooks/usePagination";
@@ -289,13 +226,83 @@ const { pagination, handlePageChange, handleSizeChange, resetPage } =
 const columns: TableColumn[] = [
   { prop: "leaveNo", label: "请假单号", slot: "leaveNoSlot", width: 170 },
   { prop: "empName", label: "申请人", width: 110 },
-  { prop: "leaveType", label: "请假类型", slot: "typeSlot", width: 100 },
+  {
+    prop: "leaveType",
+    label: "请假类型",
+    width: 100,
+    render: ({ row }) =>
+      h(
+        ElTag,
+        {
+          type:
+            row.leaveType === "ANNUAL"
+              ? "success"
+              : row.leaveType === "SICK"
+                ? "warning"
+                : "info",
+        },
+        () =>
+          row.leaveType === "ANNUAL"
+            ? "年假"
+            : row.leaveType === "SICK"
+              ? "病假"
+              : "事假",
+      ),
+  },
   { prop: "days", label: "天数", width: 90 },
-  { prop: "timeRange", label: "请假时间范围", slot: "timeSlot", minWidth: 260 },
+  {
+    prop: "timeRange",
+    label: "请假时间范围",
+    minWidth: 260,
+    render: ({ row }) =>
+      h(
+        "div",
+        { style: "font-size: 12px" },
+        `${formatDateTime(row.startTime)} 至 ${formatDateTime(row.endTime)}`,
+      ),
+  },
   { prop: "reason", label: "事由", minWidth: 150 },
-  { prop: "status", label: "审批状态", slot: "statusSlot", width: 110 },
+  {
+    prop: "status",
+    label: "审批状态",
+    width: 110,
+    render: ({ row }) =>
+      h(
+        ElTag,
+        {
+          type:
+            row.status === "APPROVED"
+              ? "success"
+              : row.status === "REJECTED"
+                ? "danger"
+                : "warning",
+        },
+        () =>
+          row.status === "APPROVED"
+            ? "已通过"
+            : row.status === "REJECTED"
+              ? "已驳回"
+              : "待审批",
+      ),
+  },
   { prop: "auditRemark", label: "审批批注", width: 140 },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动)
+const actionColumn: ActionColumnConfig = {
+  label: "操作",
+  width: 120,
+  fixed: "right",
+  buttons: (row) => [
+    {
+      label: "审批",
+      type: "primary",
+      perm: ["hr:leave:audit"],
+      show: row.status === "PENDING",
+      onClick: () => openAudit(row),
+    },
+  ],
+};
 
 const applyDialogVisible = ref(false);
 const submitLoading = ref(false);

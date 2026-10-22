@@ -9,9 +9,15 @@ import {
   Query,
   Patch,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { NoticeService } from './notice.service';
-import { CreateNoticeDto, UpdateNoticeDto, QueryNoticeDto } from './dto/notice.dto';
+import {
+  CreateNoticeDto,
+  UpdateNoticeDto,
+  QueryNoticeDto,
+  ChangeNoticeStatusDto,
+} from './dto/notice.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -58,8 +64,11 @@ export class NoticeController {
   @Patch(':id/status')
   @Permissions('ops:notice:list')
   @OperLog({ title: '调整公告发布状态', businessType: 'UPDATE' })
-  async changeStatus(@Param('id') id: number, @Body('status') status: number) {
-    return this.noticeService.changeStatus(id, status);
+  async changeStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ChangeNoticeStatusDto,
+  ) {
+    return this.noticeService.changeStatus(id, dto.status);
   }
 
   @Delete(':id')

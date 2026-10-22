@@ -15,6 +15,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -28,11 +29,6 @@
         >
           新增字典项
         </el-button>
-      </template>
-
-      <template #action="{ row }">
-        <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-        <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
       </template>
     </BaseTable>
 
@@ -66,10 +62,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, h } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
-import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import { ElMessage, ElMessageBox, FormInstance, ElTag } from 'element-plus';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import { usePagination } from '@/hooks/usePagination';
@@ -93,8 +89,37 @@ const columns: TableColumn[] = [
   { prop: 'dictLabel', label: '字典标签(显示名)', width: 150 },
   { prop: 'dictValue', label: '字典键值', width: 140 },
   { prop: 'sort', label: '显示排序', width: 90 },
-  { prop: 'status', label: '状态', width: 90, formatter: (val) => (val === 1 ? '正常' : '停用') },
+  {
+    prop: 'status',
+    label: '状态',
+    width: 90,
+    render: ({ row }) =>
+      h(
+        ElTag,
+        { type: row.status === 1 ? 'success' : 'danger', size: 'small' },
+        () => (row.status === 1 ? '正常' : '停用'),
+      ),
+  },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 150,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '编辑',
+      type: 'primary',
+      onClick: () => handleEdit(row),
+    },
+    {
+      label: '删除',
+      type: 'danger',
+      onClick: () => handleDelete(row),
+    },
+  ],
+};
 
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增字典');

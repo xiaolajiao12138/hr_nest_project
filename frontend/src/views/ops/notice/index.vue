@@ -15,6 +15,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -28,20 +29,6 @@
         >
           发布公告
         </el-button>
-      </template>
-
-      <template #statusSlot="{ row }">
-        <el-switch
-          v-model="row.status"
-          :active-value="1"
-          :inactive-value="0"
-          @change="changeNoticeStatus(row)"
-        />
-      </template>
-
-      <template #action="{ row }">
-        <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-        <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
       </template>
     </BaseTable>
 
@@ -85,10 +72,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, h } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
-import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import { ElMessage, ElMessageBox, FormInstance, ElSwitch } from 'element-plus';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import BaseUpload from '@/components/BaseUpload.vue';
@@ -117,9 +104,47 @@ const columns: TableColumn[] = [
     formatter: (val) => (val === 'ANNOUNCEMENT' ? '全员公告' : '内部通知'),
   },
   { prop: 'createdBy', label: '发布人', width: 120 },
-  { prop: 'status', label: '发布状态', slot: 'statusSlot', width: 100 },
-  { prop: 'createdAt', label: '发布时间', width: 170, formatter: (val) => val ? new Date(val).toLocaleString() : '-' },
+  {
+    prop: 'status',
+    label: '发布状态',
+    width: 110,
+    render: ({ row }) =>
+      h(ElSwitch, {
+        modelValue: row.status,
+        'onUpdate:modelValue': (val: any) => {
+          row.status = val;
+        },
+        activeValue: 1,
+        inactiveValue: 0,
+        beforeChange: () => handleBeforeStatusChange(row),
+      }),
+  },
+  {
+    prop: 'createdAt',
+    label: '发布时间',
+    width: 170,
+    formatter: (val) => (val ? new Date(val).toLocaleString() : '-'),
+  },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 160,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '编辑',
+      type: 'primary',
+      onClick: () => handleEdit(row),
+    },
+    {
+      label: '删除',
+      type: 'danger',
+      onClick: () => handleDelete(row),
+    },
+  ],
+};
 
 const dialogVisible = ref(false);
 const dialogTitle = ref('发布公告');
@@ -195,12 +220,18 @@ const handleEdit = (row: any) => {
   dialogVisible.value = true;
 };
 
-const changeNoticeStatus = async (row: any) => {
+// 公告状态修改前钩子 (异步保护，并在更新成功后立即调用搜索/列表接口刷新数据)
+const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
+  const targetStatus = row.status === 1 ? 0 : 1;
   try {
-    await changeNoticeStatusApi(row.id, row.status);
-    ElMessage.success('公告状态已调整');
-  } catch (e) {
-    row.status = row.status === 1 ? 0 : 1;
+    await changeNoticeStatusApi(row.id, targetStatus);
+    ElMessage.success(`公告【${row.title}】状态已${targetStatus === 1 ? '发布' : '下架'}`);
+    row.status = targetStatus;
+    // 状态更新成功后，立即调用搜索/列表接口重新拉取最新数据
+    fetchData();
+    return true;
+  } catch (e: any) {
+    return false;
   }
 };
 

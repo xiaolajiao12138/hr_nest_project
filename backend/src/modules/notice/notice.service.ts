@@ -49,7 +49,7 @@ export class NoticeService extends BaseService<Notice> {
 
   async changeStatus(id: number, status: number): Promise<boolean> {
     await this.findById(id);
-    await this.noticeRepo.update(id, { status });
+    await this.noticeRepo.update(id, { status: Number(status) });
     return true;
   }
 }

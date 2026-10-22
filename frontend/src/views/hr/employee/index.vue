@@ -40,6 +40,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -80,22 +81,6 @@
         </div>
       </template>
 
-      <!-- 部门插槽 -->
-      <template #deptSlot="{ row }">
-        <span>{{ row.dept?.deptName || '-' }}</span>
-      </template>
-
-      <!-- 状态插槽 -->
-      <template #statusSlot="{ row }">
-        <el-tag
-          :type="
-            row.status === 1 ? 'success' : row.status === 2 ? 'info' : 'warning'
-          "
-        >
-          {{ row.status === 1 ? '在职' : row.status === 2 ? '离职' : '试用期' }}
-        </el-tag>
-      </template>
-
       <!-- 附件预览插槽 -->
       <template #attachmentsSlot="{ row }">
         <div class="attachment-tags">
@@ -126,26 +111,6 @@
           </el-tag>
           <span v-if="!row.idCardFront && !row.idCardBack && !row.eduCert">-</span>
         </div>
-      </template>
-
-      <!-- 操作列插槽 -->
-      <template #action="{ row }">
-        <el-button
-          v-hasPerm="['hr:employee:edit']"
-          type="primary"
-          link
-          @click="handleEdit(row)"
-        >
-          编辑
-        </el-button>
-        <el-button
-          v-hasPerm="['hr:employee:delete']"
-          type="danger"
-          link
-          @click="handleDelete(row)"
-        >
-          删除
-        </el-button>
       </template>
     </BaseTable>
 
@@ -329,10 +294,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, h } from 'vue';
 import { Plus, Upload, Download } from '@element-plus/icons-vue';
-import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import { ElMessage, ElMessageBox, FormInstance, ElTag } from 'element-plus';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import BaseUpload from '@/components/BaseUpload.vue';
@@ -368,13 +333,52 @@ const columns: TableColumn[] = [
   { prop: 'gender', label: '性别', width: 80 },
   { prop: 'phone', label: '联系电话', width: 140 },
   { prop: 'idCard', label: '身份证号', width: 180 },
-  { prop: 'dept', label: '部门', slot: 'deptSlot', width: 140 },
+  {
+    prop: 'dept',
+    label: '部门',
+    width: 140,
+    formatter: (val, row) => row.dept?.deptName || '-',
+  },
   { prop: 'post', label: '岗位', width: 140 },
   { prop: 'education', label: '学历', width: 100 },
   { prop: 'entryDate', label: '入职日期', width: 120 },
-  { prop: 'status', label: '状态', slot: 'statusSlot', width: 100 },
+  {
+    prop: 'status',
+    label: '状态',
+    width: 100,
+    render: ({ row }) =>
+      h(
+        ElTag,
+        {
+          type:
+            row.status === 1 ? 'success' : row.status === 2 ? 'info' : 'warning',
+        },
+        () => (row.status === 1 ? '在职' : row.status === 2 ? '离职' : '试用期'),
+      ),
+  },
   { prop: 'attachments', label: '档案附件', slot: 'attachmentsSlot', minWidth: 200 },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动并自动校验按钮权限)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 150,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '编辑',
+      type: 'primary',
+      perm: ['hr:employee:edit'],
+      onClick: () => handleEdit(row),
+    },
+    {
+      label: '删除',
+      type: 'danger',
+      perm: ['hr:employee:delete'],
+      onClick: () => handleDelete(row),
+    },
+  ],
+};
 
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增员工');

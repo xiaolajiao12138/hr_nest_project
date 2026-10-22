@@ -15,6 +15,7 @@
       :loading="loading"
       :data="tableData"
       :columns="columns"
+      :action-column="actionColumn"
       :pagination="pagination"
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
@@ -27,34 +28,6 @@
           @click="handleAdd"
         >
           新增角色
-        </el-button>
-      </template>
-
-      <template #action="{ row }">
-        <el-button
-          v-hasPerm="['system:role:edit']"
-          type="primary"
-          link
-          @click="handleEdit(row)"
-        >
-          编辑
-        </el-button>
-        <el-button
-          v-hasPerm="['system:role:edit']"
-          type="success"
-          link
-          @click="openPermissionDrawer(row)"
-        >
-          分配权限
-        </el-button>
-        <el-button
-          v-if="row.roleKey !== 'admin'"
-          v-hasPerm="['system:role:delete']"
-          type="danger"
-          link
-          @click="handleDelete(row)"
-        >
-          删除
         </el-button>
       </template>
     </BaseTable>
@@ -128,7 +101,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance, ElTree } from 'element-plus';
-import BaseTable, { TableColumn } from '@/components/BaseTable.vue';
+import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import { usePagination } from '@/hooks/usePagination';
@@ -157,6 +130,34 @@ const columns: TableColumn[] = [
   { prop: 'remark', label: '备注说明', minWidth: 200 },
   { prop: 'createdAt', label: '创建时间', width: 180, formatter: (val) => val ? new Date(val).toLocaleString() : '-' },
 ];
+
+// 企业级操作列配置 (通过 actionColumn 集中驱动)
+const actionColumn: ActionColumnConfig = {
+  label: '操作',
+  width: 220,
+  fixed: 'right',
+  buttons: (row) => [
+    {
+      label: '编辑',
+      type: 'primary',
+      perm: ['system:role:edit'],
+      onClick: () => handleEdit(row),
+    },
+    {
+      label: '分配权限',
+      type: 'success',
+      perm: ['system:role:edit'],
+      onClick: () => openPermissionDrawer(row),
+    },
+    {
+      label: '删除',
+      type: 'danger',
+      perm: ['system:role:delete'],
+      show: row.roleKey !== 'admin', // 超级管理员角色禁止删除
+      onClick: () => handleDelete(row),
+    },
+  ],
+};
 
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增角色');
