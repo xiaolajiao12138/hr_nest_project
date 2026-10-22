@@ -40,6 +40,37 @@ export class EmployeeController {
   }
 
   /**
+   * 下载员工 Excel 批量导入模板
+   */
+  @Get('template/download')
+  @Permissions('hr:employee:import')
+  async downloadTemplate(@Res() res: Response) {
+    const buffer = await this.employeeService.getImportTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="employee_import_template.xlsx"',
+    );
+    res.end(buffer);
+  }
+
+  /**
+   * 大数据分页流式导出员工 Excel
+   */
+  @Get('export/excel')
+  @Permissions('hr:employee:export')
+  @OperLog({ title: '导出员工档案Excel', businessType: 'EXPORT' })
+  async exportExcel(
+    @Query() query: QueryEmployeeDto,
+    @Res() res: Response,
+  ) {
+    await this.employeeService.exportEmployeesStream(res, query);
+  }
+
+  /**
    * 获取员工详情
    */
   @Get(':id')
@@ -84,24 +115,6 @@ export class EmployeeController {
   }
 
   /**
-   * 下载员工 Excel 批量导入模板
-   */
-  @Get('template/download')
-  @Permissions('hr:employee:import')
-  async downloadTemplate(@Res() res: Response) {
-    const buffer = await this.employeeService.getImportTemplate();
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="employee_import_template.xlsx"',
-    );
-    res.end(buffer);
-  }
-
-  /**
    * Excel 批量导入员工（严格校验 + 整体事务回滚）
    */
   @Post('import')
@@ -110,18 +123,5 @@ export class EmployeeController {
   @UseInterceptors(FileInterceptor('file'))
   async importExcel(@UploadedFile() file: Express.Multer.File) {
     return this.employeeService.importEmployeesFromExcel(file.buffer);
-  }
-
-  /**
-   * 大数据分页流式导出员工 Excel
-   */
-  @Get('export/excel')
-  @Permissions('hr:employee:export')
-  @OperLog({ title: '导出员工档案Excel', businessType: 'EXPORT' })
-  async exportExcel(
-    @Query() query: QueryEmployeeDto,
-    @Res() res: Response,
-  ) {
-    await this.employeeService.exportEmployeesStream(res, query);
   }
 }

@@ -61,26 +61,6 @@ export class UserController {
   }
 
   /**
-   * 编辑用户
-   */
-  @Put(':id')
-  @Permissions('system:user:edit')
-  @OperLog({ title: '编辑用户', businessType: 'UPDATE' })
-  async update(@Param('id') id: number, @Body() dto: UpdateUserDto) {
-    return this.userService.updateUser(id, dto);
-  }
-
-  /**
-   * 删除用户
-   */
-  @Delete(':id')
-  @Permissions('system:user:delete')
-  @OperLog({ title: '删除用户', businessType: 'DELETE' })
-  async delete(@Param('id') id: number) {
-    return this.userService.deleteById(id);
-  }
-
-  /**
    * 重置密码
    */
   @Put('reset-password')
@@ -98,5 +78,25 @@ export class UserController {
   @OperLog({ title: '修改用户状态', businessType: 'UPDATE' })
   async changeStatus(@Body() dto: ChangeUserStatusDto) {
     return this.userService.changeStatus(dto.id, dto.status);
+  }
+
+  /**
+   * 编辑用户
+   */
+  @Put(':id')
+  @Permissions('system:user:edit')
+  @OperLog({ title: '编辑用户', businessType: 'UPDATE' })
+  async update(@Param('id') id: number, @Body() dto: UpdateUserDto) {
+    return this.userService.updateUser(id, dto);
+  }
+
+  /**
+   * 删除用户
+   */
+  @Delete(':id')
+  @Permissions('system:user:delete')
+  @OperLog({ title: '删除用户', businessType: 'DELETE' })
+  async delete(@Param('id') id: number) {
+    return this.userService.deleteById(id);
   }
 }

@@ -59,16 +59,6 @@ export class RoleController {
   }
 
   /**
-   * 编辑角色
-   */
-  @Put(':id')
-  @Permissions('system:role:edit')
-  @OperLog({ title: '编辑角色', businessType: 'UPDATE' })
-  async update(@Param('id') id: number, @Body() dto: Partial<CreateRoleDto>) {
-    return this.roleService.update(id, dto);
-  }
-
-  /**
    * 分配角色菜单与按钮权限
    */
   @Put('menus')
@@ -76,6 +66,16 @@ export class RoleController {
   @OperLog({ title: '分配角色权限', businessType: 'UPDATE' })
   async updateRoleMenus(@Body() dto: UpdateRoleMenusDto) {
     return this.roleService.updateRoleMenus(dto.roleId, dto);
+  }
+
+  /**
+   * 编辑角色
+   */
+  @Put(':id')
+  @Permissions('system:role:edit')
+  @OperLog({ title: '编辑角色', businessType: 'UPDATE' })
+  async update(@Param('id') id: number, @Body() dto: Partial<CreateRoleDto>) {
+    return this.roleService.update(id, dto);
   }
 
   /**

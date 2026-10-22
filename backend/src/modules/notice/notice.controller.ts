@@ -54,18 +54,18 @@ export class NoticeController {
     });
   }
 
-  @Put(':id')
-  @Permissions('ops:notice:list')
-  @OperLog({ title: '修改系统公告', businessType: 'UPDATE' })
-  async update(@Param('id') id: number, @Body() dto: UpdateNoticeDto) {
-    return this.noticeService.update(id, dto);
-  }
-
   @Put('status')
   @Permissions('ops:notice:list')
   @OperLog({ title: '调整公告发布状态', businessType: 'UPDATE' })
   async changeStatus(@Body() dto: ChangeNoticeStatusDto) {
     return this.noticeService.changeStatus(dto.id, dto.status);
+  }
+
+  @Put(':id')
+  @Permissions('ops:notice:list')
+  @OperLog({ title: '修改系统公告', businessType: 'UPDATE' })
+  async update(@Param('id') id: number, @Body() dto: UpdateNoticeDto) {
+    return this.noticeService.update(id, dto);
   }
 
   @Delete(':id')

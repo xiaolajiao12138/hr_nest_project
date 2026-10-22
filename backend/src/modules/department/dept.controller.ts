@@ -50,16 +50,6 @@ export class DeptController {
   }
 
   /**
-   * 修改部门
-   */
-  @Put(':id')
-  @Permissions('hr:dept:list')
-  @OperLog({ title: '修改部门', businessType: 'UPDATE' })
-  async update(@Param('id') id: number, @Body() dto: UpdateDeptDto) {
-    return this.deptService.update(id, dto);
-  }
-
-  /**
    * 拖拽或修改部门排序/父级
    */
   @Put('sort')
@@ -67,6 +57,16 @@ export class DeptController {
   @OperLog({ title: '调整部门层级排序', businessType: 'UPDATE' })
   async updateSort(@Body() dto: UpdateDeptSortDto) {
     return this.deptService.updateSort(dto.id, dto.parentId, dto.sort);
+  }
+
+  /**
+   * 修改部门
+   */
+  @Put(':id')
+  @Permissions('hr:dept:list')
+  @OperLog({ title: '修改部门', businessType: 'UPDATE' })
+  async update(@Param('id') id: number, @Body() dto: UpdateDeptDto) {
+    return this.deptService.update(id, dto);
   }
 
   /**
