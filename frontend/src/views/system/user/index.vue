@@ -148,6 +148,9 @@ const columns: TableColumn[] = [
     render: ({ row }) =>
       h(ElSwitch, {
         modelValue: row.status,
+        'onUpdate:modelValue': (val: any) => {
+          row.status = val;
+        },
         activeValue: 1,
         inactiveValue: 0,
         disabled: row.username === 'admin',
@@ -279,6 +282,9 @@ const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
   try {
     await changeUserStatusApi(row.id, targetStatus);
     ElMessage.success(`用户【${row.username}】状态已${targetStatus === 1 ? '启用' : '停用'}`);
+    row.status = targetStatus;
+    // 状态更新成功后，立即调用搜索/列表接口刷新表格数据
+    fetchData();
     return true; // 请求成功，允许开关切换
   } catch (e: any) {
     // 请求失败 (被超级管理员保护拦截或网络异常)，返回 false 自动阻止切换，保持原状
