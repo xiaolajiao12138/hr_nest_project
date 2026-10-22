@@ -345,7 +345,7 @@ const fetchData = async () => {
 const fetchEmployees = async () => {
   const res: any = await getEmployeeListApi({
     page: 1,
-    pageSize: 200,
+    pageSize: 100,
     status: 1,
   });
   employeeOptions.value = res.list || [];
