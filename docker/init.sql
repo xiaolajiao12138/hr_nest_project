@@ -263,10 +263,9 @@ INSERT INTO sys_role (id, role_name, role_key, sort, status, remark) VALUES
 SELECT setval('sys_role_id_seq', (SELECT MAX(id) FROM sys_role));
 
 -- 初始化用户 (密码全部为: 123456, 采用 bcrypt 加密)
--- $2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6x8ekEY5kGDO3vbp66K2 是 123456 的 bcrypt 散列
 INSERT INTO sys_user (id, username, password, real_name, phone, email, dept_id, status) VALUES
-(1, 'admin', '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6x8ekEY5kGDO3vbp66K2', '超级管理员', '13800001001', 'admin@hrsystem.com', 1, 1),
-(2, 'hr_user', '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6x8ekEY5kGDO3vbp66K2', '人事主管', '13800001002', 'hr@hrsystem.com', 3, 1);
+(1, 'admin', '$2a$10$C4au.6EnCKBLQ0mR2alhRua0XwKeDdmdKL8brGGsM/PpiwwX3UQiW', '超级管理员', '13800001001', 'admin@hrsystem.com', 1, 1),
+(2, 'hr_user', '$2a$10$C4au.6EnCKBLQ0mR2alhRua0XwKeDdmdKL8brGGsM/PpiwwX3UQiW', '人事主管', '13800001002', 'hr@hrsystem.com', 3, 1);
 
 SELECT setval('sys_user_id_seq', (SELECT MAX(id) FROM sys_user));
 
