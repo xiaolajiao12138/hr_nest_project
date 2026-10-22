@@ -24,10 +24,10 @@ export function applyLeaveApi(data: any) {
   });
 }
 
-export function auditLeaveApi(id: number, data: { action: 'APPROVED' | 'REJECTED'; auditRemark?: string }) {
+export function auditLeaveApi(data: { id: number; action: 'APPROVED' | 'REJECTED'; auditRemark?: string }) {
   return request({
-    url: `/hr/leave/${id}/audit`,
-    method: 'patch',
+    url: '/hr/leave/audit',
+    method: 'put',
     data,
   });
 }

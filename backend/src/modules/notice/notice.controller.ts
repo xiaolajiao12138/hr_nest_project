@@ -61,14 +61,11 @@ export class NoticeController {
     return this.noticeService.update(id, dto);
   }
 
-  @Patch(':id/status')
+  @Put('status')
   @Permissions('ops:notice:list')
   @OperLog({ title: '调整公告发布状态', businessType: 'UPDATE' })
-  async changeStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ChangeNoticeStatusDto,
-  ) {
-    return this.noticeService.changeStatus(id, dto.status);
+  async changeStatus(@Body() dto: ChangeNoticeStatusDto) {
+    return this.noticeService.changeStatus(dto.id, dto.status);
   }
 
   @Delete(':id')

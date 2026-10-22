@@ -10,8 +10,8 @@ export function createNoticeApi(data: any) {
 export function updateNoticeApi(id: number, data: any) {
   return request({ url: `/ops/notice/${id}`, method: 'put', data });
 }
-export function changeNoticeStatusApi(id: number, status: number) {
-  return request({ url: `/ops/notice/${id}/status`, method: 'patch', data: { status } });
+export function changeNoticeStatusApi(data: { id: number; status: number }) {
+  return request({ url: '/ops/notice/status', method: 'put', data });
 }
 export function deleteNoticeApi(id: number) {
   return request({ url: `/ops/notice/${id}`, method: 'delete' });

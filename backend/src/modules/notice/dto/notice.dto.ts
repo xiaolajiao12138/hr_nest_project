@@ -33,6 +33,10 @@ export class CreateNoticeDto {
 export class UpdateNoticeDto extends CreateNoticeDto {}
 
 export class ChangeNoticeStatusDto {
+  @IsNotEmpty({ message: '公告ID不能为空' })
+  @IsInt({ message: '公告ID必须为整数' })
+  id: number;
+
   @IsNotEmpty({ message: '状态值不能为空' })
   @IsInt({ message: '状态值必须为整数 (1:发布, 0:草稿/下架)' })
   status: number;

@@ -75,6 +75,10 @@ export class UpdateUserDto {
 }
 
 export class ResetPasswordDto {
+  @IsNotEmpty({ message: '用户ID不能为空' })
+  @IsInt({ message: '用户ID必须为整数' })
+  id: number;
+
   @IsNotEmpty({ message: '新密码不能为空' })
   @Length(6, 30, { message: '密码长度至少6位' })
   newPassword: string;
@@ -99,6 +103,10 @@ export class CreateRoleDto {
 }
 
 export class UpdateRoleMenusDto {
+  @IsNotEmpty({ message: '角色ID不能为空' })
+  @IsInt({ message: '角色ID必须为整数' })
+  roleId: number;
+
   @IsArray({ message: '菜单ID集合必须是数组' })
   menuIds: number[];
 }
@@ -139,6 +147,10 @@ export class CreateMenuDto {
 }
 
 export class ChangeUserStatusDto {
+  @IsNotEmpty({ message: '用户ID不能为空' })
+  @IsInt({ message: '用户ID必须为整数' })
+  id: number;
+
   @IsNotEmpty({ message: '状态值不能为空' })
   @IsInt({ message: '状态值必须为数值 (1:启用, 0:停用)' })
   status: number;

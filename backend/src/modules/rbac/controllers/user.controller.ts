@@ -83,26 +83,20 @@ export class UserController {
   /**
    * 重置密码
    */
-  @Patch(':id/reset-password')
+  @Put('reset-password')
   @Permissions('system:user:resetPwd')
   @OperLog({ title: '重置用户密码', businessType: 'UPDATE' })
-  async resetPassword(
-    @Param('id') id: number,
-    @Body() dto: ResetPasswordDto,
-  ) {
-    return this.userService.resetPassword(id, dto);
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.userService.resetPassword(dto.id, dto);
   }
 
   /**
    * 切换用户状态 (启用/禁用)
    */
-  @Patch(':id/status')
+  @Put('status')
   @Permissions('system:user:edit')
   @OperLog({ title: '修改用户状态', businessType: 'UPDATE' })
-  async changeStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ChangeUserStatusDto,
-  ) {
-    return this.userService.changeStatus(id, dto.status);
+  async changeStatus(@Body() dto: ChangeUserStatusDto) {
+    return this.userService.changeStatus(dto.id, dto.status);
   }
 }

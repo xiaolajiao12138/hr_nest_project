@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { DeptService } from './dept.service';
-import { CreateDeptDto, UpdateDeptDto } from './dto/dept.dto';
+import { CreateDeptDto, UpdateDeptDto, UpdateDeptSortDto } from './dto/dept.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -62,15 +62,11 @@ export class DeptController {
   /**
    * 拖拽或修改部门排序/父级
    */
-  @Patch(':id/sort')
+  @Put('sort')
   @Permissions('hr:dept:list')
   @OperLog({ title: '调整部门层级排序', businessType: 'UPDATE' })
-  async updateSort(
-    @Param('id') id: number,
-    @Body('parentId') parentId: number,
-    @Body('sort') sort: number,
-  ) {
-    return this.deptService.updateSort(id, parentId, sort);
+  async updateSort(@Body() dto: UpdateDeptSortDto) {
+    return this.deptService.updateSort(dto.id, dto.parentId, dto.sort);
   }
 
   /**

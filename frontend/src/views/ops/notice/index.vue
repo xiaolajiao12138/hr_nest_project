@@ -224,7 +224,7 @@ const handleEdit = (row: any) => {
 const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
   const targetStatus = row.status === 1 ? 0 : 1;
   try {
-    await changeNoticeStatusApi(row.id, targetStatus);
+    await changeNoticeStatusApi({ id: row.id, status: targetStatus });
     ElMessage.success(`公告【${row.title}】状态已${targetStatus === 1 ? '发布' : '下架'}`);
     row.status = targetStatus;
     // 状态更新成功后，立即调用搜索/列表接口重新拉取最新数据

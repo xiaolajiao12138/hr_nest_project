@@ -31,3 +31,17 @@ export class CreateDeptDto {
 }
 
 export class UpdateDeptDto extends CreateDeptDto {}
+
+export class UpdateDeptSortDto {
+  @IsNotEmpty({ message: '部门ID不能为空' })
+  @IsInt({ message: '部门ID必须为整数' })
+  id: number;
+
+  @IsOptional()
+  @IsInt({ message: '父级ID必须为整数' })
+  parentId?: number;
+
+  @IsNotEmpty({ message: '排序值不能为空' })
+  @IsInt({ message: '排序值必须为整数' })
+  sort: number;
+}

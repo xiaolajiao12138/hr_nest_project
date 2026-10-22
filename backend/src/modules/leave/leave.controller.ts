@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Param,
   Query,
@@ -58,14 +59,13 @@ export class LeaveController {
   /**
    * 审批请假单（通过/驳回，若驳回年假则自动原路归还年假天数）
    */
-  @Patch(':id/audit')
+  @Put('audit')
   @Permissions('hr:leave:audit')
   @OperLog({ title: '审批请假申请', businessType: 'UPDATE' })
   async audit(
-    @Param('id') id: number,
     @Body() dto: AuditLeaveDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.leaveService.auditLeave(id, dto, user.userId);
+    return this.leaveService.auditLeave(dto.id, dto, user.userId);
   }
 }

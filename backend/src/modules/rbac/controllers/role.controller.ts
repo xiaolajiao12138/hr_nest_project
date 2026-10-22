@@ -71,14 +71,11 @@ export class RoleController {
   /**
    * 分配角色菜单与按钮权限
    */
-  @Put(':id/menus')
+  @Put('menus')
   @Permissions('system:role:edit')
   @OperLog({ title: '分配角色权限', businessType: 'UPDATE' })
-  async updateRoleMenus(
-    @Param('id') id: number,
-    @Body() dto: UpdateRoleMenusDto,
-  ) {
-    return this.roleService.updateRoleMenus(id, dto);
+  async updateRoleMenus(@Body() dto: UpdateRoleMenusDto) {
+    return this.roleService.updateRoleMenus(dto.roleId, dto);
   }
 
   /**

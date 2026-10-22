@@ -294,7 +294,7 @@ const saveRoleMenus = async () => {
     const halfCheckedKeys = menuTreeRef.value.getHalfCheckedKeys();
     const totalKeys = [...checkedKeys, ...halfCheckedKeys] as number[];
 
-    await updateRoleMenusApi(currentRole.value.id, totalKeys);
+    await updateRoleMenusApi({ roleId: currentRole.value.id, menuIds: totalKeys });
     ElMessage.success('角色菜单路由及按钮权限已成功保存');
     drawerVisible.value = false;
   } finally {

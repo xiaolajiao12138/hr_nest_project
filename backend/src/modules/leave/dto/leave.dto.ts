@@ -54,6 +54,10 @@ export class CreateLeaveDto {
 }
 
 export class AuditLeaveDto {
+  @IsNotEmpty({ message: '请假单ID不能为空' })
+  @IsInt({ message: '请假单ID必须为整数' })
+  id: number;
+
   @IsNotEmpty({ message: '审批动作不能为空' })
   @IsIn(['APPROVED', 'REJECTED'], {
     message: '审批动作仅限 APPROVED 或 REJECTED',

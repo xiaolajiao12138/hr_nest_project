@@ -13,11 +13,11 @@ export function updateUserApi(id: number, data: any) {
 export function deleteUserApi(id: number) {
   return request({ url: `/system/user/${id}`, method: 'delete' });
 }
-export function resetPasswordApi(id: number, data: any) {
-  return request({ url: `/system/user/${id}/reset-password`, method: 'patch', data });
+export function resetPasswordApi(data: { id: number; newPassword: string }) {
+  return request({ url: '/system/user/reset-password', method: 'put', data });
 }
-export function changeUserStatusApi(id: number, status: number) {
-  return request({ url: `/system/user/${id}/status`, method: 'patch', data: { status } });
+export function changeUserStatusApi(data: { id: number; status: number }) {
+  return request({ url: '/system/user/status', method: 'put', data });
 }
 
 // 角色管理
@@ -36,8 +36,8 @@ export function createRoleApi(data: any) {
 export function updateRoleApi(id: number, data: any) {
   return request({ url: `/system/role/${id}`, method: 'put', data });
 }
-export function updateRoleMenusApi(id: number, menuIds: number[]) {
-  return request({ url: `/system/role/${id}/menus`, method: 'put', data: { menuIds } });
+export function updateRoleMenusApi(data: { roleId: number; menuIds: number[] }) {
+  return request({ url: '/system/role/menus', method: 'put', data });
 }
 export function deleteRoleApi(id: number) {
   return request({ url: `/system/role/${id}`, method: 'delete' });

@@ -448,7 +448,11 @@ const submitAudit = async () => {
   if (!currentLeave.value) return;
   auditLoading.value = true;
   try {
-    await auditLeaveApi(currentLeave.value.id, auditForm);
+    await auditLeaveApi({
+      id: currentLeave.value.id,
+      action: auditForm.action,
+      auditRemark: auditForm.auditRemark,
+    });
     ElMessage.success("审批处理完成");
     auditDialogVisible.value = false;
     fetchData();

@@ -30,10 +30,10 @@ export function deleteDeptApi(id: number) {
   });
 }
 
-export function updateDeptSortApi(id: number, parentId: number, sort: number) {
+export function updateDeptSortApi(data: { id: number; parentId?: number; sort: number }) {
   return request({
-    url: `/hr/dept/${id}/sort`,
-    method: 'patch',
-    data: { parentId, sort },
+    url: '/hr/dept/sort',
+    method: 'put',
+    data,
   });
 }
