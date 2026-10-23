@@ -284,6 +284,7 @@ INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, m
 (201, 2, '部门管理', 'DeptManage', '/hr/dept', 'views/hr/dept/index.vue', 'OfficeBuilding', 1, 'C', 'hr:dept:list', false, false, 1),
 (202, 2, '员工档案', 'EmployeeManage', '/hr/employee', 'views/hr/employee/index.vue', 'Avatar', 2, 'C', 'hr:employee:list', false, false, 1),
 (203, 2, '请假审批', 'LeaveManage', '/hr/leave', 'views/hr/leave/index.vue', 'Tickets', 3, 'C', 'hr:leave:list', false, false, 1),
+(204, 2, '薪酬核算', 'SalaryManage', '/hr/salary', 'views/hr/salary/index.vue', 'Money', 4, 'C', 'hr:salary:list', false, false, 1),
 
 -- 员工档案按钮权限
 (210, 202, '员工新增', '', '', '', '', 1, 'F', 'hr:employee:add', false, false, 1),
@@ -295,6 +296,12 @@ INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, m
 -- 请假按钮权限
 (220, 203, '请假申请', '', '', '', '', 1, 'F', 'hr:leave:add', false, false, 1),
 (221, 203, '请假审批', '', '', '', '', 2, 'F', 'hr:leave:audit', false, false, 1),
+
+-- 薪资管理按钮权限
+(230, 204, '薪资核算', '', '', '', '', 1, 'F', 'hr:salary:calc', false, false, 1),
+(231, 204, '薪资调整', '', '', '', '', 2, 'F', 'hr:salary:edit', false, false, 1),
+(232, 204, '发薪确认', '', '', '', '', 3, 'F', 'hr:salary:confirm', false, false, 1),
+(233, 204, '薪资导出', '', '', '', '', 4, 'F', 'hr:salary:export', false, false, 1),
 
 -- 3. 系统权限管理目录
 (3, 0, '系统权限', 'SystemManage', '/system', 'Layout', 'Setting', 3, 'M', '', false, false, 1),
@@ -322,7 +329,7 @@ SELECT 1, id FROM sys_menu;
 
 -- 人事专员分配部分权限 (工作台、人事管理及其所有子菜单和按钮、系统公告)
 INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 2, id FROM sys_menu WHERE id IN (1, 2, 201, 202, 203, 210, 211, 212, 213, 214, 220, 221, 4, 401);
+SELECT 2, id FROM sys_menu WHERE id IN (1, 2, 201, 202, 203, 204, 210, 211, 212, 213, 214, 220, 221, 230, 231, 232, 233, 4, 401);
 
 -- 初始化数据字典
 INSERT INTO sys_dict (dict_name, dict_type, dict_label, dict_value, sort, status, remark) VALUES

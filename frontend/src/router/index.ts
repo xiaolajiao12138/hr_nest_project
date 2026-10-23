@@ -28,6 +28,18 @@ export const constantRoutes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    path: '/hr/salary',
+    component: Layout,
+    children: [
+      {
+        path: '',
+        name: 'SalaryManage',
+        component: () => import('@/views/hr/salary/index.vue'),
+        meta: { title: '薪酬核算管理', icon: 'Money' },
+      },
+    ],
+  },
 ];
 
 const router = createRouter({
