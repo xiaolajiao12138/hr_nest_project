@@ -10,7 +10,14 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { LeaveService } from './leave.service';
-import { CreateLeaveDto, AuditLeaveDto, QueryLeaveDto } from './dto/leave.dto';
+import {
+  CreateLeaveDto,
+  AuditLeaveDto,
+  QueryLeaveDto,
+  QueryAnnualLeaveDto,
+  AdjustAnnualLeaveDto,
+  InitAnnualLeaveDto,
+} from './dto/leave.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -114,5 +121,34 @@ export class LeaveController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.leaveService.auditLeave(dto.id, dto, user.userId);
+  }
+
+  /**
+   * 分页查询全员年假额度台账
+   */
+  @Get('annual/list')
+  @Permissions('hr:leave:list')
+  async getAnnualPage(@Query() query: QueryAnnualLeaveDto) {
+    return this.leaveService.findAnnualLeavePage(query);
+  }
+
+  /**
+   * 手动微调员工年假额度
+   */
+  @Put('annual/adjust')
+  @Permissions('hr:leave:audit')
+  @OperLog({ title: '手动微调员工年假额度', businessType: 'UPDATE' })
+  async adjustAnnual(@Body() dto: AdjustAnnualLeaveDto) {
+    return this.leaveService.adjustAnnualLeave(dto);
+  }
+
+  /**
+   * 批量为指定年度全员自动初始化开辟年假账户
+   */
+  @Post('annual/init-year')
+  @Permissions('hr:leave:audit')
+  @OperLog({ title: '全员年假额度年度初始化', businessType: 'INSERT' })
+  async initAnnualForYear(@Body() dto: InitAnnualLeaveDto) {
+    return this.leaveService.initAnnualLeaveForYear(dto);
   }
 }

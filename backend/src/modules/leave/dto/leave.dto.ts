@@ -68,3 +68,53 @@ export class AuditLeaveDto {
   @IsString()
   auditRemark?: string;
 }
+
+/**
+ * 全员年假额度台账分页查询 DTO
+ */
+export class QueryAnnualLeaveDto extends PageParamDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  year?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  deptId?: number;
+}
+
+/**
+ * 手动调整员工年假额度 DTO
+ */
+export class AdjustAnnualLeaveDto {
+  @IsNotEmpty({ message: '年假账户ID不能为空' })
+  @IsInt()
+  id: number;
+
+  @IsNotEmpty({ message: '总年假天数不能为空' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0, { message: '总年假天数不能小于0' })
+  totalDays: number;
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}
+
+/**
+ * 批量为指定年度全员初始化年假额度 DTO
+ */
+export class InitAnnualLeaveDto {
+  @IsNotEmpty({ message: '核算年份不能为空' })
+  @Type(() => Number)
+  @IsInt()
+  year: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  defaultDays?: number;
+}

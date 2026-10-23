@@ -43,4 +43,7 @@ export class AnnualLeave extends BaseEntity {
     comment: '剩余可用天数',
   })
   remainDays: number;
+
+  @Column({ length: 255, nullable: true, comment: '备注说明或调整记录' })
+  remark?: string;
 }

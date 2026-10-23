@@ -50,3 +50,36 @@ export function auditLeaveApi(data: { id: number; action: 'APPROVED' | 'REJECTED
     data,
   });
 }
+
+/**
+ * 分页查询全员年假额度台账列表
+ */
+export function getAnnualLeaveListApi(params: any) {
+  return request<{ list: any[]; total: number }>({
+    url: '/hr/leave/annual/list',
+    method: 'get',
+    params,
+  });
+}
+
+/**
+ * HR 管理员微调员工年假额度
+ */
+export function adjustAnnualLeaveApi(data: { id: number; totalDays: number; remark?: string }) {
+  return request({
+    url: '/hr/leave/annual/adjust',
+    method: 'put',
+    data,
+  });
+}
+
+/**
+ * 批量为指定年度全员初始化年假账户
+ */
+export function initAnnualLeaveForYearApi(data: { year: number; defaultDays?: number }) {
+  return request<{ createdCount: number }>({
+    url: '/hr/leave/annual/init-year',
+    method: 'post',
+    data,
+  });
+}

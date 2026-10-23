@@ -1,67 +1,136 @@
 <template>
   <div class="leave-page">
-    <BaseSearch :model="searchForm" @search="handleSearch" @reset="handleReset">
-      <el-form-item label="关键字" prop="keyword">
-        <el-input
-          v-model="searchForm.keyword"
-          placeholder="单号/员工姓名/事由"
-          clearable
-          style="width: 180px"
-        />
-      </el-form-item>
-      <el-form-item label="请假类型" prop="leaveType">
-        <el-select
-          v-model="searchForm.leaveType"
-          placeholder="全部类型"
-          clearable
-          style="width: 140px"
-        >
-          <el-option label="年假" value="ANNUAL" />
-          <el-option label="病假" value="SICK" />
-          <el-option label="事假" value="CASUAL" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="审批状态" prop="status">
-        <el-select
-          v-model="searchForm.status"
-          placeholder="全部状态"
-          clearable
-          style="width: 140px"
-        >
-          <el-option label="待审批" value="PENDING" />
-          <el-option label="已通过" value="APPROVED" />
-          <el-option label="已驳回" value="REJECTED" />
-        </el-select>
-      </el-form-item>
-    </BaseSearch>
+    <el-tabs v-model="activeTab" class="leave-tabs" @tab-change="handleTabChange">
+      <!-- Tab 1: 请假审批单记录 -->
+      <el-tab-pane label="请假审批记录" name="leaves">
+        <BaseSearch :model="searchForm" @search="handleSearch" @reset="handleReset">
+          <el-form-item label="关键字" prop="keyword">
+            <el-input
+              v-model="searchForm.keyword"
+              placeholder="单号/员工姓名/事由"
+              clearable
+              style="width: 180px"
+            />
+          </el-form-item>
+          <el-form-item label="请假类型" prop="leaveType">
+            <el-select
+              v-model="searchForm.leaveType"
+              placeholder="全部类型"
+              clearable
+              style="width: 140px"
+            >
+              <el-option label="年假" value="ANNUAL" />
+              <el-option label="病假" value="SICK" />
+              <el-option label="事假" value="CASUAL" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="审批状态" prop="status">
+            <el-select
+              v-model="searchForm.status"
+              placeholder="全部状态"
+              clearable
+              style="width: 140px"
+            >
+              <el-option label="待审批" value="PENDING" />
+              <el-option label="已通过" value="APPROVED" />
+              <el-option label="已驳回" value="REJECTED" />
+            </el-select>
+          </el-form-item>
+        </BaseSearch>
 
-    <BaseTable
-      :loading="loading"
-      :data="tableData"
-      :columns="columns"
-      :action-column="actionColumn"
-      :pagination="pagination"
-      @page-change="handlePageChange"
-      @size-change="handleSizeChange"
-    >
-      <template #toolbar>
-        <el-button
-          v-hasPerm="['hr:leave:add']"
-          type="primary"
-          :icon="Plus"
-          @click="handleApply"
+        <BaseTable
+          :loading="loading"
+          :data="tableData"
+          :columns="columns"
+          :action-column="actionColumn"
+          :pagination="pagination"
+          @page-change="handlePageChange"
+          @size-change="handleSizeChange"
         >
-          请假申请
-        </el-button>
-      </template>
+          <template #toolbar>
+            <el-button
+              v-hasPerm="['hr:leave:add']"
+              type="primary"
+              :icon="Plus"
+              @click="handleApply"
+            >
+              请假申请
+            </el-button>
+          </template>
 
-      <!-- 请假单号插槽 -->
-      <template #leaveNoSlot="{ row }">
-        <span style="font-family: monospace; font-weight: bold">{{
-          row.leaveNo
-        }}</span>
-      </template>
-    </BaseTable>
+          <!-- 请假单号插槽 -->
+          <template #leaveNoSlot="{ row }">
+            <span style="font-family: monospace; font-weight: bold">{{
+              row.leaveNo
+            }}</span>
+          </template>
+        </BaseTable>
+      </el-tab-pane>
+
+      <!-- Tab 2: 员工年假额度台账 (hr_annual 强事务联动) -->
+      <el-tab-pane label="员工年假额度台账" name="annual">
+        <BaseSearch :model="annualSearch" @search="handleAnnualSearch" @reset="handleAnnualReset">
+          <el-form-item label="核算年度">
+            <el-date-picker
+              v-model="annualYearStr"
+              type="year"
+              placeholder="选择年度"
+              value-format="YYYY"
+              style="width: 130px"
+              @change="handleAnnualYearChange"
+            />
+          </el-form-item>
+          <el-form-item label="所属部门">
+            <el-select
+              v-model="annualSearch.deptId"
+              placeholder="全部部门"
+              clearable
+              style="width: 150px"
+            >
+              <el-option
+                v-for="d in deptOptions"
+                :key="d.id"
+                :label="d.deptName"
+                :value="d.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="关键字">
+            <el-input
+              v-model="annualSearch.keyword"
+              placeholder="工号/姓名/岗位"
+              clearable
+              style="width: 170px"
+            />
+          </el-form-item>
+        </BaseSearch>
+
+        <BaseTable
+          :loading="annualLoading"
+          :data="annualTableData"
+          :columns="annualColumns"
+          :action-column="annualActionColumn"
+          :pagination="annualPagination"
+          @page-change="handleAnnualPageChange"
+          @size-change="handleAnnualSizeChange"
+        >
+          <template #toolbar>
+            <el-button
+              v-hasPerm="['hr:leave:audit']"
+              type="success"
+              plain
+              :icon="Calendar"
+              @click="openInitAnnualDialog"
+            >
+              全员年度额度批量开户/初始化
+            </el-button>
+            <span class="annual-toolbar-tip">
+              数据源自 <code>hr_annual</code> 强事务表：申请年假时悲观排他锁扣减，审批驳回时原路返还
+            </span>
+          </template>
+        </BaseTable>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 请假申请弹窗 -->
     <BaseDialog
@@ -193,26 +262,109 @@
         </el-form>
       </div>
     </BaseDialog>
+
+    <!-- 微调年假额度弹窗 -->
+    <el-dialog v-model="adjustDialogVisible" title="微调员工年假额度" width="500px">
+      <el-form label-width="110px">
+        <el-form-item label="员工信息">
+          <el-input :model-value="`${currentAdjustRow?.empName} (${currentAdjustRow?.empNo})`" disabled />
+        </el-form-item>
+        <el-form-item label="核算年份">
+          <el-input :model-value="`${currentAdjustRow?.year} 年度`" disabled />
+        </el-form-item>
+        <el-form-item label="已使用年假">
+          <el-tag type="info">{{ currentAdjustRow?.usedDays }} 天</el-tag>
+        </el-form-item>
+        <el-form-item label="总年假天数">
+          <el-input-number
+            v-model="adjustForm.totalDays"
+            :min="0"
+            :step="0.5"
+            :precision="1"
+            style="width: 150px"
+          />
+          <span style="margin-left: 8px; color: #64748b">天</span>
+        </el-form-item>
+        <el-form-item label="调整后剩余">
+          <span style="font-weight: 700; color: #10b981; font-size: 15px">
+            {{ previewRemainDays }} 天
+          </span>
+        </el-form-item>
+        <el-form-item label="调整原因备注">
+          <el-input
+            v-model="adjustForm.remark"
+            type="textarea"
+            :rows="2"
+            placeholder="例如: 员工工龄增加折算 +2 天，或年度结转"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adjustLoading" @click="handleConfirmAdjust">
+          确认调整
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量全员开户初始化年假对话框 -->
+    <el-dialog v-model="initYearDialogVisible" title="批量为在职员工开辟年度年假账户" width="480px">
+      <el-alert
+        type="info"
+        :closable="false"
+        title="系统将检索全公司所有正常在职员工，若在所选年份尚未开立年假账户，则自动按基准天数批量完成开户。"
+        style="margin-bottom: 16px"
+      />
+      <el-form label-width="110px">
+        <el-form-item label="核算年份">
+          <el-input-number v-model="initYearForm.year" :min="2020" :max="2099" style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="默认基准天数">
+          <el-input-number
+            v-model="initYearForm.defaultDays"
+            :min="1"
+            :step="0.5"
+            :precision="1"
+            style="width: 150px"
+          />
+          <span style="margin-left: 8px; color: #64748b">天 / 人</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="initYearDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="initYearLoading" @click="handleConfirmInitYear">
+          确认批量开户
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, h } from "vue";
-import { Plus } from "@element-plus/icons-vue";
+import { ref, reactive, onMounted, computed, h } from "vue";
+import { Plus, Calendar } from "@element-plus/icons-vue";
 import { ElMessage, FormInstance, ElTag } from "element-plus";
 import BaseTable, { TableColumn, ActionColumnConfig } from "@/components/BaseTable.vue";
 import BaseSearch from "@/components/BaseSearch.vue";
 import BaseDialog from "@/components/BaseDialog.vue";
 import { usePagination } from "@/hooks/usePagination";
+import { formatDateTime } from "@/utils/date";
 import {
   getLeaveListApi,
   getLeaveDetailApi,
   applyLeaveApi,
   auditLeaveApi,
   getAnnualBalanceApi,
+  getAnnualLeaveListApi,
+  adjustAnnualLeaveApi,
+  initAnnualLeaveForYearApi,
 } from "@/api/leave";
 import { getEmployeeListApi } from "@/api/employee";
+import { getDeptTreeApi } from "@/api/dept";
 
+const activeTab = ref("leaves");
+
+// ------------------- 请假记录列表状态 -------------------
 const loading = ref(false);
 const tableData = ref<any[]>([]);
 const employeeOptions = ref<any[]>([]);
@@ -227,7 +379,7 @@ const { pagination, handlePageChange, handleSizeChange, resetPage } =
   usePagination(() => fetchData());
 
 const columns: TableColumn[] = [
-  { prop: "leaveNo", label: "请假单号", slot: "leaveNoSlot", width: 170 },
+  { prop: "leaveNo", label: "请假单号", slot: "leaveNoSlot", minWidth: 160 },
   { prop: "empName", label: "申请人", width: 110 },
   {
     prop: "leaveType",
@@ -288,10 +440,9 @@ const columns: TableColumn[] = [
               : "待审批",
       ),
   },
-  { prop: "auditRemark", label: "审批批注", width: 140 },
+  { prop: "auditRemark", label: "审批批注", minWidth: 140 },
 ];
 
-// 企业级操作列配置 (通过 actionColumn 集中驱动)
 const actionColumn: ActionColumnConfig = {
   label: "操作",
   width: 120,
@@ -336,8 +487,103 @@ const auditForm = reactive({
   auditRemark: "",
 });
 
+// ------------------- 年假额度台账状态 -------------------
+const annualLoading = ref(false);
+const annualTableData = ref<any[]>([]);
+const deptOptions = ref<any[]>([]);
+const annualYearStr = ref(String(new Date().getFullYear()));
+
+const annualSearch = reactive({
+  year: new Date().getFullYear(),
+  deptId: undefined as number | undefined,
+  keyword: "",
+});
+
+const {
+  pagination: annualPagination,
+  handlePageChange: handleAnnualPageChange,
+  handleSizeChange: handleAnnualSizeChange,
+  resetPage: resetAnnualPage,
+} = usePagination(() => fetchAnnualData());
+
+const annualColumns: TableColumn[] = [
+  { prop: "empNo", label: "员工工号", width: 110 },
+  { prop: "empName", label: "员工姓名", minWidth: 120 },
+  { prop: "deptName", label: "所属部门", minWidth: 130 },
+  { prop: "post", label: "岗位职务", minWidth: 120 },
+  { prop: "year", label: "年度", width: 85, formatter: (val) => `${val}年` },
+  {
+    prop: "totalDays",
+    label: "总年假额度",
+    width: 110,
+    formatter: (val) => `${Number(val || 0).toFixed(1)} 天`,
+  },
+  {
+    prop: "usedDays",
+    label: "已休年假",
+    width: 100,
+    formatter: (val) => `${Number(val || 0).toFixed(1)} 天`,
+  },
+  {
+    prop: "remainDays",
+    label: "剩余可用",
+    width: 110,
+    render: ({ row }) =>
+      h(
+        "span",
+        { style: "font-weight: 700; color: #10b981; font-size: 14px" },
+        `${Number(row.remainDays || 0).toFixed(1)} 天`,
+      ),
+  },
+  { prop: "remark", label: "备注/调整说明", minWidth: 160 },
+  {
+    prop: "updatedAt",
+    label: "最后变动时间",
+    width: 175,
+    formatter: (val) => formatDateTime(val) || "-",
+  },
+];
+
+const annualActionColumn: ActionColumnConfig = {
+  label: "操作",
+  width: 110,
+  fixed: "right",
+  buttons: (row) => [
+    {
+      label: "微调额度",
+      type: "primary",
+      perm: ["hr:leave:audit"],
+      onClick: () => openAdjustDialog(row),
+    },
+  ],
+};
+
+// 微调年假额度状态
+const adjustDialogVisible = ref(false);
+const adjustLoading = ref(false);
+const currentAdjustRow = ref<any>(null);
+const adjustForm = reactive({
+  id: 0,
+  totalDays: 5.0,
+  remark: "",
+});
+
+const previewRemainDays = computed(() => {
+  if (!currentAdjustRow.value) return 0;
+  const used = Number(currentAdjustRow.value.usedDays || 0);
+  return Number(Math.max(0, adjustForm.totalDays - used).toFixed(1));
+});
+
+// 批量开户初始化年假状态
+const initYearDialogVisible = ref(false);
+const initYearLoading = ref(false);
+const initYearForm = reactive({
+  year: new Date().getFullYear(),
+  defaultDays: 5.0,
+});
+
+// ------------------- 数据获取与逻辑处理 -------------------
 const fetchData = async () => {
-  console.log(pagination);
   loading.value = true;
   try {
     const params = {
@@ -353,6 +599,44 @@ const fetchData = async () => {
   }
 };
 
+const fetchAnnualData = async () => {
+  annualLoading.value = true;
+  try {
+    const params = {
+      year: annualSearch.year,
+      deptId: annualSearch.deptId,
+      keyword: annualSearch.keyword,
+      page: annualPagination.page,
+      pageSize: annualPagination.pageSize,
+    };
+    const res: any = await getAnnualLeaveListApi(params);
+    annualTableData.value = res.list || [];
+    annualPagination.total = res.total || 0;
+  } finally {
+    annualLoading.value = false;
+  }
+};
+
+const flattenTree = (tree: any[]): any[] => {
+  let list: any[] = [];
+  tree.forEach((item) => {
+    list.push(item);
+    if (item.children && item.children.length > 0) {
+      list = list.concat(flattenTree(item.children));
+    }
+  });
+  return list;
+};
+
+const loadDepts = async () => {
+  try {
+    const res: any = await getDeptTreeApi();
+    deptOptions.value = flattenTree(res || []);
+  } catch {
+    deptOptions.value = [];
+  }
+};
+
 const fetchEmployees = async () => {
   const res: any = await getEmployeeListApi({
     page: 1,
@@ -360,6 +644,15 @@ const fetchEmployees = async () => {
     status: 1,
   });
   employeeOptions.value = res.list || [];
+};
+
+const handleTabChange = (tab: string | number) => {
+  if (tab === "leaves") {
+    fetchData();
+  } else if (tab === "annual") {
+    loadDepts();
+    fetchAnnualData();
+  }
 };
 
 const handleSearch = () => {
@@ -375,6 +668,25 @@ const handleReset = () => {
   fetchData();
 };
 
+const handleAnnualSearch = () => {
+  resetAnnualPage();
+  fetchAnnualData();
+};
+
+const handleAnnualReset = () => {
+  annualSearch.deptId = undefined;
+  annualSearch.keyword = "";
+  annualSearch.year = new Date().getFullYear();
+  annualYearStr.value = String(annualSearch.year);
+  resetAnnualPage();
+  fetchAnnualData();
+};
+
+const handleAnnualYearChange = (val: string) => {
+  annualSearch.year = val ? parseInt(val, 10) : new Date().getFullYear();
+  handleAnnualSearch();
+};
+
 const handleApply = async () => {
   applyForm.empId = undefined;
   applyForm.leaveType = "ANNUAL";
@@ -384,7 +696,6 @@ const handleApply = async () => {
   annualInfo.value = null;
   applyDialogVisible.value = true;
 
-  // 懒加载：首次打开请假弹窗时拉取员工下拉数据
   if (employeeOptions.value.length === 0) {
     await fetchEmployees();
   }
@@ -401,7 +712,7 @@ const checkAnnualBalance = async () => {
     try {
       const res: any = await getAnnualBalanceApi(applyForm.empId);
       annualInfo.value = res;
-    } catch (e) {
+    } catch {
       annualInfo.value = null;
     }
   } else {
@@ -435,6 +746,9 @@ const submitApply = async () => {
       ElMessage.success("请假单提交成功，若为年假已原子化预扣减年假额度");
       applyDialogVisible.value = false;
       fetchData();
+      if (activeTab.value === "annual") {
+        fetchAnnualData();
+      }
     } finally {
       submitLoading.value = false;
     }
@@ -471,14 +785,59 @@ const submitAudit = async () => {
     ElMessage.success("审批处理完成");
     auditDialogVisible.value = false;
     fetchData();
+    if (activeTab.value === "annual") {
+      fetchAnnualData();
+    }
   } finally {
     auditLoading.value = false;
   }
 };
 
-const formatDateTime = (val: string) => {
-  if (!val) return "";
-  return new Date(val).toLocaleString("zh-CN", { hour12: false });
+// ------------------- 年假微调与开户处理 -------------------
+const openAdjustDialog = (row: any) => {
+  currentAdjustRow.value = row;
+  adjustForm.id = row.id;
+  adjustForm.totalDays = Number(row.totalDays);
+  adjustForm.remark = row.remark || "";
+  adjustDialogVisible.value = true;
+};
+
+const handleConfirmAdjust = async () => {
+  if (!currentAdjustRow.value) return;
+  adjustLoading.value = true;
+  try {
+    await adjustAnnualLeaveApi({
+      id: adjustForm.id,
+      totalDays: adjustForm.totalDays,
+      remark: adjustForm.remark,
+    });
+    ElMessage.success(`员工【${currentAdjustRow.value.empName}】年假额度已成功调整`);
+    adjustDialogVisible.value = false;
+    fetchAnnualData();
+  } finally {
+    adjustLoading.value = false;
+  }
+};
+
+const openInitAnnualDialog = () => {
+  initYearForm.year = annualSearch.year;
+  initYearForm.defaultDays = 5.0;
+  initYearDialogVisible.value = true;
+};
+
+const handleConfirmInitYear = async () => {
+  initYearLoading.value = true;
+  try {
+    const res: any = await initAnnualLeaveForYearApi({
+      year: initYearForm.year,
+      defaultDays: initYearForm.defaultDays,
+    });
+    ElMessage.success(`开户完成：本次为 ${res.createdCount} 位新员工初始化了 ${initYearForm.year} 年假账户`);
+    initYearDialogVisible.value = false;
+    fetchAnnualData();
+  } finally {
+    initYearLoading.value = false;
+  }
 };
 
 onMounted(() => {
@@ -486,4 +845,26 @@ onMounted(() => {
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.leave-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.leave-tabs {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 12px 16px 20px 16px;
+}
+.annual-toolbar-tip {
+  font-size: 13px;
+  color: #64748b;
+  margin-left: 12px;
+}
+.annual-toolbar-tip code {
+  background-color: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #0f172a;
+}
+</style>

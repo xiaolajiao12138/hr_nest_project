@@ -5,7 +5,14 @@ import { Leave } from './entities/leave.entity';
 import { AnnualLeave } from './entities/annual.entity';
 import { Employee } from '../employee/entities/employee.entity';
 import { BaseService } from '../../common/base/base.service';
-import { CreateLeaveDto, AuditLeaveDto, QueryLeaveDto } from './dto/leave.dto';
+import {
+  CreateLeaveDto,
+  AuditLeaveDto,
+  QueryLeaveDto,
+  QueryAnnualLeaveDto,
+  AdjustAnnualLeaveDto,
+  InitAnnualLeaveDto,
+} from './dto/leave.dto';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { PageResultDto } from '../../common/dto/page-result.dto';
 import { SseService } from '../sse/sse.service';
@@ -322,5 +329,115 @@ export class LeaveService extends BaseService<Leave> {
       throw new BusinessException('请假单不存在');
     }
     return leave;
+  }
+
+  /**
+   * 分页查询全员年假额度台账列表
+   */
+  async findAnnualLeavePage(query: QueryAnnualLeaveDto): Promise<PageResultDto<any>> {
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
+    const year = query.year || new Date().getFullYear();
+
+    const qb = this.annualRepo
+      .createQueryBuilder('annual')
+      .leftJoinAndSelect('annual.employee', 'emp')
+      .leftJoinAndSelect('emp.dept', 'dept')
+      .where('annual.year = :year', { year })
+      .orderBy('emp.empNo', 'ASC')
+      .addOrderBy('annual.id', 'DESC')
+      .skip(skip)
+      .take(pageSize);
+
+    if (query.deptId) {
+      qb.andWhere('emp.deptId = :deptId', { deptId: query.deptId });
+    }
+
+    if (query.keyword) {
+      qb.andWhere('(emp.name LIKE :kw OR emp.empNo LIKE :kw OR emp.post LIKE :kw)', {
+        kw: `%${query.keyword}%`,
+      });
+    }
+
+    const [list, total] = await qb.getManyAndCount();
+
+    const formattedList = list.map((item) => ({
+      id: item.id,
+      empId: item.empId,
+      empNo: item.employee?.empNo || '-',
+      empName: item.employee?.name || '-',
+      deptName: item.employee?.dept?.deptName || '-',
+      post: item.employee?.post || '-',
+      year: item.year,
+      totalDays: Number(item.totalDays),
+      usedDays: Number(item.usedDays),
+      remainDays: Number(item.remainDays),
+      remark: item.remark || '',
+      updatedAt: item.updatedAt,
+    }));
+
+    return PageResultDto.create(formattedList, total, page, pageSize);
+  }
+
+  /**
+   * HR 管理员手动微调员工年假额度
+   */
+  async adjustAnnualLeave(dto: AdjustAnnualLeaveDto): Promise<AnnualLeave> {
+    const record = await this.annualRepo.findOne({
+      where: { id: dto.id },
+      relations: ['employee'],
+    });
+
+    if (!record) {
+      throw new BusinessException('年假账户记录不存在');
+    }
+
+    const newTotal = Number(dto.totalDays);
+    const used = Number(record.usedDays);
+
+    record.totalDays = newTotal;
+    record.remainDays = Number(Math.max(0, newTotal - used).toFixed(1));
+    if (dto.remark !== undefined) {
+      record.remark = dto.remark;
+    }
+
+    return this.annualRepo.save(record);
+  }
+
+  /**
+   * 批量为指定年度全员自动开辟初始化年假账户
+   */
+  async initAnnualLeaveForYear(dto: InitAnnualLeaveDto): Promise<{ createdCount: number }> {
+    const targetYear = dto.year || new Date().getFullYear();
+    const defaultDays = dto.defaultDays !== undefined ? Number(dto.defaultDays) : 5.0;
+
+    const employees = await this.empRepo.find({ where: { status: 1 } });
+    const existing = await this.annualRepo.find({
+      where: { year: targetYear },
+      select: ['empId'],
+    });
+    const existingSet = new Set(existing.map((e) => e.empId));
+
+    const toInsert: AnnualLeave[] = [];
+    for (const emp of employees) {
+      if (!existingSet.has(emp.id)) {
+        const item = this.annualRepo.create({
+          empId: emp.id,
+          year: targetYear,
+          totalDays: defaultDays,
+          usedDays: 0.0,
+          remainDays: defaultDays,
+          remark: `系统初始化自动分配 ${defaultDays} 天`,
+        });
+        toInsert.push(item);
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await this.annualRepo.save(toInsert);
+    }
+
+    return { createdCount: toInsert.length };
   }
 }
