@@ -56,6 +56,18 @@ export class NoticeController {
   }
 
   /**
+   * 根据公告主键 ID 获取公告完整详情及附件信息 (Query 传参规范: ?id=xxx)
+   *
+   * @param id 公告记录主键 ID
+   * @returns 返回公告详情实体（关联附件信息）
+   */
+  @Get('detail')
+  @Permissions('ops:notice:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.noticeService.findById(id, ['file']);
+  }
+
+  /**
    * 根据公告主键 ID 获取公告完整详情及附件信息
    *
    * @param id 公告记录主键 ID

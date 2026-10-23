@@ -7,6 +7,13 @@ export function getNoticeListApi(params: any) {
 export function getLatestNoticesApi() {
   return request({ url: '/ops/notice/latest', method: 'get' });
 }
+export function getNoticeDetailApi(id: number) {
+  return request({
+    url: '/ops/notice/detail',
+    method: 'get',
+    params: { id },
+  });
+}
 export function createNoticeApi(data: any) {
   return request({ url: '/ops/notice', method: 'post', data });
 }

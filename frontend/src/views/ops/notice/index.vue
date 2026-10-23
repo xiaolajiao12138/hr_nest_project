@@ -40,33 +40,35 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
-        <el-form-item label="公告标题" prop="title">
-          <el-input v-model="formData.title" placeholder="请输入公告标题" />
-        </el-form-item>
-        <el-form-item label="公告类型" prop="noticeType">
-          <el-radio-group v-model="formData.noticeType">
-            <el-radio label="NOTICE">内部通知</el-radio>
-            <el-radio label="ANNOUNCEMENT">全员公告</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="公告正文" prop="content">
-          <el-input
-            v-model="formData.content"
-            type="textarea"
-            :rows="5"
-            placeholder="请输入正文内容"
-          />
-        </el-form-item>
-        <el-form-item label="相关附件">
-          <BaseUpload
-            v-model="formData.fileId"
-            v-model:file-url="attachmentUrl"
-            folder="notice"
-            tip-text="上传公告附件"
-          />
-        </el-form-item>
-      </el-form>
+      <div v-loading="detailLoading">
+        <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
+          <el-form-item label="公告标题" prop="title">
+            <el-input v-model="formData.title" placeholder="请输入公告标题" />
+          </el-form-item>
+          <el-form-item label="公告类型" prop="noticeType">
+            <el-radio-group v-model="formData.noticeType">
+              <el-radio label="NOTICE">内部通知</el-radio>
+              <el-radio label="ANNOUNCEMENT">全员公告</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="公告正文" prop="content">
+            <el-input
+              v-model="formData.content"
+              type="textarea"
+              :rows="5"
+              placeholder="请输入正文内容"
+            />
+          </el-form-item>
+          <el-form-item label="相关附件">
+            <BaseUpload
+              v-model="formData.fileId"
+              v-model:file-url="attachmentUrl"
+              folder="notice"
+              tip-text="上传公告附件"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -82,6 +84,7 @@ import BaseUpload from '@/components/BaseUpload.vue';
 import { usePagination } from '@/hooks/usePagination';
 import {
   getNoticeListApi,
+  getNoticeDetailApi,
   createNoticeApi,
   updateNoticeApi,
   changeNoticeStatusApi,
@@ -149,6 +152,7 @@ const actionColumn: ActionColumnConfig = {
 const dialogVisible = ref(false);
 const dialogTitle = ref('发布公告');
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 const attachmentUrl = ref('');
@@ -206,18 +210,35 @@ const handleAdd = () => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑系统公告
+ * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据公告 ID 异步请求后端独立详情接口获取最新完整正文与附件
+ * 
+ * @param row 列表当前点击行（仅提取 row.id）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = '编辑公告';
-  Object.assign(formData, {
-    title: row.title,
-    content: row.content,
-    noticeType: row.noticeType,
-    fileId: row.fileId,
-    status: row.status,
-  });
-  attachmentUrl.value = row.file?.fileUrl || '';
+  attachmentUrl.value = '';
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const detail: any = await getNoticeDetailApi(row.id);
+    Object.assign(formData, {
+      title: detail.title,
+      content: detail.content,
+      noticeType: detail.noticeType,
+      fileId: detail.fileId,
+      status: detail.status,
+    });
+    attachmentUrl.value = detail.file?.fileUrl || '';
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取公告详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 // 公告状态修改前钩子 (异步保护，并在更新成功后立即调用搜索/列表接口刷新数据)

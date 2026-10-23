@@ -23,7 +23,8 @@ export class NoticeService extends BaseService<Notice> {
   }
 
   /**
-   * 分页查询系统公告与通知列表
+   * 分页查询系统公告与通知列表（轻量级列表模式）
+   * 列表仅返回标题、类型、发布人与时间等元数据，附件与富文本详情通过独立详情接口按需下发
    *
    * @param query 查询参数对象，包含分页信息、模糊关键字、通知类型、发布状态
    * @returns 返回包含数据列表、总数、当前页及页容量的统一分页对象
@@ -33,10 +34,9 @@ export class NoticeService extends BaseService<Notice> {
     const pageSize = Number(query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
 
-    // 构建 QueryBuilder，关联查询上传附件信息并按 ID 倒序排列
+    // 轻量构建 QueryBuilder，不冗余联查附件大表，按 ID 倒序排列
     const qb = this.noticeRepo
       .createQueryBuilder('notice')
-      .leftJoinAndSelect('notice.file', 'file')
       .skip(skip)
       .take(pageSize)
       .orderBy('notice.id', 'DESC');
