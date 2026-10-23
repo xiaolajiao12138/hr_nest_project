@@ -8,6 +8,14 @@ export function getCaptchaApi() {
   });
 }
 
+// 获取 RSA 传输加密公钥
+export function getRsaPublicKeyApi() {
+  return request<{ publicKey: string }>({
+    url: '/auth/rsa-public-key',
+    method: 'get',
+  });
+}
+
 // 登录
 export function loginApi(data: any) {
   return request({

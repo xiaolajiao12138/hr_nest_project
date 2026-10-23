@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { loginApi, getUserInfoApi } from '@/api/auth';
+import { encryptRsa } from '@/utils/rsa';
 import {
   getToken,
   setToken,
@@ -20,7 +21,14 @@ export const useUserStore = defineStore('user', {
   actions: {
     // 登录
     async login(loginForm: any) {
-      const res: any = await loginApi(loginForm);
+      // 密码采用 RSA 公钥非对称加密传输，防止网络抓包密码泄露
+      const encryptedPassword = await encryptRsa(loginForm.password);
+      const payload = {
+        ...loginForm,
+        password: encryptedPassword,
+      };
+
+      const res: any = await loginApi(payload);
       this.token = res.accessToken;
       setToken(res.accessToken);
       setRefreshToken(res.refreshToken);

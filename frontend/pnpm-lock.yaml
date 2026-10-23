@@ -20,6 +20,9 @@ importers:
       element-plus:
         specifier: ^2.9.2
         version: 2.14.7(vue@3.5.44(typescript@5.7.3))
+      jsencrypt:
+        specifier: ^3.5.4
+        version: 3.5.4
       nprogress:
         specifier: ^0.2.0
         version: 0.2.0
@@ -741,6 +744,9 @@ packages:
   is-glob@4.0.3:
     resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
     engines: {node: '>=0.10.0'}
+
+  jsencrypt@3.5.4:
+    resolution: {integrity: sha512-kNjfYEMNASxrDGsmcSQh/rUTmcoRfSUkxnAz+MMywM8jtGu+fFEZ3nJjHM58zscVnwR0fYmG9sGkTDjqUdpiwA==}
 
   lodash-es@4.18.1:
     resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
@@ -1506,6 +1512,8 @@ snapshots:
     dependencies:
       is-extglob: 2.1.1
     optional: true
+
+  jsencrypt@3.5.4: {}
 
   lodash-es@4.18.1: {}
 
