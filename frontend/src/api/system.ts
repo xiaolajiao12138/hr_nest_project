@@ -4,6 +4,9 @@ import request from '@/utils/request';
 export function getUserListApi(params: any) {
   return request({ url: '/system/user/list', method: 'get', params });
 }
+export function getUserDetailApi(id: number) {
+  return request({ url: '/system/user/detail', method: 'get', params: { id } });
+}
 export function createUserApi(data: any) {
   return request({ url: '/system/user', method: 'post', data });
 }
@@ -23,6 +26,9 @@ export function changeUserStatusApi(data: { id: number; status: number }) {
 // 角色管理
 export function getRoleListApi(params: any) {
   return request({ url: '/system/role/list', method: 'get', params });
+}
+export function getRoleDetailApi(id: number) {
+  return request({ url: '/system/role/detail', method: 'get', params: { id } });
 }
 export function getAllRolesApi() {
   return request({ url: '/system/role/all', method: 'get' });
@@ -46,6 +52,9 @@ export function deleteRoleApi(id: number) {
 // 菜单管理
 export function getMenuTreeApi() {
   return request({ url: '/system/menu/tree', method: 'get' });
+}
+export function getMenuDetailApi(id: number) {
+  return request({ url: '/system/menu/detail', method: 'get', params: { id } });
 }
 export function createMenuApi(data: any) {
   return request({ url: '/system/menu', method: 'post', data });

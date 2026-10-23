@@ -85,82 +85,84 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="110px">
-        <el-form-item label="上级菜单">
-          <el-tree-select
-            v-model="formData.parentId"
-            :data="treeSelectData"
-            :props="{ label: 'title', value: 'id', children: 'children' }"
-            check-strictly
-            placeholder="请选择上级菜单(不选则为顶级)"
-            clearable
-            style="width: 100%"
-          />
-        </el-form-item>
+      <div v-loading="detailLoading">
+        <el-form ref="formRef" :model="formData" :rules="formRules" label-width="110px">
+          <el-form-item label="上级菜单">
+            <el-tree-select
+              v-model="formData.parentId"
+              :data="treeSelectData"
+              :props="{ label: 'title', value: 'id', children: 'children' }"
+              check-strictly
+              placeholder="请选择上级菜单(不选则为顶级)"
+              clearable
+              style="width: 100%"
+            />
+          </el-form-item>
 
-        <el-form-item label="菜单类型" prop="menuType">
-          <el-radio-group v-model="formData.menuType">
-            <el-radio label="M">目录 (M)</el-radio>
-            <el-radio label="C">菜单/路由 (C)</el-radio>
-            <el-radio label="F">按钮权限 (F)</el-radio>
-          </el-radio-group>
-        </el-form-item>
+          <el-form-item label="菜单类型" prop="menuType">
+            <el-radio-group v-model="formData.menuType">
+              <el-radio label="M">目录 (M)</el-radio>
+              <el-radio label="C">菜单/路由 (C)</el-radio>
+              <el-radio label="F">按钮权限 (F)</el-radio>
+            </el-radio-group>
+          </el-form-item>
 
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="菜单标题" prop="title">
-              <el-input v-model="formData.title" placeholder="例如 员工档案" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="路由英文名" prop="name">
-              <el-input v-model="formData.name" placeholder="例如 EmployeeManage" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="菜单标题" prop="title">
+                <el-input v-model="formData.title" placeholder="例如 员工档案" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="路由英文名" prop="name">
+                <el-input v-model="formData.name" placeholder="例如 EmployeeManage" />
+              </el-form-item>
+            </el-col>
+          </el-row>
 
-        <el-row v-if="formData.menuType !== 'F'" :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="路由路径 path" prop="path">
-              <el-input v-model="formData.path" placeholder="例如 /hr/employee" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="组件 component" prop="component">
-              <el-input
-                v-model="formData.component"
-                placeholder="例如 Layout 或 views/hr/employee/index.vue"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
+          <el-row v-if="formData.menuType !== 'F'" :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="路由路径 path" prop="path">
+                <el-input v-model="formData.path" placeholder="例如 /hr/employee" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="组件 component" prop="component">
+                <el-input
+                  v-model="formData.component"
+                  placeholder="例如 Layout 或 views/hr/employee/index.vue"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
 
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="Element图标" prop="icon">
-              <el-input v-model="formData.icon" placeholder="例如 UserFilled, Setting" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="权限标识 perms" prop="perms">
-              <el-input v-model="formData.perms" placeholder="例如 hr:employee:add" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="Element图标" prop="icon">
+                <el-input v-model="formData.icon" placeholder="例如 UserFilled, Setting" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="权限标识 perms" prop="perms">
+                <el-input v-model="formData.perms" placeholder="例如 hr:employee:add" />
+              </el-form-item>
+            </el-col>
+          </el-row>
 
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="显示排序" prop="sort">
-              <el-input-number v-model="formData.sort" :min="0" :max="999" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="侧边栏隐藏" prop="isHidden">
-              <el-switch v-model="formData.isHidden" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="显示排序" prop="sort">
+                <el-input-number v-model="formData.sort" :min="0" :max="999" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="侧边栏隐藏" prop="isHidden">
+                <el-switch v-model="formData.isHidden" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -172,6 +174,7 @@ import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
 import BaseDialog from '@/components/BaseDialog.vue';
 import {
   getMenuTreeApi,
+  getMenuDetailApi,
   createMenuApi,
   updateMenuApi,
   deleteMenuApi,
@@ -182,6 +185,7 @@ const menuTree = ref<any[]>([]);
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增菜单路由');
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 
@@ -252,22 +256,38 @@ const handleAddChild = (row: any) => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑菜单路由
+ * 遵循企业级架构规范：点击编辑不从树节点行数据拷贝，而是根据菜单 ID 异步请求后端独立详情接口获取最新完整路由属性
+ * 
+ * @param row 列表当前点击行（仅提取 row.id 与 title）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = `编辑菜单路由【${row.title}】`;
-  Object.assign(formData, {
-    parentId: row.parentId,
-    title: row.title,
-    name: row.name,
-    path: row.path,
-    component: row.component,
-    icon: row.icon,
-    menuType: row.menuType,
-    perms: row.perms,
-    sort: row.sort,
-    isHidden: Boolean(row.isHidden),
-  });
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const detail: any = await getMenuDetailApi(row.id);
+    Object.assign(formData, {
+      parentId: detail.parentId,
+      title: detail.title,
+      name: detail.name,
+      path: detail.path,
+      component: detail.component,
+      icon: detail.icon,
+      menuType: detail.menuType,
+      perms: detail.perms,
+      sort: detail.sort,
+      isHidden: Boolean(detail.isHidden),
+    });
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取菜单详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const handleDelete = (row: any) => {

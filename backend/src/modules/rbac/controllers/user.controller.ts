@@ -117,6 +117,19 @@ export class UserController {
   }
 
   /**
+   * 根据主键 ID 获取用户完整详情 (Query 传参规范: ?id=xxx)
+   * 自动加载关联的角色实体 roles 与所属部门实体 dept
+   *
+   * @param id 用户主键 ID
+   * @returns 返回关联后的用户完整实体
+   */
+  @Get('detail')
+  @Permissions('system:user:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.userService.findById(id, ['roles', 'dept']);
+  }
+
+  /**
    * 根据主键 ID 获取用户完整详情
    * 自动加载关联的角色实体 roles 与所属部门实体 dept
    *

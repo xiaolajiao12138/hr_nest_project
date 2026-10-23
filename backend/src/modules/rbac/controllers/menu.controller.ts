@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -35,6 +36,18 @@ export class MenuController {
   @Permissions('system:menu:list')
   async getMenuTree() {
     return this.menuService.getMenuTree();
+  }
+
+  /**
+   * 根据菜单主键 ID 获取菜单详情 (Query 传参规范: ?id=xxx)
+   *
+   * @param id 菜单记录主键 ID
+   * @returns 返回菜单详细信息实体
+   */
+  @Get('detail')
+  @Permissions('system:menu:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.menuService.findById(id);
   }
 
   /**

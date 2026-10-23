@@ -40,59 +40,61 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-width="90px"
-      >
-        <el-form-item label="登录账号" prop="username">
-          <el-input
-            v-model="formData.username"
-            placeholder="请输入登录用户名"
-            :disabled="!!currentId"
-          />
-        </el-form-item>
-        <el-form-item v-if="!currentId" label="登录密码" prop="password">
-          <el-input
-            v-model="formData.password"
-            type="password"
-            placeholder="请输入登录密码(最少6位)"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item label="真实姓名" prop="realName">
-          <el-input v-model="formData.realName" placeholder="请输入姓名" />
-        </el-form-item>
-        <el-form-item label="联系电话" prop="phone">
-          <el-input v-model="formData.phone" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="所属部门" prop="deptId">
-          <el-tree-select
-            v-model="formData.deptId"
-            :data="deptTree"
-            :props="{ label: 'deptName', value: 'id', children: 'children' }"
-            check-strictly
-            placeholder="请选择部门"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="分配角色" prop="roleIds">
-          <el-select
-            v-model="formData.roleIds"
-            multiple
-            placeholder="请分配角色"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="role in allRoles"
-              :key="role.id"
-              :label="role.roleName"
-              :value="role.id"
+      <div v-loading="detailLoading">
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="formRules"
+          label-width="90px"
+        >
+          <el-form-item label="登录账号" prop="username">
+            <el-input
+              v-model="formData.username"
+              placeholder="请输入登录用户名"
+              :disabled="!!currentId"
             />
-          </el-select>
-        </el-form-item>
-      </el-form>
+          </el-form-item>
+          <el-form-item v-if="!currentId" label="登录密码" prop="password">
+            <el-input
+              v-model="formData.password"
+              type="password"
+              placeholder="请输入登录密码(最少6位)"
+              show-password
+            />
+          </el-form-item>
+          <el-form-item label="真实姓名" prop="realName">
+            <el-input v-model="formData.realName" placeholder="请输入姓名" />
+          </el-form-item>
+          <el-form-item label="联系电话" prop="phone">
+            <el-input v-model="formData.phone" placeholder="请输入手机号" />
+          </el-form-item>
+          <el-form-item label="所属部门" prop="deptId">
+            <el-tree-select
+              v-model="formData.deptId"
+              :data="deptTree"
+              :props="{ label: 'deptName', value: 'id', children: 'children' }"
+              check-strictly
+              placeholder="请选择部门"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="分配角色" prop="roleIds">
+            <el-select
+              v-model="formData.roleIds"
+              multiple
+              placeholder="请分配角色"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="role in allRoles"
+                :key="role.id"
+                :label="role.roleName"
+                :value="role.id"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -116,6 +118,7 @@ import BaseDialog from "@/components/BaseDialog.vue";
 import { usePagination } from "@/hooks/usePagination";
 import {
   getUserListApi,
+  getUserDetailApi,
   createUserApi,
   updateUserApi,
   deleteUserApi,
@@ -222,6 +225,7 @@ const actionColumn: ActionColumnConfig = {
 const dialogVisible = ref(false);
 const dialogTitle = ref("新增用户");
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 
@@ -289,17 +293,33 @@ const handleAdd = () => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑用户
+ * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据用户 ID 异步请求后端独立详情接口获取最新完整用户与角色关联数据
+ * 
+ * @param row 列表当前点击行（仅提取 row.id）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = "编辑用户";
-  Object.assign(formData, {
-    username: row.username,
-    realName: row.realName,
-    phone: row.phone,
-    deptId: row.deptId,
-    roleIds: (row.roles || []).map((r: any) => r.id),
-  });
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const detail: any = await getUserDetailApi(row.id);
+    Object.assign(formData, {
+      username: detail.username,
+      realName: detail.realName,
+      phone: detail.phone,
+      deptId: detail.deptId,
+      roleIds: (detail.roles || []).map((r: any) => r.id),
+    });
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取用户详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 // 状态修改前钩子 (仅在用户真实点击切换时触发，支持异步防抖与自动阻止状态切换)

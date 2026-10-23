@@ -51,6 +51,18 @@ export class RoleController {
   }
 
   /**
+   * 获取指定角色详情 (Query 传参规范: ?id=xxx)
+   *
+   * @param id 角色主键 ID
+   * @returns 返回角色实体
+   */
+  @Get('detail')
+  @Permissions('system:role:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.roleService.findById(id);
+  }
+
+  /**
    * 获取指定角色当前已绑定的菜单与权限 ID 集合
    *
    * @param id 角色主键 ID

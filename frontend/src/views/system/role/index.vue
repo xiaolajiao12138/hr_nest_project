@@ -40,24 +40,26 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
-        <el-form-item label="角色名称" prop="roleName">
-          <el-input v-model="formData.roleName" placeholder="例如 人事专员" />
-        </el-form-item>
-        <el-form-item label="权限字符" prop="roleKey">
-          <el-input
-            v-model="formData.roleKey"
-            placeholder="例如 hr_specialist"
-            :disabled="!!currentId"
-          />
-        </el-form-item>
-        <el-form-item label="显示排序" prop="sort">
-          <el-input-number v-model="formData.sort" :min="0" :max="999" />
-        </el-form-item>
-        <el-form-item label="备注说明" prop="remark">
-          <el-input v-model="formData.remark" type="textarea" :rows="3" />
-        </el-form-item>
-      </el-form>
+      <div v-loading="detailLoading">
+        <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
+          <el-form-item label="角色名称" prop="roleName">
+            <el-input v-model="formData.roleName" placeholder="例如 人事专员" />
+          </el-form-item>
+          <el-form-item label="权限字符" prop="roleKey">
+            <el-input
+              v-model="formData.roleKey"
+              placeholder="例如 hr_specialist"
+              :disabled="!!currentId"
+            />
+          </el-form-item>
+          <el-form-item label="显示排序" prop="sort">
+            <el-input-number v-model="formData.sort" :min="0" :max="999" />
+          </el-form-item>
+          <el-form-item label="备注说明" prop="remark">
+            <el-input v-model="formData.remark" type="textarea" :rows="3" />
+          </el-form-item>
+        </el-form>
+      </div>
     </BaseDialog>
 
     <!-- 分配菜单与按钮权限抽屉 -->
@@ -107,6 +109,7 @@ import BaseDialog from '@/components/BaseDialog.vue';
 import { usePagination } from '@/hooks/usePagination';
 import {
   getRoleListApi,
+  getRoleDetailApi,
   createRoleApi,
   updateRoleApi,
   deleteRoleApi,
@@ -162,6 +165,7 @@ const actionColumn: ActionColumnConfig = {
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增角色');
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 
@@ -218,16 +222,32 @@ const handleAdd = () => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑角色
+ * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据角色 ID 异步请求后端独立详情接口获取最新完整数据
+ * 
+ * @param row 列表当前点击行（仅提取 row.id）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = '编辑角色';
-  Object.assign(formData, {
-    roleName: row.roleName,
-    roleKey: row.roleKey,
-    sort: row.sort,
-    remark: row.remark,
-  });
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const detail: any = await getRoleDetailApi(row.id);
+    Object.assign(formData, {
+      roleName: detail.roleName,
+      roleKey: detail.roleKey,
+      sort: detail.sort,
+      remark: detail.remark,
+    });
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取角色详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const handleDelete = (row: any) => {
