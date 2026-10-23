@@ -5,7 +5,7 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="kpi-card kpi-gross">
           <div class="kpi-header">
-            <span class="kpi-title">{{ t('salary.totalGross') }}</span>
+            <span class="kpi-title">{{ t("salary.totalGross") }}</span>
             <el-icon class="kpi-icon"><Money /></el-icon>
           </div>
           <div class="kpi-value">¥ {{ formatMoney(kpiData.totalGross) }}</div>
@@ -16,7 +16,7 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="kpi-card kpi-net">
           <div class="kpi-header">
-            <span class="kpi-title">{{ t('salary.totalNet') }}</span>
+            <span class="kpi-title">{{ t("salary.totalNet") }}</span>
             <el-icon class="kpi-icon"><Wallet /></el-icon>
           </div>
           <div class="kpi-value">¥ {{ formatMoney(kpiData.totalNet) }}</div>
@@ -27,10 +27,12 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="kpi-card kpi-deduction">
           <div class="kpi-header">
-            <span class="kpi-title">{{ t('salary.totalDeductions') }}</span>
+            <span class="kpi-title">{{ t("salary.totalDeductions") }}</span>
             <el-icon class="kpi-icon"><Coin /></el-icon>
           </div>
-          <div class="kpi-value">¥ {{ formatMoney(kpiData.totalDeduction) }}</div>
+          <div class="kpi-value">
+            ¥ {{ formatMoney(kpiData.totalDeduction) }}
+          </div>
           <div class="kpi-desc">含社保公积金、个税与请假扣减</div>
         </el-card>
       </el-col>
@@ -38,13 +40,17 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="kpi-card kpi-headcount">
           <div class="kpi-header">
-            <span class="kpi-title">{{ t('salary.headcount') }}</span>
+            <span class="kpi-title">{{ t("salary.headcount") }}</span>
             <el-icon class="kpi-icon"><User /></el-icon>
           </div>
-          <div class="kpi-value">{{ kpiData.totalCount }} <span class="unit">人</span></div>
+          <div class="kpi-value">
+            {{ kpiData.totalCount }} <span class="unit">人</span>
+          </div>
           <div class="kpi-desc">
             <span class="status-dot draft">草稿: {{ kpiData.draftCount }}</span>
-            <span class="status-dot confirmed">核准: {{ kpiData.confirmedCount }}</span>
+            <span class="status-dot confirmed"
+              >核准: {{ kpiData.confirmedCount }}</span
+            >
             <span class="status-dot paid">已发: {{ kpiData.paidCount }}</span>
           </div>
         </el-card>
@@ -120,7 +126,7 @@
           :icon="Cpu"
           @click="openCalculateDialog"
         >
-          {{ t('salary.calculate') }}
+          {{ t("salary.calculate") }}
         </el-button>
 
         <el-button
@@ -151,7 +157,7 @@
           :loading="exportLoading"
           @click="handleExport"
         >
-          {{ t('salary.exportExcel') }}
+          {{ t("salary.exportExcel") }}
         </el-button>
 
         <el-button :icon="Refresh" @click="fetchData">刷新</el-button>
@@ -160,8 +166,13 @@
       <!-- 员工信息复合插槽 -->
       <template #employeeSlot="{ row }">
         <div class="emp-cell">
-          <div class="emp-name">{{ row.employee?.name || '-' }}</div>
-          <div class="emp-sub">工号: {{ row.employee?.employeeNo || '-' }}</div>
+          <div class="emp-name">{{ row.employee?.name || "-" }}</div>
+          <div class="emp-sub">
+            工号:
+            {{
+              (row.employee as any)?.empNo || row.employee?.employeeNo || "-"
+            }}
+          </div>
         </div>
       </template>
 
@@ -192,7 +203,9 @@
               <div>预扣预缴个税: ¥ {{ formatMoney(row.tax) }}</div>
             </div>
           </template>
-          <span class="deduction-text">- ¥ {{ formatMoney(row.totalDeduction) }}</span>
+          <span class="deduction-text"
+            >- ¥ {{ formatMoney(row.totalDeduction) }}</span
+          >
         </el-tooltip>
       </template>
 
@@ -204,13 +217,22 @@
       <!-- 状态插槽 -->
       <template #statusSlot="{ row }">
         <el-tag v-if="row.status === 1" type="info" effect="plain">草稿</el-tag>
-        <el-tag v-else-if="row.status === 2" type="warning" effect="plain">已核准</el-tag>
-        <el-tag v-else-if="row.status === 3" type="success" effect="plain">已发放</el-tag>
+        <el-tag v-else-if="row.status === 2" type="warning" effect="plain"
+          >已核准</el-tag
+        >
+        <el-tag v-else-if="row.status === 3" type="success" effect="plain"
+          >已发放</el-tag
+        >
       </template>
 
       <!-- 工资条保护状态插槽 -->
       <template #securitySlot="{ row }">
-        <el-tag v-if="row.hasPassword" type="success" size="small" effect="light">
+        <el-tag
+          v-if="row.hasPassword"
+          type="success"
+          size="small"
+          effect="light"
+        >
           <el-icon><Lock /></el-icon> 密码加密
         </el-tag>
         <el-tag v-else type="info" size="small" effect="light">
@@ -304,7 +326,9 @@
         label-width="120px"
         class="edit-salary-form"
       >
-        <el-divider content-position="left">应发薪酬收入项 (自动累计应发)</el-divider>
+        <el-divider content-position="left"
+          >应发薪酬收入项 (自动累计应发)</el-divider
+        >
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="基本工资">
@@ -439,7 +463,9 @@
           </div>
           <div class="calc-item">
             <span class="label">测算扣除总额:</span>
-            <span class="value deduction">- ¥ {{ formatMoney(calcLiveDeduction) }}</span>
+            <span class="value deduction"
+              >- ¥ {{ formatMoney(calcLiveDeduction) }}</span
+            >
           </div>
           <div class="calc-item">
             <span class="label">测算实发到手:</span>
@@ -452,8 +478,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ref, reactive, computed, onMounted } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Money,
   Wallet,
@@ -466,11 +492,11 @@ import {
   Refresh,
   Lock,
   Edit,
-} from '@element-plus/icons-vue';
-import { useI18n } from '@/locales';
-import BaseSearch from '@/components/BaseSearch.vue';
-import BaseTable, { type TableColumn } from '@/components/BaseTable.vue';
-import BaseDialog from '@/components/BaseDialog.vue';
+} from "@element-plus/icons-vue";
+import { useI18n } from "@/locales";
+import BaseSearch from "@/components/BaseSearch.vue";
+import BaseTable, { type TableColumn } from "@/components/BaseTable.vue";
+import BaseDialog from "@/components/BaseDialog.vue";
 import {
   getSalaryListApi,
   calculateSalaryApi,
@@ -479,8 +505,8 @@ import {
   exportSalaryApi,
   SalaryRecord,
   SalaryKPI,
-} from '@/api/salary';
-import { getDeptTreeApi } from '@/api/dept';
+} from "@/api/salary";
+import { getDeptTreeApi } from "@/api/dept";
 
 const { t } = useI18n();
 
@@ -489,7 +515,7 @@ const { t } = useI18n();
  */
 function formatMoney(num?: number | string): string {
   const n = Number(num || 0);
-  return n.toLocaleString('zh-CN', {
+  return n.toLocaleString("zh-CN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -499,7 +525,7 @@ function formatMoney(num?: number | string): string {
 function getCurrentYearMonth(): string {
   const d = new Date();
   const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
 }
 
@@ -526,7 +552,7 @@ const searchForm = reactive({
   yearMonth: getCurrentYearMonth(),
   departmentId: undefined as number | undefined,
   status: undefined as number | undefined,
-  keyword: '',
+  keyword: "",
 });
 
 // 分页器
@@ -538,26 +564,30 @@ const pagination = reactive({
 
 // 表格列定义
 const columns: TableColumn[] = [
-  { label: '薪资月份', prop: 'yearMonth', width: 110, align: 'center' },
-  { label: '员工档案', slot: 'employeeSlot', minWidth: 150, align: 'left' },
+  { label: "薪资月份", prop: "yearMonth", width: 110, align: "center" },
+  { label: "员工档案", slot: "employeeSlot", minWidth: 150, align: "left" },
   {
-    label: '所属部门',
-    prop: 'departmentName',
+    label: "所属部门",
+    prop: "departmentName",
     width: 130,
-    formatter: (_: any, row: SalaryRecord) => row.employee?.department?.name || '-',
+    formatter: (_: any, row: SalaryRecord) =>
+      (row.employee as any)?.dept?.deptName ||
+      row.employee?.department?.name ||
+      "-",
   },
   {
-    label: '岗位职位',
-    prop: 'positionName',
+    label: "岗位职位",
+    prop: "positionName",
     width: 120,
-    formatter: (_: any, row: SalaryRecord) => row.employee?.position?.name || '-',
+    formatter: (_: any, row: SalaryRecord) =>
+      (row.employee as any)?.post || row.employee?.position?.name || "-",
   },
-  { label: '应发薪资', slot: 'grossSlot', width: 130, align: 'right' },
-  { label: '扣除合计', slot: 'deductionSlot', width: 130, align: 'right' },
-  { label: '实发到手', slot: 'netSalarySlot', width: 140, align: 'right' },
-  { label: '发放状态', slot: 'statusSlot', width: 100, align: 'center' },
-  { label: '安全防护', slot: 'securitySlot', width: 120, align: 'center' },
-  { label: '备注说明', prop: 'remarks', minWidth: 140, align: 'left' },
+  { label: "应发薪资", slot: "grossSlot", width: 130, align: "right" },
+  { label: "扣除合计", slot: "deductionSlot", width: 130, align: "right" },
+  { label: "实发到手", slot: "netSalarySlot", width: 140, align: "right" },
+  { label: "发放状态", slot: "statusSlot", width: 100, align: "center" },
+  { label: "安全防护", slot: "securitySlot", width: 120, align: "center" },
+  { label: "备注说明", prop: "remarks", minWidth: 140, align: "left" },
 ];
 
 /**
@@ -582,7 +612,7 @@ async function fetchData() {
       Object.assign(kpiData, res.kpi);
     }
   } catch (error) {
-    console.error('加载薪酬列表失败:', error);
+    console.error("加载薪酬列表失败:", error);
   } finally {
     loading.value = false;
   }
@@ -594,7 +624,7 @@ async function loadDeptTree() {
     const res: any = await getDeptTreeApi();
     deptTree.value = res || [];
   } catch (error) {
-    console.error('加载部门树失败:', error);
+    console.error("加载部门树失败:", error);
   }
 }
 
@@ -608,7 +638,7 @@ function handleReset() {
   searchForm.yearMonth = getCurrentYearMonth();
   searchForm.departmentId = undefined;
   searchForm.status = undefined;
-  searchForm.keyword = '';
+  searchForm.keyword = "";
   pagination.page = 1;
   fetchData();
 }
@@ -632,22 +662,22 @@ function handleSelectionChange(rows: SalaryRecord[]) {
 
 // 批量确认核准或发放
 async function handleBatchConfirm(targetStatus: number) {
-  const label = targetStatus === 2 ? '核准' : '发放';
+  const label = targetStatus === 2 ? "核准" : "发放";
   const ids = selectedRows.value.map((r) => r.id);
   if (!ids.length) return;
 
   try {
     await ElMessageBox.confirm(
       `确定要将选中的 ${ids.length} 笔薪酬记录流转为【${label}】状态吗？`,
-      '批量流转提示',
+      "批量流转提示",
       {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: targetStatus === 3 ? 'warning' : 'info',
-      }
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: targetStatus === 3 ? "warning" : "info",
+      },
     );
 
-    await batchConfirmSalaryApi({ ids, status: targetStatus });
+    await batchConfirmSalaryApi({ ids, targetStatus: targetStatus });
     ElMessage.success(`批量${label}操作成功`);
     fetchData();
   } catch (error) {
@@ -657,16 +687,16 @@ async function handleBatchConfirm(targetStatus: number) {
 
 // 单笔快捷流转状态
 async function quickChangeStatus(row: SalaryRecord, targetStatus: number) {
-  const label = targetStatus === 2 ? '核准' : '发放';
+  const label = targetStatus === 2 ? "核准" : "发放";
   try {
     await ElMessageBox.confirm(
-      `确认将员工 ${row.employee?.name || ''} 的薪资置为【${label}】吗？`,
-      '状态流转',
+      `确认将员工 ${row.employee?.name || ""} 的薪资置为【${label}】吗？`,
+      "状态流转",
       {
-        type: targetStatus === 3 ? 'warning' : 'info',
-      }
+        type: targetStatus === 3 ? "warning" : "info",
+      },
     );
-    await batchConfirmSalaryApi({ ids: [row.id], status: targetStatus });
+    await batchConfirmSalaryApi({ ids: [row.id], targetStatus: targetStatus });
     ElMessage.success(`${label}成功`);
     fetchData();
   } catch {
@@ -682,10 +712,10 @@ async function handleExport() {
     const res: any = await exportSalaryApi(month);
 
     const blob = new Blob([res], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `员工薪资明细_${month}.xlsx`;
     document.body.appendChild(link);
@@ -693,9 +723,9 @@ async function handleExport() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    ElMessage.success('薪资报表导出成功');
+    ElMessage.success("薪资报表导出成功");
   } catch (error) {
-    ElMessage.error('导出报表失败');
+    ElMessage.error("导出报表失败");
   } finally {
     exportLoading.value = false;
   }
@@ -716,7 +746,7 @@ function openCalculateDialog() {
 
 async function submitCalculate() {
   if (!calcForm.yearMonth) {
-    ElMessage.warning('请选择核算月份');
+    ElMessage.warning("请选择核算月份");
     return;
   }
   calcSubmitting.value = true;
@@ -727,7 +757,7 @@ async function submitCalculate() {
     searchForm.yearMonth = calcForm.yearMonth;
     fetchData();
   } catch (error: any) {
-    ElMessage.error(error?.message || '智能核算异常');
+    ElMessage.error(error?.message || "智能核算异常");
   } finally {
     calcSubmitting.value = false;
   }
@@ -748,8 +778,8 @@ const editForm = reactive({
   socialSecurity: 0,
   housingFund: 0,
   tax: 0,
-  payslipPassword: '',
-  remarks: '',
+  payslipPassword: "",
+  remarks: "",
 });
 
 function openEditDialog(row: SalaryRecord) {
@@ -764,8 +794,8 @@ function openEditDialog(row: SalaryRecord) {
   editForm.socialSecurity = Number(row.socialSecurity || 0);
   editForm.housingFund = Number(row.housingFund || 0);
   editForm.tax = Number(row.tax || 0);
-  editForm.payslipPassword = '';
-  editForm.remarks = row.remarks || '';
+  editForm.payslipPassword = "";
+  editForm.remarks = row.remarks || "";
   editDialogVisible.value = true;
 }
 
@@ -810,11 +840,11 @@ async function submitEdit() {
       payslipPassword: editForm.payslipPassword || undefined,
       remarks: editForm.remarks,
     });
-    ElMessage.success('薪酬微调保存成功');
+    ElMessage.success("薪酬微调保存成功");
     editDialogVisible.value = false;
     fetchData();
   } catch (error: any) {
-    ElMessage.error(error?.message || '调整失败');
+    ElMessage.error(error?.message || "调整失败");
   } finally {
     editSubmitting.value = false;
   }
@@ -860,7 +890,7 @@ onMounted(() => {
       .kpi-value {
         font-size: 24px;
         font-weight: 700;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-family: "Helvetica Neue", Arial, sans-serif;
         line-height: 1.2;
         margin-bottom: 8px;
 

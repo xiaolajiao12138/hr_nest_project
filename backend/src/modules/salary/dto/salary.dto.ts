@@ -27,6 +27,11 @@ export class QuerySalaryDto extends PageParamDto {
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
+  departmentId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
   status?: number;
 }
 

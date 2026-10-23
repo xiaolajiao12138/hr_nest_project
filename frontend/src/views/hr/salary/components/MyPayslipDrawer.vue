@@ -106,9 +106,9 @@
           <div class="banner-emp">
             <span>{{ payslipDetail.employee?.name }}</span>
             <span class="split">|</span>
-            <span>工号: {{ payslipDetail.employee?.employeeNo }}</span>
+            <span>工号: {{ (payslipDetail.employee as any)?.empNo || payslipDetail.employee?.employeeNo }}</span>
             <span class="split">|</span>
-            <span>{{ payslipDetail.employee?.department?.name || '公司' }}</span>
+            <span>{{ (payslipDetail.employee as any)?.dept?.deptName || payslipDetail.employee?.department?.name || '公司' }}</span>
           </div>
         </div>
 

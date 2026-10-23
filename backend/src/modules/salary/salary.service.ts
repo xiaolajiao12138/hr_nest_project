@@ -225,9 +225,12 @@ export class SalaryService implements OnModuleInit {
       pageSize = 10,
       yearMonth,
       deptId,
+      departmentId,
       keyword,
       status,
     } = query;
+
+    const filterDeptId = deptId || departmentId;
 
     const qb = this.salaryRepo
       .createQueryBuilder('salary')
@@ -240,8 +243,8 @@ export class SalaryService implements OnModuleInit {
       qb.andWhere('salary.yearMonth = :yearMonth', { yearMonth });
     }
 
-    if (deptId) {
-      qb.andWhere('employee.deptId = :deptId', { deptId });
+    if (filterDeptId) {
+      qb.andWhere('employee.deptId = :deptId', { deptId: filterDeptId });
     }
 
     if (status !== undefined && status !== null) {
@@ -255,13 +258,38 @@ export class SalaryService implements OnModuleInit {
       );
     }
 
-    // 统计总体 KPI (总应发、总实发、总扣税社保)
-    const statsQb = qb.clone();
+    // 独立构建统计查询（绝不带 ORDER BY，避免 PostgreSQL 报 GROUP BY 语法错误）
+    const statsQb = this.salaryRepo.createQueryBuilder('salary');
+    if (filterDeptId || keyword) {
+      statsQb.leftJoin('salary.employee', 'employee');
+    }
+    if (yearMonth) {
+      statsQb.andWhere('salary.yearMonth = :yearMonth', { yearMonth });
+    }
+    if (filterDeptId) {
+      statsQb.andWhere('employee.deptId = :deptId', { deptId: filterDeptId });
+    }
+    if (status !== undefined && status !== null) {
+      statsQb.andWhere('salary.status = :status', { status });
+    }
+    if (keyword) {
+      statsQb.andWhere(
+        '(employee.name LIKE :kw OR employee.empNo LIKE :kw OR employee.phone LIKE :kw)',
+        { kw: `%${keyword.trim()}%` }
+      );
+    }
+
     const statsResult = await statsQb
-      .select('SUM(salary.grossSalary)', 'totalGross')
-      .addSelect('SUM(salary.netSalary)', 'totalNet')
-      .addSelect('SUM(salary.socialSecurity + salary.housingFund + salary.tax + salary.leaveDeduction)', 'totalDeduction')
+      .select('COALESCE(SUM(salary.grossSalary), 0)', 'totalGross')
+      .addSelect('COALESCE(SUM(salary.netSalary), 0)', 'totalNet')
+      .addSelect(
+        'COALESCE(SUM(salary.socialSecurity + salary.housingFund + salary.tax + salary.leaveDeduction), 0)',
+        'totalDeduction'
+      )
       .addSelect('COUNT(salary.id)', 'totalCount')
+      .addSelect('COUNT(CASE WHEN salary.status = 1 THEN 1 END)', 'draftCount')
+      .addSelect('COUNT(CASE WHEN salary.status = 2 THEN 1 END)', 'confirmedCount')
+      .addSelect('COUNT(CASE WHEN salary.status = 3 THEN 1 END)', 'paidCount')
       .getRawOne();
 
     // 分页列表
@@ -270,16 +298,27 @@ export class SalaryService implements OnModuleInit {
       .take(pageSize)
       .getManyAndCount();
 
+    const kpi = {
+      totalGross: Number(statsResult?.totalGross || 0),
+      totalNet: Number(statsResult?.totalNet || 0),
+      totalDeduction: Number(statsResult?.totalDeduction || 0),
+      totalCount: Number(statsResult?.totalCount || 0),
+      draftCount: Number(statsResult?.draftCount || 0),
+      confirmedCount: Number(statsResult?.confirmedCount || 0),
+      paidCount: Number(statsResult?.paidCount || 0),
+    };
+
     return {
       list,
       total,
       page,
       pageSize,
+      kpi,
       stats: {
-        totalGross: Number(statsResult?.totalGross || 0).toFixed(2),
-        totalNet: Number(statsResult?.totalNet || 0).toFixed(2),
-        totalDeduction: Number(statsResult?.totalDeduction || 0).toFixed(2),
-        totalCount: Number(statsResult?.totalCount || 0),
+        totalGross: kpi.totalGross.toFixed(2),
+        totalNet: kpi.totalNet.toFixed(2),
+        totalDeduction: kpi.totalDeduction.toFixed(2),
+        totalCount: kpi.totalCount,
       },
     };
   }

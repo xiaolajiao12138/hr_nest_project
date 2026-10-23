@@ -97,7 +97,7 @@ export function updateSalaryApi(id: number, data: Partial<SalaryRecord> & { pays
 /**
  * 批量审批确认或发放薪酬
  */
-export function batchConfirmSalaryApi(data: { ids: number[]; status: number }) {
+export function batchConfirmSalaryApi(data: { ids: number[]; targetStatus: number }) {
   return request<{ affected: number }>({
     url: '/salary/batch-confirm',
     method: 'post',
