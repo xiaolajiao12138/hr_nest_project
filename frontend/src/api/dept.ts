@@ -7,6 +7,14 @@ export function getDeptTreeApi() {
   });
 }
 
+export function getDeptDetailApi(id: number) {
+  return request({
+    url: '/hr/dept/detail',
+    method: 'get',
+    params: { id },
+  });
+}
+
 export function createDeptApi(data: any) {
   return request({
     url: '/hr/dept',

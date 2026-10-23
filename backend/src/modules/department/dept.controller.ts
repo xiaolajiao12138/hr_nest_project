@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -34,6 +35,18 @@ export class DeptController {
   @Permissions('hr:dept:list')
   async getTree() {
     return this.deptService.getDeptTree();
+  }
+
+  /**
+   * 根据部门主键 ID 获取部门详细配置信息 (Query 传参规范: ?id=xxx)
+   *
+   * @param id 部门主键 ID
+   * @returns 返回部门实体
+   */
+  @Get('detail')
+  @Permissions('hr:dept:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.deptService.findById(id);
   }
 
   /**

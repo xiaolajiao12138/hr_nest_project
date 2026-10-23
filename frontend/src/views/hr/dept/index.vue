@@ -42,37 +42,39 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
-        <el-form-item label="上级部门">
-          <el-tree-select
-            v-model="formData.parentId"
-            :data="treeSelectData"
-            :props="{ label: 'deptName', value: 'id', children: 'children' }"
-            check-strictly
-            placeholder="请选择上级部门(不选则为根部门)"
-            clearable
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="部门名称" prop="deptName">
-          <el-input v-model="formData.deptName" placeholder="请输入部门名称" />
-        </el-form-item>
-        <el-form-item label="负责人" prop="leader">
-          <el-input v-model="formData.leader" placeholder="请输入负责人姓名" />
-        </el-form-item>
-        <el-form-item label="联系电话" prop="phone">
-          <el-input v-model="formData.phone" placeholder="请输入联系电话" />
-        </el-form-item>
-        <el-form-item label="显示排序" prop="sort">
-          <el-input-number v-model="formData.sort" :min="0" :max="999" />
-        </el-form-item>
-        <el-form-item label="部门状态">
-          <el-radio-group v-model="formData.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+      <div v-loading="detailLoading">
+        <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
+          <el-form-item label="上级部门">
+            <el-tree-select
+              v-model="formData.parentId"
+              :data="treeSelectData"
+              :props="{ label: 'deptName', value: 'id', children: 'children' }"
+              check-strictly
+              placeholder="请选择上级部门(不选则为根部门)"
+              clearable
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="部门名称" prop="deptName">
+            <el-input v-model="formData.deptName" placeholder="请输入部门名称" />
+          </el-form-item>
+          <el-form-item label="负责人" prop="leader">
+            <el-input v-model="formData.leader" placeholder="请输入负责人姓名" />
+          </el-form-item>
+          <el-form-item label="联系电话" prop="phone">
+            <el-input v-model="formData.phone" placeholder="请输入联系电话" />
+          </el-form-item>
+          <el-form-item label="显示排序" prop="sort">
+            <el-input-number v-model="formData.sort" :min="0" :max="999" />
+          </el-form-item>
+          <el-form-item label="部门状态">
+            <el-radio-group v-model="formData.status">
+              <el-radio :label="1">启用</el-radio>
+              <el-radio :label="0">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -84,6 +86,7 @@ import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
 import BaseDialog from '@/components/BaseDialog.vue';
 import {
   getDeptTreeApi,
+  getDeptDetailApi,
   createDeptApi,
   updateDeptApi,
   deleteDeptApi,
@@ -94,6 +97,7 @@ const deptTree = ref<any[]>([]);
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增部门');
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 
@@ -149,16 +153,32 @@ const handleAddChild = (row: any) => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑部门
+ * 遵循企业级架构规范：点击编辑不从树节点行数据拷贝，而是根据部门 ID 异步请求后端独立详情接口获取最新完整部门信息
+ * 
+ * @param row 列表当前点击行（仅提取 row.id）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = '编辑部门';
-  formData.parentId = row.parentId;
-  formData.deptName = row.deptName;
-  formData.leader = row.leader;
-  formData.phone = row.phone;
-  formData.sort = row.sort;
-  formData.status = row.status;
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const detail: any = await getDeptDetailApi(row.id);
+    formData.parentId = detail.parentId;
+    formData.deptName = detail.deptName;
+    formData.leader = detail.leader;
+    formData.phone = detail.phone;
+    formData.sort = detail.sort;
+    formData.status = detail.status;
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取部门详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const handleDelete = (row: any) => {
