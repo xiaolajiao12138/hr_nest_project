@@ -1,13 +1,36 @@
 <template>
-  <div class="dashboard-container" v-loading="loading">
+  <div
+    ref="dashboardRef"
+    class="dashboard-container"
+    :class="{ 'is-fullscreen': isFullscreen }"
+    v-loading="loading"
+  >
     <!-- 顶部工作台欢迎与刷新栏 -->
     <div class="welcome-header">
       <div class="header-left">
-        <h2 class="welcome-title">欢迎使用 HR 人力资源数字化管理系统</h2>
-        <span class="welcome-subtitle">数据更新时间：{{ lastUpdatedTime || '加载中...' }}</span>
+        <h2 class="welcome-title">{{ t('dashboard.welcome') }}</h2>
+        <span class="welcome-subtitle">
+          {{ t('common.updateTime') }}：{{ lastUpdatedTime || t('common.loading') }}
+          <span v-if="isFullscreen" class="fullscreen-tip">
+            • {{ t('dashboard.fullscreenHint') }}
+          </span>
+        </span>
       </div>
       <div class="header-right">
-        <el-button type="primary" plain :icon="Refresh" @click="fetchData">刷新数据</el-button>
+        <!-- 一键全屏大屏放大 / 退出按钮 -->
+        <el-button
+          :type="isFullscreen ? 'warning' : 'primary'"
+          plain
+          :icon="isFullscreen ? Aim : FullScreen"
+          @click="toggleFullscreen"
+        >
+          {{ isFullscreen ? t('common.exitFullscreen') : t('common.fullscreen') }}
+        </el-button>
+
+        <!-- 刷新数据按钮 -->
+        <el-button type="primary" plain :icon="Refresh" @click="fetchData">
+          {{ t('common.refresh') }}
+        </el-button>
       </div>
     </div>
 
@@ -17,12 +40,12 @@
         <el-card shadow="hover" class="stat-card card-emp">
           <div class="stat-content">
             <div class="stat-info">
-              <span class="stat-title">在职员工总数</span>
+              <span class="stat-title">{{ t('dashboard.totalEmployees') }}</span>
               <div class="stat-num-wrapper">
                 <span class="stat-value">{{ stats.overview.totalEmployees }}</span>
-                <span class="stat-unit">人</span>
+                <span class="stat-unit">{{ t('dashboard.unitPerson') }}</span>
               </div>
-              <span class="stat-tip">状态正常的合同在职员工</span>
+              <span class="stat-tip">{{ t('dashboard.totalEmployeesTip') }}</span>
             </div>
             <div class="stat-icon-wrapper icon-emp">
               <el-icon><Avatar /></el-icon>
@@ -35,12 +58,12 @@
         <el-card shadow="hover" class="stat-card card-leave">
           <div class="stat-content">
             <div class="stat-info">
-              <span class="stat-title">待审批请假单</span>
+              <span class="stat-title">{{ t('dashboard.pendingLeaves') }}</span>
               <div class="stat-num-wrapper">
                 <span class="stat-value text-warning">{{ stats.overview.pendingLeaves }}</span>
-                <span class="stat-unit">笔</span>
+                <span class="stat-unit">{{ t('dashboard.unitBill') }}</span>
               </div>
-              <span class="stat-tip">亟待主管与人事审批</span>
+              <span class="stat-tip">{{ t('dashboard.pendingLeavesTip') }}</span>
             </div>
             <div class="stat-icon-wrapper icon-leave">
               <el-icon><Tickets /></el-icon>
@@ -53,12 +76,12 @@
         <el-card shadow="hover" class="stat-card card-dept">
           <div class="stat-content">
             <div class="stat-info">
-              <span class="stat-title">组织架构部门</span>
+              <span class="stat-title">{{ t('dashboard.deptCount') }}</span>
               <div class="stat-num-wrapper">
                 <span class="stat-value">{{ stats.overview.deptCount }}</span>
-                <span class="stat-unit">个</span>
+                <span class="stat-unit">{{ t('dashboard.unitDept') }}</span>
               </div>
-              <span class="stat-tip">启用运行中的组织单元</span>
+              <span class="stat-tip">{{ t('dashboard.deptCountTip') }}</span>
             </div>
             <div class="stat-icon-wrapper icon-dept">
               <el-icon><OfficeBuilding /></el-icon>
@@ -71,12 +94,12 @@
         <el-card shadow="hover" class="stat-card card-attend">
           <div class="stat-content">
             <div class="stat-info">
-              <span class="stat-title">今日综合出勤率</span>
+              <span class="stat-title">{{ t('dashboard.attendanceRate') }}</span>
               <div class="stat-num-wrapper">
                 <span class="stat-value text-success">{{ stats.overview.attendanceRate }}</span>
                 <span class="stat-unit">%</span>
               </div>
-              <span class="stat-tip">扣除全天请假与公假</span>
+              <span class="stat-tip">{{ t('dashboard.attendanceRateTip') }}</span>
             </div>
             <div class="stat-icon-wrapper icon-attend">
               <el-icon><Histogram /></el-icon>
@@ -94,9 +117,9 @@
             <div class="chart-header">
               <div class="chart-title-box">
                 <span class="title-bar"></span>
-                <span class="chart-title">各部门人员分布与编制统计</span>
+                <span class="chart-title">{{ t('dashboard.deptDistTitle') }}</span>
               </div>
-              <el-tag size="small" type="primary" effect="plain">在职规模 vs 目标编制</el-tag>
+              <el-tag size="small" type="primary" effect="plain">{{ t('dashboard.deptDistTag') }}</el-tag>
             </div>
           </template>
           <div ref="deptChartRef" class="chart-box"></div>
@@ -109,9 +132,9 @@
             <div class="chart-header">
               <div class="chart-title-box">
                 <span class="title-bar"></span>
-                <span class="chart-title">员工学历与人才结构画像</span>
+                <span class="chart-title">{{ t('dashboard.eduDistTitle') }}</span>
               </div>
-              <el-tag size="small" type="success" effect="plain">全员学历梯次</el-tag>
+              <el-tag size="small" type="success" effect="plain">{{ t('dashboard.eduDistTag') }}</el-tag>
             </div>
           </template>
           <div ref="eduChartRef" class="chart-box"></div>
@@ -127,9 +150,9 @@
             <div class="chart-header">
               <div class="chart-title-box">
                 <span class="title-bar"></span>
-                <span class="chart-title">近半年考勤与请假月度走势</span>
+                <span class="chart-title">{{ t('dashboard.trendTitle') }}</span>
               </div>
-              <el-tag size="small" type="warning" effect="plain">近 6 个月动态追踪</el-tag>
+              <el-tag size="small" type="warning" effect="plain">{{ t('dashboard.trendTag') }}</el-tag>
             </div>
           </template>
           <div ref="leaveChartRef" class="chart-box"></div>
@@ -142,7 +165,7 @@
             <div class="chart-header">
               <div class="chart-title-box">
                 <span class="title-bar"></span>
-                <span class="chart-title">快捷业务协同与通道</span>
+                <span class="chart-title">{{ t('dashboard.quickAccess') }}</span>
               </div>
             </div>
           </template>
@@ -153,8 +176,8 @@
                   <el-icon><User /></el-icon>
                 </div>
                 <div class="item-text">
-                  <span class="item-name">员工档案</span>
-                  <span class="item-desc">花名册及入离职</span>
+                  <span class="item-name">{{ t('dashboard.employeeArchive') }}</span>
+                  <span class="item-desc">{{ t('dashboard.employeeArchiveDesc') }}</span>
                 </div>
               </div>
 
@@ -163,8 +186,8 @@
                   <el-icon><Tickets /></el-icon>
                 </div>
                 <div class="item-text">
-                  <span class="item-name">请假审批</span>
-                  <span class="item-desc">假勤申请与核准</span>
+                  <span class="item-name">{{ t('dashboard.leaveApproval') }}</span>
+                  <span class="item-desc">{{ t('dashboard.leaveApprovalDesc') }}</span>
                 </div>
               </div>
 
@@ -173,8 +196,8 @@
                   <el-icon><OfficeBuilding /></el-icon>
                 </div>
                 <div class="item-text">
-                  <span class="item-name">部门架构</span>
-                  <span class="item-desc">组织拓扑与负责人</span>
+                  <span class="item-name">{{ t('dashboard.deptStructure') }}</span>
+                  <span class="item-desc">{{ t('dashboard.deptStructureDesc') }}</span>
                 </div>
               </div>
 
@@ -183,8 +206,8 @@
                   <el-icon><Menu /></el-icon>
                 </div>
                 <div class="item-text">
-                  <span class="item-name">权限路由</span>
-                  <span class="item-desc">菜单权限与分配</span>
+                  <span class="item-name">{{ t('common.refresh') }}</span>
+                  <span class="item-desc">{{ t('dashboard.welcomeSub') }}</span>
                 </div>
               </div>
             </div>
@@ -206,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import {
   Avatar,
   Tickets,
@@ -215,13 +238,44 @@ import {
   Refresh,
   User,
   Menu,
+  FullScreen,
+  Aim,
 } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
 import { getDashboardStatsApi, type DashboardStats } from '@/api/dashboard';
+import { useI18n } from '@/locales';
+
+const { t, locale } = useI18n();
+
+// 容器与全屏状态
+const dashboardRef = ref<HTMLDivElement | null>(null);
+const isFullscreen = ref(false);
 
 // 加载状态与最后刷新时间
 const loading = ref(false);
 const lastUpdatedTime = ref('');
+
+// 切换全屏沉浸模式
+const toggleFullscreen = async () => {
+  try {
+    if (!document.fullscreenElement) {
+      if (dashboardRef.value?.requestFullscreen) {
+        await dashboardRef.value.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    }
+  } catch (err) {
+    console.warn('全屏切换失败:', err);
+  }
+};
+
+const handleFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement;
+  handleResize();
+};
 
 // 统计核心数据响应式对象
 const stats = ref<DashboardStats>({
@@ -283,6 +337,10 @@ const renderDeptChart = () => {
   const actualCounts = list.map((item) => item.actualCount);
   const planCounts = list.map((item) => item.planCount);
 
+  const isDark = isFullscreen.value;
+  const textColor = isDark ? '#94a3b8' : '#606266';
+  const splitLineColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f0f2f5';
+
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
@@ -291,10 +349,10 @@ const renderDeptChart = () => {
       },
     },
     legend: {
-      data: ['在职人数', '编制规划'],
+      data: [t('dashboard.totalEmployees'), t('dashboard.deptDistTag')],
       top: 0,
       right: 10,
-      textStyle: { color: '#606266', fontSize: 12 },
+      textStyle: { color: textColor, fontSize: 12 },
     },
     grid: {
       left: '3%',
@@ -307,25 +365,25 @@ const renderDeptChart = () => {
       type: 'category',
       data: deptNames,
       axisLabel: {
-        color: '#606266',
+        color: textColor,
         interval: 0,
         rotate: deptNames.length > 5 ? 25 : 0,
       },
       axisLine: {
-        lineStyle: { color: '#e4e7ed' },
+        lineStyle: { color: isDark ? '#334155' : '#e4e7ed' },
       },
     },
     yAxis: {
       type: 'value',
-      name: '人数 (人)',
-      nameTextStyle: { color: '#909399', fontSize: 11 },
+      name: `${t('dashboard.personCount')} (${t('dashboard.unitPerson')})`,
+      nameTextStyle: { color: textColor, fontSize: 11 },
       splitLine: {
-        lineStyle: { type: 'dashed', color: '#f0f2f5' },
+        lineStyle: { type: 'dashed', color: splitLineColor },
       },
     },
     series: [
       {
-        name: '在职人数',
+        name: t('dashboard.totalEmployees'),
         type: 'bar',
         barWidth: 16,
         itemStyle: {
@@ -338,7 +396,7 @@ const renderDeptChart = () => {
         data: actualCounts,
       },
       {
-        name: '编制规划',
+        name: t('dashboard.deptDistTag'),
         type: 'bar',
         barWidth: 16,
         itemStyle: {
@@ -366,28 +424,30 @@ const renderEduChart = () => {
   }
 
   const eduData = stats.value.educationDistribution || [];
+  const isDark = isFullscreen.value;
+  const textColor = isDark ? '#cbd5e1' : '#606266';
 
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'item',
-      formatter: '{b} : {c} 人 ({d}%)',
+      formatter: `{b} : {c} ${t('dashboard.unitPerson')} ({d}%)`,
     },
     legend: {
       bottom: '0%',
       left: 'center',
-      textStyle: { color: '#606266', fontSize: 12 },
+      textStyle: { color: textColor, fontSize: 12 },
     },
     color: ['#409eff', '#67c23a', '#e6a23c', '#909399', '#9b59b6'],
     series: [
       {
-        name: '学历分布',
+        name: t('dashboard.eduDistTitle'),
         type: 'pie',
         radius: ['45%', '70%'],
         center: ['50%', '45%'],
         avoidLabelOverlap: false,
         itemStyle: {
           borderRadius: 8,
-          borderColor: '#fff',
+          borderColor: isDark ? '#1e293b' : '#fff',
           borderWidth: 2,
         },
         label: {
@@ -423,16 +483,19 @@ const renderLeaveChart = () => {
   }
 
   const { months, annual, sick, casual } = stats.value.leaveTrend;
+  const isDark = isFullscreen.value;
+  const textColor = isDark ? '#94a3b8' : '#606266';
+  const splitLineColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f0f2f5';
 
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
     },
     legend: {
-      data: ['年假', '病假', '事假'],
+      data: [t('dashboard.annualLeave'), t('dashboard.sickLeave'), t('dashboard.casualLeave')],
       top: 0,
       right: 10,
-      textStyle: { color: '#606266', fontSize: 12 },
+      textStyle: { color: textColor, fontSize: 12 },
     },
     grid: {
       left: '3%',
@@ -446,23 +509,23 @@ const renderLeaveChart = () => {
       boundaryGap: false,
       data: months,
       axisLine: {
-        lineStyle: { color: '#e4e7ed' },
+        lineStyle: { color: isDark ? '#334155' : '#e4e7ed' },
       },
       axisLabel: {
-        color: '#606266',
+        color: textColor,
       },
     },
     yAxis: {
       type: 'value',
-      name: '申请人次',
-      nameTextStyle: { color: '#909399', fontSize: 11 },
+      name: t('dashboard.trendTitle'),
+      nameTextStyle: { color: textColor, fontSize: 11 },
       splitLine: {
-        lineStyle: { type: 'dashed', color: '#f0f2f5' },
+        lineStyle: { type: 'dashed', color: splitLineColor },
       },
     },
     series: [
       {
-        name: '年假',
+        name: t('dashboard.annualLeave'),
         type: 'line',
         smooth: true,
         showSymbol: false,
@@ -476,7 +539,7 @@ const renderLeaveChart = () => {
         data: annual,
       },
       {
-        name: '病假',
+        name: t('dashboard.sickLeave'),
         type: 'line',
         smooth: true,
         showSymbol: false,
@@ -490,7 +553,7 @@ const renderLeaveChart = () => {
         data: sick,
       },
       {
-        name: '事假',
+        name: t('dashboard.casualLeave'),
         type: 'line',
         smooth: true,
         showSymbol: false,
@@ -537,13 +600,22 @@ const fetchData = async () => {
   }
 };
 
+// 监听国际化语言切换，动态重新渲染图表
+watch(locale, () => {
+  renderDeptChart();
+  renderEduChart();
+  renderLeaveChart();
+});
+
 onMounted(() => {
   fetchData();
   window.addEventListener('resize', handleResize);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
   if (resizeTimer) clearTimeout(resizeTimer);
 
   // 释放 ECharts 实例，杜绝内存泄漏
@@ -832,5 +904,103 @@ onBeforeUnmount(() => {
 .dot.online {
   background-color: #67c23a;
   box-shadow: 0 0 6px #67c23a;
+}
+
+/* 全屏大屏模式样式 */
+.dashboard-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  padding: 24px 32px;
+  overflow-y: auto;
+  background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 100%);
+  box-sizing: border-box;
+}
+
+.dashboard-container.is-fullscreen .welcome-header {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-container.is-fullscreen .welcome-title {
+  color: #f8fafc;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dashboard-container.is-fullscreen .welcome-subtitle {
+  color: #94a3b8;
+}
+
+.fullscreen-tip {
+  color: #38bdf8;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.dashboard-container.is-fullscreen .stat-card {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-container.is-fullscreen .stat-title {
+  color: #94a3b8;
+}
+
+.dashboard-container.is-fullscreen .stat-value {
+  color: #f8fafc;
+}
+
+.dashboard-container.is-fullscreen .stat-tip {
+  color: #64748b;
+}
+
+.dashboard-container.is-fullscreen .chart-card {
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+}
+
+.dashboard-container.is-fullscreen .chart-title {
+  color: #e2e8f0;
+}
+
+.dashboard-container.is-fullscreen .quick-item {
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-container.is-fullscreen .quick-item:hover {
+  background-color: rgba(30, 41, 59, 0.9);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.dashboard-container.is-fullscreen .item-name {
+  color: #f1f5f9;
+}
+
+.dashboard-container.is-fullscreen .item-desc {
+  color: #94a3b8;
+}
+
+.dashboard-container.is-fullscreen .system-status-box {
+  background-color: rgba(15, 23, 42, 0.5);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.dashboard-container.is-fullscreen .status-title {
+  color: #cbd5e1;
+}
+
+.dashboard-container.is-fullscreen .status-badge {
+  color: #94a3b8;
 }
 </style>
