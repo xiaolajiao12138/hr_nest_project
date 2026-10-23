@@ -64,15 +64,26 @@ import { Plus, ZoomIn, Delete, Document } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getToken } from '@/utils/auth';
 
+/**
+ * 通用文件与图片上传组件 Props
+ */
 const props = withDefaults(
   defineProps<{
+    /** 双向绑定的文件在数据库中的主键 ID (v-model) */
     modelValue?: number | string | null;
+    /** 文件的完整可访问预览网络地址 (v-model:fileUrl) */
     fileUrl?: string;
+    /** 文件原始名称展示 */
     fileName?: string;
+    /** 上传存储分类二级目录名称，默认为 'common' */
     folder?: string;
+    /** 文件最大限制体积 (MB)，默认为 20MB */
     maxSizeMB?: number;
+    /** 允许上传的文件后缀扩展名白名单 */
     acceptExtensions?: string[];
+    /** 未上传时的居中提示文案 */
     tipText?: string;
+    /** 是否禁用上传与删除交互 */
     disabled?: boolean;
   }>(),
   {
@@ -84,25 +95,41 @@ const props = withDefaults(
   },
 );
 
+/**
+ * BaseUpload 事件派发器
+ */
 const emit = defineEmits<{
+  /** 绑定的文件 ID 变更 */
   (e: 'update:modelValue', fileId: number | null): void;
+  /** 绑定的文件预览 URL 变更 */
   (e: 'update:fileUrl', url: string): void;
+  /** 文件变更全量实体回调 */
   (e: 'change', fileData: any): void;
 }>();
 
+/** 服务端文件上传接口地址 */
 const uploadUrl = `${import.meta.env.VITE_API_PREFIX || '/api'}/upload/file`;
+
+/** 携带 JWT Bearer Token 的请求头计算属性 */
 const headers = computed(() => ({
   Authorization: `Bearer ${getToken()}`,
 }));
 
+/** 弹窗大图/PDF 预览对话框可见性 */
 const previewDialogVisible = ref(false);
 
+/** 判断当前已上传文件是否为图片类型 */
 const isImage = computed(() => {
   if (!props.fileUrl) return false;
   return /\.(png|jpg|jpeg|gif|webp)$/i.test(props.fileUrl);
 });
 
-// 上传前校验
+/**
+ * 文件上传前客户端白名单与体积强校验
+ *
+ * @param rawFile 待上传的原生 File 对象
+ * @returns 校验通过返回 true，不通过抛出提示并返回 false 阻断上传
+ */
 const beforeUpload = (rawFile: File) => {
   const ext = (rawFile.name.substring(rawFile.name.lastIndexOf('.')) || '').toLowerCase();
   if (!props.acceptExtensions.includes(ext)) {
@@ -119,7 +146,12 @@ const beforeUpload = (rawFile: File) => {
   return true;
 };
 
-// 上传成功
+/**
+ * 文件上传成功回调处理
+ * 解包服务端返回数据，向父组件同步更新文件 ID、文件 URL
+ *
+ * @param res 服务端响应 JSON
+ */
 const handleSuccess = (res: any) => {
   if (res.code === 200) {
     ElMessage.success('上传成功');
@@ -131,12 +163,16 @@ const handleSuccess = (res: any) => {
   }
 };
 
-// 上传失败
+/**
+ * 文件上传网络或服务异常回调
+ */
 const handleError = () => {
   ElMessage.error('网络异常，文件上传失败');
 };
 
-// 删除文件
+/**
+ * 移除已上传的文件，清空各绑定值
+ */
 const handleRemove = () => {
   emit('update:modelValue', null);
   emit('update:fileUrl', '');

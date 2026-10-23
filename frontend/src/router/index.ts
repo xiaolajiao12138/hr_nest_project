@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
+import Layout from '@/layout/index.vue';
 
-// 基础公开路由清单（仅保留登录与404，业务路由登录后完全由后端数据库驱动动态生成）
+// 基础公开路由清单（仅保留登录、404及基础框架页面如个人中心）
 export const constantRoutes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -13,6 +14,19 @@ export const constantRoutes: RouteRecordRaw[] = [
     name: 'NotFound',
     component: () => import('@/views/404.vue'),
     meta: { title: '404', hidden: true },
+  },
+  {
+    path: '/profile',
+    component: Layout,
+    meta: { hidden: true },
+    children: [
+      {
+        path: '',
+        name: 'Profile',
+        component: () => import('@/views/profile/index.vue'),
+        meta: { title: '个人中心', icon: 'User' },
+      },
+    ],
   },
 ];
 

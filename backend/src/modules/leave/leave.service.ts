@@ -10,8 +10,27 @@ import { BusinessException } from '../../common/exceptions/business.exception';
 import { PageResultDto } from '../../common/dto/page-result.dto';
 import { SseService } from '../sse/sse.service';
 
+/**
+ * 请假审批与年假账户核心业务服务类
+ * 
+ * 核心业务领域：
+ * 1. 考勤请假流程多维检索与分页（关联部门、申请人档案、审批人）
+ * 2. 员工年假账户额度动态计算与自动初始化
+ * 3. 强一致性事务原子场景：提交请假申请时，自动利用悲观锁预扣减年假账户额度，失败整体回滚
+ * 4. 强一致性事务原子场景：审批驳回年假申请时，事务内原子归还预扣额度至年假账户
+ * 5. SSE 实时事件联动：申请提交与审核完成自动广播待办徽标变动与审批结果提醒
+ */
 @Injectable()
 export class LeaveService extends BaseService<Leave> {
+  /**
+   * 构造函数注入依赖实体仓储与外部服务
+   * 
+   * @param leaveRepo 请假单实体 Repository
+   * @param annualRepo 年假账户额度实体 Repository
+   * @param empRepo 员工档案实体 Repository
+   * @param dataSource 全局 TypeORM 数据源（用于底层事务驱动）
+   * @param sseService 全局 SSE 实时推送服务
+   */
   constructor(
     @InjectRepository(Leave)
     private readonly leaveRepo: Repository<Leave>,
@@ -26,7 +45,9 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
-   * 获取待审批请假申请总数
+   * 获取当前系统处于待审批状态 (PENDING) 的请假任务总数
+   * 
+   * @returns 包含待办数量的对象 { count: number }
    */
   async getPendingCount(): Promise<{ count: number }> {
     const count = await this.leaveRepo.count({ where: { status: 'PENDING' } });
@@ -34,13 +55,17 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
-   * 分页查询请假记录
+   * 综合分页条件查询请假申请记录列表
+   * 
+   * @param query 过滤条件参数（状态、请假类型、所属部门、综合模糊关键字、分页入参）
+   * @returns 分页结果包装对象，包含联表详情与总记录数
    */
   async findLeavePage(query: QueryLeaveDto): Promise<PageResultDto<Leave>> {
     const page = Number(query.page) || 1;
     const pageSize = Number(query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
 
+    // 构建连表查询查询器
     const qb = this.leaveRepo
       .createQueryBuilder('leave')
       .leftJoinAndSelect('leave.dept', 'dept')
@@ -50,6 +75,7 @@ export class LeaveService extends BaseService<Leave> {
       .take(pageSize)
       .orderBy('leave.id', 'DESC');
 
+    // 动态拼接过滤条件
     if (query.status) {
       qb.andWhere('leave.status = :status', { status: query.status });
     }
@@ -73,7 +99,11 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
-   * 获取员工当年年假可用余额
+   * 检索指定员工在特定年份的年假账户余额（若无则自动初始化）
+   * 
+   * @param empId 员工档案唯一 ID
+   * @param year 查询年份（默认当年）
+   * @returns 年假账户实体（含总天数、已用天数、剩余天数）
    */
   async getEmployeeAnnualBalance(empId: number, year?: number) {
     const queryYear = year || new Date().getFullYear();
@@ -81,8 +111,8 @@ export class LeaveService extends BaseService<Leave> {
       where: { empId, year: queryYear },
     });
 
+    // 若无该年度记录，自动按基准额度 5.0 天开户初始化
     if (!balance) {
-      // 默认初始化
       balance = this.annualRepo.create({
         empId,
         year: queryYear,
@@ -97,10 +127,21 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
-   * 重点事务场景：提交请假申请
-   * 规则：新增请假记录 和 更新员工年假余额 放在同一个数据库事务，两个操作原子化，任一操作失败整体回滚
+   * 重点事务业务：员工提交请假申请
+   * 
+   * 事务原子性与一致性规则：
+   * 1. 强校验员工档案与所在部门存在性；
+   * 2. 若申请类型为年假 (ANNUAL)，开启数据库行级悲观排他锁（pessimistic_write）读取当年年假账户；
+   * 3. 严格校验剩余年假是否满足申请天数，余额不足直接抛出业务异常阻断并全量回滚；
+   * 4. 事务内扣减可用余额，累加已用天数，并创建 PENDING 初始状态的请假单；
+   * 5. 事务成功提交后，异步触发 SSE 实时推流广播最新待审批任务数。
+   * 
+   * @param dto 创建请假单入参
+   * @returns 创建完成的请假单实体
+   * @throws BusinessException 当员工不存在或年假可用额度不足时抛出异常
    */
   async applyLeave(dto: CreateLeaveDto): Promise<Leave> {
+    // 校验申请人档案状态
     const emp = await this.empRepo.findOne({
       where: { id: dto.empId },
       relations: ['dept'],
@@ -113,12 +154,13 @@ export class LeaveService extends BaseService<Leave> {
     const currentYear = new Date(dto.startTime).getFullYear();
     const leaveNo = `LV${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
 
+    // 进入强事务执行块
     const savedLeave = await this.withTransaction(async (manager) => {
-      // 1. 如果是年假，强校验并预扣减/冻结年假余额
+      // 1. 如果是年假，使用悲观行级写锁防止并发超额扣减
       if (dto.leaveType === 'ANNUAL') {
         const annualRecord = await manager.findOne(AnnualLeave, {
           where: { empId: dto.empId, year: currentYear },
-          lock: { mode: 'pessimistic_write' }, // 悲观锁防并发扣减
+          lock: { mode: 'pessimistic_write' },
         });
 
         if (!annualRecord) {
@@ -130,13 +172,14 @@ export class LeaveService extends BaseService<Leave> {
         const remaining = Number(annualRecord.remainDays);
         const applyDays = Number(dto.days);
 
+        // 额度校验
         if (remaining < applyDays) {
           throw new BusinessException(
             `年假余额不足！当前剩余可用年假为 ${remaining} 天，申请天数为 ${applyDays} 天`,
           );
         }
 
-        // 扣减剩余年假，累加已用天数
+        // 预先扣减可用额度
         annualRecord.remainDays = Number((remaining - applyDays).toFixed(1));
         annualRecord.usedDays = Number(
           (Number(annualRecord.usedDays) + applyDays).toFixed(1),
@@ -144,7 +187,7 @@ export class LeaveService extends BaseService<Leave> {
         await manager.save(annualRecord);
       }
 
-      // 2. 插入请假单记录
+      // 2. 插入处于待审批状态的请假记录
       const leave = manager.create(Leave, {
         leaveNo,
         empId: emp.id,
@@ -183,8 +226,19 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
-   * 重点事务场景：审批请假申请（通过 / 驳回）
-   * 规则：若驳回年假，事务内原子归还之前扣减的年假天数
+   * 重点事务业务：主管/人事审批请假单（通过 / 驳回）
+   * 
+   * 事务原子性与回滚机制：
+   * 1. 防重复审批校验：确保当前请假单处于待审批 PENDING 状态；
+   * 2. 原子状态变更：更新审核状态（APPROVED/REJECTED）、批注意见及审核人 ID；
+   * 3. 额度原路退还：若本次审核结果为【驳回】且属于【年假】，在事务内加排他写锁，将扣除的天数原子退回员工账户；
+   * 4. 事务提交后，触发 SSE 广播待办徽标递减与申请结果弹窗通知。
+   * 
+   * @param leaveId 请假单 ID
+   * @param auditDto 审批入参（审核动作、批注意见）
+   * @param auditUserId 执行审批的当前管理员/主管用户 ID
+   * @returns 审批后的请假单记录
+   * @throws BusinessException 单据不存在或已被审批时抛出
    */
   async auditLeave(
     leaveId: number,
@@ -203,12 +257,13 @@ export class LeaveService extends BaseService<Leave> {
       throw new BusinessException('该请假单已被审批处理，无法重复操作');
     }
 
+    // 开启审批事务
     const savedLeave = await this.withTransaction(async (manager) => {
       leave.status = auditDto.action;
       leave.auditRemark = auditDto.auditRemark || '';
       leave.auditUserId = auditUserId;
 
-      // 如果请假被驳回且为年假，将已预扣的年假归还到员工年假余额
+      // 驳回年假原子回滚逻辑：将已扣减的天数全额退回到年假账户
       if (auditDto.action === 'REJECTED' && leave.leaveType === 'ANNUAL') {
         const year = new Date(leave.startTime).getFullYear();
         const annualRecord = await manager.findOne(AnnualLeave, {

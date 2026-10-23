@@ -40,6 +40,14 @@ export const useUserStore = defineStore('user', {
       return res;
     },
 
+    // 局部更新用户信息（例如在个人中心修改姓名、头像、手机号等）
+    updateUserProfile(partialInfo: Record<string, any>) {
+      if (this.userInfo) {
+        this.userInfo = { ...this.userInfo, ...partialInfo };
+        setUserInfo(this.userInfo);
+      }
+    },
+
     // 登出
     logout() {
       this.token = '';

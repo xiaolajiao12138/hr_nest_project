@@ -7,7 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
-  Patch,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { LeaveService } from './leave.service';
 import { CreateLeaveDto, AuditLeaveDto, QueryLeaveDto } from './dto/leave.dto';
@@ -20,13 +20,20 @@ import {
   CurrentUserPayload,
 } from '../../common/decorators/current-user.decorator';
 
+/**
+ * 请假与审批管理控制器
+ * 提供待办审批统计、请假单分页查询、年假余额核算、请假申请提交以及审批（通过/驳回强事务）等接口
+ */
 @Controller('hr/leave')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class LeaveController {
   constructor(private readonly leaveService: LeaveService) {}
 
   /**
-   * 获取待审批请假任务总数
+   * 获取当前待审批请假任务总数
+   * 用于顶部 Header 铃铛待办徽标和工作台概览卡片的实时数据呈现
+   *
+   * @returns 返回待审批单据总数 { count: number }
    */
   @Get('pending-count')
   @Permissions('hr:leave:list')
@@ -35,7 +42,10 @@ export class LeaveController {
   }
 
   /**
-   * 分页查询请假审批单
+   * 分页查询请假审批单列表
+   *
+   * @param query 分页与筛选条件（包含页码、页大小、员工ID、审批状态、请假类型等）
+   * @returns 返回包含请假单实体和关联员工、审批人信息的标准分页结果
    */
   @Get('list')
   @Permissions('hr:leave:list')
@@ -44,19 +54,28 @@ export class LeaveController {
   }
 
   /**
-   * 查询员工当年的年假余额
+   * 查询指定员工当年的年假账户余额与历史核销记录
+   *
+   * @param empId 员工主键 ID
+   * @param year 查询年份（可选，默认为当前公历年）
+   * @returns 返回该员工对应年度的年假总额、已用额度及剩余天数
    */
   @Get('annual-balance/:empId')
   @Permissions('hr:leave:list')
   async getAnnualBalance(
-    @Param('empId') empId: number,
+    @Param('empId', ParseIntPipe) empId: number,
     @Query('year') year?: number,
   ) {
     return this.leaveService.getEmployeeAnnualBalance(empId, year);
   }
 
   /**
-   * 提交请假申请（强事务处理：若为年假自动扣减年假账户）
+   * 员工提交请假申请
+   * 采用强事务与行锁保障：若类型为年假，即时校验并预扣减年假账户额度；同时触发 SSE 全员待办总数更新广播
+   *
+   * @param dto 请假申请参数（员工ID、请假类型、起止时间戳、申请理由）
+   * @returns 返回创建成功的请假实体
+   * @throws {BusinessException} 当年假余额不足或时间区间冲突时抛出异常并自动回滚事务
    */
   @Post('apply')
   @Permissions('hr:leave:add')
@@ -66,7 +85,16 @@ export class LeaveController {
   }
 
   /**
-   * 审批请假单（通过/驳回，若驳回年假则自动原路归还年假天数）
+   * 主管/HR 审批请假单
+   * 采用强事务保障：
+   * 1. 若审批驳回且为年假类型，自动原路回滚返还预扣的年假额度；
+   * 2. 更新单据状态为已批准/已驳回；
+   * 3. 通过 SSE 向申请人定向推送弹窗通知，并广播更新待办任务数。
+   *
+   * @param dto 审批请求载荷（请假单ID、审批动作 APPROVED/REJECTED、审批意见）
+   * @param user 当前执行审批操作的登录用户上下文
+   * @returns 返回更新后的请假单记录
+   * @throws {BusinessException} 当请假单不存在或已被重复审批时抛出业务异常
    */
   @Put('audit')
   @Permissions('hr:leave:audit')

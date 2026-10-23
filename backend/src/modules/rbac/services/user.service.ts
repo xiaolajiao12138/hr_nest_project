@@ -4,7 +4,14 @@ import { Repository, DataSource, In, Like } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { BaseService } from '../../../common/base/base.service';
-import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from '../dto/rbac.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  ResetPasswordDto,
+  UpdateProfileDto,
+  UpdatePasswordDto,
+} from '../dto/rbac.dto';
+import { OperLogEntity } from '../../log/entities/oper-log.entity';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 import * as bcrypt from 'bcryptjs';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
@@ -133,5 +140,116 @@ export class UserService extends BaseService<User> {
     }
     await this.userRepo.update(id, { status: Number(status) });
     return true;
+  }
+
+  /**
+   * 获取当前登录用户个人详细信息
+   */
+  async getProfile(userId: number) {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ['dept', 'roles'],
+    });
+
+    if (!user) {
+      throw new BusinessException('用户不存在');
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      realName: user.realName,
+      phone: user.phone || '',
+      email: user.email || '',
+      avatar: user.avatar || '',
+      status: user.status,
+      createdAt: user.createdAt,
+      dept: user.dept ? { id: user.dept.id, deptName: user.dept.deptName } : null,
+      roles: (user.roles || []).map((role) => ({
+        id: role.id,
+        roleName: role.roleName,
+        roleKey: role.roleKey,
+      })),
+    };
+  }
+
+  /**
+   * 更新当前登录用户个人资料
+   */
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BusinessException('用户不存在');
+    }
+
+    if (dto.realName !== undefined) {
+      user.realName = dto.realName;
+    }
+    if (dto.phone !== undefined) {
+      user.phone = dto.phone;
+    }
+    if (dto.email !== undefined) {
+      user.email = dto.email;
+    }
+    if (dto.avatar !== undefined) {
+      user.avatar = dto.avatar;
+    }
+
+    const updated = await this.userRepo.save(user);
+    return {
+      id: updated.id,
+      username: updated.username,
+      realName: updated.realName,
+      phone: updated.phone,
+      email: updated.email,
+      avatar: updated.avatar,
+    };
+  }
+
+  /**
+   * 修改当前登录用户密码
+   */
+  async updatePassword(userId: number, dto: UpdatePasswordDto) {
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+
+    if (!user) {
+      throw new BusinessException('用户不存在');
+    }
+
+    const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
+    if (!isMatch) {
+      throw new BusinessException('原旧密码输入错误，请重新确认');
+    }
+
+    if (dto.oldPassword === dto.newPassword) {
+      throw new BusinessException('新密码不能与原旧密码相同');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    await this.userRepo.update(user.id, { password: hashedPassword });
+    return true;
+  }
+
+  /**
+   * 查询个人操作日志（近况审计）
+   */
+  async getUserLogs(username: string, pageParam: PageParamDto) {
+    const page = Number(pageParam.page) || 1;
+    const pageSize = Number(pageParam.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
+
+    const logRepo = this.dataSource.getRepository(OperLogEntity);
+    const [list, total] = await logRepo.findAndCount({
+      where: { operName: username },
+      order: { operTime: 'DESC' },
+      skip,
+      take: pageSize,
+    });
+
+    return PageResultDto.create(list, total, page, pageSize);
   }
 }

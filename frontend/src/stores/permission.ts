@@ -3,28 +3,37 @@ import { RouteRecordRaw } from 'vue-router';
 import { getDynamicRoutesApi } from '@/api/auth';
 import Layout from '@/layout/index.vue';
 
-// Vite 动态加载 views 目录下的所有 vue 组件
+/**
+ * 基于 Vite 的 import.meta.glob 机制预先扫描 views 目录下的所有 Vue 单文件组件
+ * 用于动态路由配置中根据后端返回的组件文件路径字符串映射实际的异步加载函数
+ */
 const modules = import.meta.glob('../views/**/*.vue');
 
+/**
+ * 动态路由权限与侧边栏菜单管理 Store
+ * 负责从后端拉取当前登录人具备权限的菜单树，转换为 Vue-Router 规范路由记录，并挂载至路由实例
+ */
 export const usePermissionStore = defineStore('permission', {
   state: () => ({
-    // 动态添加的所有路由
+    /** 当前用户动态追加注册的所有路由记录集合 */
     routes: [] as RouteRecordRaw[],
-    // 用于侧边栏渲染的菜单树
+    /** 用于渲染左侧自适应侧边栏的树形菜单数据源 */
     sidebarMenus: [] as any[],
-    // 是否已动态加载过路由
+    /** 标识当前应用生命周期内是否已经完成动态路由挂载（防止路由守卫死循环触发） */
     isRoutesLoaded: false,
   }),
 
   actions: {
     /**
-     * 从后端数据库获取当前角色拥有的菜单树，并动态转换为 Vue Router 格式
+     * 向后端请求当前用户所属角色的菜单树，并转换为可直接被 Vue-Router 消费的 RouteRecordRaw 集合
+     *
+     * @returns 返回解析完成的动态路由记录数组
      */
     async generateRoutes(): Promise<RouteRecordRaw[]> {
       const serverRoutes: any = await getDynamicRoutesApi();
       this.sidebarMenus = serverRoutes;
 
-      // 递归转换后端菜单为 RouteRecordRaw
+      // 递归将后端元数据结构转换为 Vue Router 格式
       const accessedRoutes = this.transformRoutes(serverRoutes);
 
       this.routes = accessedRoutes;
@@ -33,18 +42,23 @@ export const usePermissionStore = defineStore('permission', {
     },
 
     /**
-     * 递归转换路由结构
+     * 递归转换后端菜单结构为 Vue-Router 标准 RouteRecordRaw 路由记录
+     * 针对顶级独立页面（如工作台），自动注入 Layout 外层骨架，保证侧边栏与顶部导航正常显示
+     *
+     * @param asyncRoutes 后端返回的多级菜单节点列表
+     * @param isRoot 是否为路由树的最顶层节点，默认为 true
+     * @returns 返回标准化路由对象数组
      */
     transformRoutes(asyncRoutes: any[], isRoot = true): RouteRecordRaw[] {
       const res: RouteRecordRaw[] = [];
 
       for (const item of asyncRoutes) {
-        // 查找或映射组件
+        // 根据 component 标识匹配真实组件加载器
         let viewComponent: any = null;
         if (item.component === 'Layout') {
           viewComponent = Layout;
         } else if (item.component) {
-          // 规范路径格式，匹配 modules
+          // 统一去除首部斜杠并补齐 views/ 前缀，以便精准命中 glob 映射字典
           let compPath = item.component.replace(/^\//, '');
           if (!compPath.startsWith('views/')) {
             compPath = `views/${compPath}`;
@@ -55,7 +69,7 @@ export const usePermissionStore = defineStore('permission', {
             viewComponent = modules[moduleKey];
           } else {
             console.warn(`[动态路由] 未找到组件路径: ${moduleKey}`);
-            // 找不到时降级为空视图，避免页面崩溃
+            // 路径配置错误时降级为 404 占位视图，防止整个系统白屏崩溃
             viewComponent = () => import('@/views/404.vue');
           }
         }
@@ -67,8 +81,8 @@ export const usePermissionStore = defineStore('permission', {
           isFrame: Boolean(item.meta?.isFrame),
         };
 
-        // 核心：若为根级独立页面（非 Layout 容器且无 children，例如工作台 /dashboard）
-        // 自动在外层包裹 Layout 布局骨架，确保侧边栏菜单与顶部导航正常可见
+        // 核心处理：若为根级非 Layout 的独立页面（例如首页面板工作台 /dashboard）
+        // 自动在外层包装顶级 Layout 容器，使工作台始终能展示左侧导航栏与顶部工具栏
         if (isRoot && item.component !== 'Layout') {
           res.push({
             path: item.path,
@@ -85,7 +99,7 @@ export const usePermissionStore = defineStore('permission', {
           continue;
         }
 
-        // 常规目录或多级菜单节点
+        // 常规目录容器或多级子路由节点
         const routeRecord: any = {
           path: item.path,
           name: item.name,
@@ -93,7 +107,7 @@ export const usePermissionStore = defineStore('permission', {
           meta,
         };
 
-        // 处理子路由
+        // 递归处理子路由集合
         if (item.children && item.children.length > 0) {
           routeRecord.children = this.transformRoutes(item.children, false);
         }
@@ -104,7 +118,9 @@ export const usePermissionStore = defineStore('permission', {
       return res;
     },
 
-    // 重置路由状态
+    /**
+     * 用户登出时重置路由加载状态与缓存
+     */
     resetRoutes() {
       this.routes = [];
       this.sidebarMenus = [];

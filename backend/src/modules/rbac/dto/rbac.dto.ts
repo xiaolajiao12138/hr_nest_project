@@ -155,3 +155,33 @@ export class ChangeUserStatusDto {
   @IsInt({ message: '状态值必须为数值 (1:启用, 0:停用)' })
   status: number;
 }
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString({ message: '真实姓名必须为字符串' })
+  @Length(2, 50, { message: '真实姓名长度在 2-50 个字符之间' })
+  realName?: string;
+
+  @IsOptional()
+  @IsString({ message: '手机号必须为字符串' })
+  phone?: string;
+
+  @IsOptional()
+  @IsString({ message: '邮箱必须为字符串' })
+  email?: string;
+
+  @IsOptional()
+  @IsString({ message: '头像地址必须为字符串' })
+  avatar?: string;
+}
+
+export class UpdatePasswordDto {
+  @IsNotEmpty({ message: '旧密码不能为空' })
+  @IsString()
+  oldPassword: string;
+
+  @IsNotEmpty({ message: '新密码不能为空' })
+  @Length(6, 30, { message: '新密码长度至少6位且不超过30位' })
+  @IsString()
+  newPassword: string;
+}

@@ -15,10 +15,29 @@ import { PageResultDto } from '../../common/dto/page-result.dto';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { Response } from 'express';
 
+/**
+ * 员工档案管理与 Excel 大数据批量服务类
+ * 
+ * 核心业务领域：
+ * 1. 员工花名册档案的多条件联表检索与分页
+ * 2. 入职建档强事务：新增员工档案 + 自动原子开户初始化当前年度 5 天年假账户
+ * 3. Excel 严格校验批量导入：导入前进行工号唯一性、部门存在性、手机身份证格式全量逐行预检，任一失败全量阻断
+ * 4. 大数据流式分页导出：基于 ExcelJS 写入流分页拉取数据，彻底杜绝数十万行数据导出时的 Node.js OOM 内存溢出
+ */
 @Injectable()
 export class EmployeeService extends BaseService<Employee> {
+  /** 日志记录器 */
   private readonly logger = new Logger(EmployeeService.name);
 
+  /**
+   * 构造函数注入实体仓储、部门、年假及 Excel 工具服务
+   * 
+   * @param empRepo 员工档案实体 Repository
+   * @param deptRepo 部门实体 Repository（用于部门名称与 ID 的预匹配）
+   * @param annualRepo 年假账户实体 Repository
+   * @param excelService Excel 流式导入导出核心服务
+   * @param dataSource TypeORM 数据源
+   */
   constructor(
     @InjectRepository(Employee)
     private readonly empRepo: Repository<Employee>,
@@ -33,7 +52,10 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 分页查询员工（支持部门级联、模糊检索）
+   * 分页条件查询员工档案列表（级联加载所属部门与身份证/学历证附件）
+   * 
+   * @param queryDto 查询过滤条件（工号/姓名/手机模糊关键字、部门ID、在职状态、岗位）
+   * @returns 标准分页响应对象
    */
   async findEmployeePage(
     queryDto: QueryEmployeeDto,
@@ -42,6 +64,7 @@ export class EmployeeService extends BaseService<Employee> {
     const pageSize = Number(queryDto.pageSize) || 10;
     const skip = (page - 1) * pageSize;
 
+    // 联表预加载部门与 MinIO 附件文件实体
     const qb = this.empRepo
       .createQueryBuilder('emp')
       .leftJoinAndSelect('emp.dept', 'dept')
@@ -52,6 +75,7 @@ export class EmployeeService extends BaseService<Employee> {
       .take(pageSize)
       .orderBy('emp.id', 'DESC');
 
+    // 动态拼接搜索条件
     if (queryDto.keyword) {
       qb.andWhere(
         '(emp.empNo LIKE :kw OR emp.name LIKE :kw OR emp.phone LIKE :kw)',
@@ -76,9 +100,14 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 创建员工（同时事务初始化当年年假 5 天）
+   * 创建员工档案（强一致事务：建档 + 原子开户初始化当年年假）
+   * 
+   * @param dto 创建员工入参载荷
+   * @returns 创建成功后的员工实体
+   * @throws BusinessException 当工号已被占用时抛出业务异常
    */
   async createEmployee(dto: CreateEmployeeDto): Promise<Employee> {
+    // 校验工号唯一性，防止录入重复工号
     const exist = await this.empRepo.findOne({
       where: { empNo: dto.empNo },
     });
@@ -86,11 +115,12 @@ export class EmployeeService extends BaseService<Employee> {
       throw new BusinessException(`工号 ${dto.empNo} 已存在`);
     }
 
+    // 开启入职事务：员工记录与年假初始额度原子提交
     return this.withTransaction(async (manager) => {
       const emp = manager.create(Employee, dto);
       const savedEmp = await manager.save(emp);
 
-      // 初始化当前年度年假账户
+      // 同步初始化当前年度 5.0 天年假账户
       const currentYear = new Date().getFullYear();
       const annual = manager.create(AnnualLeave, {
         empId: savedEmp.id,
@@ -106,7 +136,9 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 生成员工导入模板
+   * 生成供用户下载的员工批量导入 Excel 模板
+   * 
+   * @returns 包含表头与标准示例数据的 Excel 文件 Buffer 二进制流
    */
   async getImportTemplate(): Promise<Buffer> {
     return this.excelService.generateTemplate(
@@ -127,21 +159,32 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 重点：Excel 批量导入员工（严格全量校验 + 事务级回滚）
-   * 规则：逐行校验，若任一行出错，整批事务回滚，不保存任何数据，返回所有错误行号
+   * 重点业务：Excel 批量导入员工（严格全量预校验 + 事务级原子入库）
+   * 
+   * 数据一致性与安全规则：
+   * 1. 预先加载系统所有正常部门并建立 Name -> ID 哈希映射；
+   * 2. 预先加载数据库全量工号，在内存 Set 中进行 O(1) 冲突比对；
+   * 3. 逐行执行手机正则、身份证正则、部门存在性、文件内工号唯一性强校验；
+   * 4. 若发现任一行存在校验错误，整批数据全量回滚不予入库，一次性返回所有错误行号及具体原因；
+   * 5. 校验全部通过后，开启独立数据库事务批量持久化，并为每名员工自动开户初始化年假。
+   * 
+   * @param fileBuffer 上传的 Excel 原始二进制数据
+   * @returns 校验结果或导入成功报告
    */
   async importEmployeesFromExcel(fileBuffer: Buffer) {
-    // 预先加载系统所有部门供名称匹配
+    // 预先加载系统所有部门供名称快速匹配
     const depts = await this.deptRepo.find();
     const deptMap = new Map<string, number>();
     depts.forEach((d) => deptMap.set(d.deptName.trim(), d.id));
 
-    // 预先查询系统中已有的工号
+    // 预先查询系统中已占用的工号清单
     const existingEmployees = await this.empRepo.find({ select: ['empNo'] });
     const existingEmpNoSet = new Set(existingEmployees.map((e) => e.empNo));
 
+    // 用于检测当前上传文件内部是否出现相互重复工号
     const batchEmpNos = new Set<string>();
 
+    // 声明列定义与逐行验证规则
     const columnDefs: ColumnDefinition[] = [
       {
         header: '工号',
@@ -185,12 +228,13 @@ export class EmployeeService extends BaseService<Employee> {
       { header: '月基本薪资', key: 'salary', required: false },
     ];
 
+    // 执行多行解析与规则校验
     const parseResult = await this.excelService.parseAndValidate<any>(
       fileBuffer,
       columnDefs,
     );
 
-    // 严格校验：若存在任意错误，直接返回错误明细，不进入事务入库
+    // 严格防御：若发现任何格式或业务错误，全量阻断并返回错误清单
     if (!parseResult.success) {
       return {
         success: false,
@@ -199,7 +243,7 @@ export class EmployeeService extends BaseService<Employee> {
       };
     }
 
-    // 全部行校验通过，开启独立事务批量插入
+    // 全部行校验通过，开启独立事务批量插入并初始化年假
     const currentYear = new Date().getFullYear();
 
     await this.withTransaction(async (manager) => {
@@ -220,7 +264,7 @@ export class EmployeeService extends BaseService<Employee> {
         });
         const savedEmp = await manager.save(emp);
 
-        // 初始化年假
+        // 事务内同步初始化年假账户
         const annual = manager.create(AnnualLeave, {
           empId: savedEmp.id,
           year: currentYear,
@@ -240,12 +284,21 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 重点：大数据流式分页导出员工列表（防止内存溢出 OOM）
+   * 重点特性：大数据流式分页导出员工列表（杜绝 Node.js 内存溢出 OOM）
+   * 
+   * 性能优化保障：
+   * 1. 采用 HTTP 分块传输（Transfer-Encoding: chunked）配合 ExcelJS WorkbookWriter；
+   * 2. 避免一次性在内存中查询和组装十万行实体，按批次（如 500 条）分页拉取并写入流；
+   * 3. 写入完成后主动调用 commit 刷新缓冲区，维持极低的内存占用（平稳在 50MB 以内）。
+   * 
+   * @param res Express HTTP 响应对象
+   * @param queryDto 导出检索条件
    */
   async exportEmployeesStream(
     res: Response,
     queryDto: QueryEmployeeDto,
   ): Promise<void> {
+    // 导出列头定义
     const columns = [
       { header: '员工工号', key: 'empNo', width: 16 },
       { header: '姓名', key: 'name', width: 14 },
@@ -260,14 +313,17 @@ export class EmployeeService extends BaseService<Employee> {
       { header: '状态', key: 'statusText', width: 12 },
     ];
 
+    // 委托 ExcelService 执行底层流式管道下发
     await this.excelService.exportLargeDataStream(
       res,
       `员工档案清单_${new Date().toISOString().slice(0, 10)}`,
       columns,
       async (page, pageSize) => {
+        // 分页异步查询数据
         const query = { ...queryDto, page, pageSize };
         const result = await this.findEmployeePage(query);
 
+        // 转换为符合 Excel 列头映射的平面数据结构
         const mappedList = result.list.map((emp) => ({
           empNo: emp.empNo,
           name: emp.name,
@@ -285,7 +341,7 @@ export class EmployeeService extends BaseService<Employee> {
 
         return { list: mappedList, total: result.total };
       },
-      500, // 每次查询 500 条流式下发
+      500, // 每批次 500 条分页拉取流式下发
     );
   }
 }

@@ -28,19 +28,33 @@ import Header from './Header.vue';
 import TagsView from './TagsView.vue';
 import { useNotifyStore } from '@/stores/notify';
 
+/**
+ * 侧边菜单栏折叠状态响应式变量
+ * true 为收起（宽度 64px），false 为展开（宽度 220px）
+ */
 const isCollapse = ref(false);
+
 const notifyStore = useNotifyStore();
 
+/**
+ * 切换侧边栏展开/折叠状态
+ */
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value;
 };
 
-// 挂载布局时自动连接 SSE 实时推送通道
+/**
+ * 主骨架挂载完成生命周期钩子
+ * 启动 SSE 服务端实时推送长连接，自动拉取未读消息与待审批数量
+ */
 onMounted(() => {
   notifyStore.initSSE();
 });
 
-// 销毁时释放 SSE 长连接资源
+/**
+ * 主骨架卸载/销毁前生命周期钩子
+ * 关闭 SSE 长连接并注销重连计时器，杜绝后台游离连接与内存泄漏
+ */
 onBeforeUnmount(() => {
   notifyStore.closeSSE();
 });

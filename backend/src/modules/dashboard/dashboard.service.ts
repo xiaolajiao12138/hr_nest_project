@@ -5,22 +5,33 @@ import { Dept } from '../department/entities/dept.entity';
 import { Employee } from '../employee/entities/employee.entity';
 import { Leave } from '../leave/entities/leave.entity';
 
+/**
+ * 首页工作台大屏统计数据结构定义
+ */
 export interface DashboardStatsResult {
+  /** 头部 4 项关键核心运营指标概览 */
   overview: {
+    /** 在职员工总数 */
     totalEmployees: number;
+    /** 待审批请假申请总数 */
     pendingLeaves: number;
+    /** 正常运行部门总数 */
     deptCount: number;
+    /** 今日综合出勤率百分比 (0-100) */
     attendanceRate: number;
   };
+  /** 部门人力编制统计（柱状图） */
   deptDistribution: {
     deptName: string;
     actualCount: number;
     planCount: number;
   }[];
+  /** 员工学历结构占比（环形饼图） */
   educationDistribution: {
     name: string;
     value: number;
   }[];
+  /** 近 6 个月考勤与请假走势（多折线面积图） */
   leaveTrend: {
     months: string[];
     annual: number[];
@@ -29,6 +40,10 @@ export interface DashboardStatsResult {
   };
 }
 
+/**
+ * 仪表盘与大屏数据聚合服务
+ * 汇聚员工、部门、考勤审批等关键模块的核心指标，为管理层提供全景化人资分析数据
+ */
 @Injectable()
 export class DashboardService {
   constructor(
@@ -41,17 +56,19 @@ export class DashboardService {
   ) {}
 
   /**
-   * 获取首页工作台核心统计数据
+   * 获取首页工作台核心统计概览与多维度图表聚合数据
+   *
+   * @returns 返回整合后的概览卡片指标、部门编制分布、学历占比和近半年请假走势
    */
   async getDashboardStats(): Promise<DashboardStatsResult> {
-    // 1. 概览指标
+    // 1. 概览核心指标并发统计
     const [totalEmployees, pendingLeaves, deptCount] = await Promise.all([
       this.employeeRepo.count({ where: { status: 1 } }),
       this.leaveRepo.count({ where: { status: 'PENDING' } }),
       this.deptRepo.count({ where: { status: 1 } }),
     ]);
 
-    // 计算今日出勤率预估 (在职总数减去当前正在请假的人数)
+    // 计算今日出勤率预估（在职总数减去当前时间段处于已批准状态的请假人数）
     const now = new Date();
     const activeLeaves = await this.leaveRepo
       .createQueryBuilder('leave')
@@ -73,6 +90,7 @@ export class DashboardService {
 
     let deptDistribution = [];
     if (depts.length > 0) {
+      // 聚合各部门在职员工人数
       const deptCounts = await this.employeeRepo
         .createQueryBuilder('emp')
         .select('emp.deptId', 'deptId')
@@ -88,7 +106,7 @@ export class DashboardService {
 
       deptDistribution = depts.map((d) => {
         const actual = countMap.get(d.id) || 0;
-        // 编制数设为实际人数 + 预设冗余(至少为 actual + 1)
+        // 编制计划数：设为实际人数 + 20% 预设冗余(至少为 actual + 1)
         const plan = actual > 0 ? actual + Math.max(1, Math.floor(actual * 0.2)) : 5;
         return {
           deptName: d.deptName,
@@ -98,7 +116,7 @@ export class DashboardService {
       });
     }
 
-    // 若数据为空，提供演示兜底数据
+    // 若当前数据库无部门数据，提供合理的演示兜底，保证前台大屏图表正常渲染
     if (deptDistribution.length === 0) {
       deptDistribution = [
         { deptName: '研发中心', actualCount: 28, planCount: 35 },
@@ -144,21 +162,20 @@ export class DashboardService {
     const sickData: number[] = [];
     const casualData: number[] = [];
 
-    // 生成近6个月的月份标签 (格式: 'YYYY-MM')
+    // 动态回溯推导近 6 个月的月份区间与中文标签
     const currentDate = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
-      const monthStr = `${year}-${month}`;
       const label = `${d.getMonth() + 1}月`;
       monthLabels.push(label);
 
-      // 月初与月末
+      // 计算该月的起止时间戳
       const startOfMonth = new Date(year, d.getMonth(), 1, 0, 0, 0);
       const endOfMonth = new Date(year, d.getMonth() + 1, 0, 23, 59, 59);
 
-      // 查询该月各类型请假数量 (无论审批状态，只要是请假申请即反映月度考勤负荷)
+      // 查询该月各分类请假发生频次
       const leavesInMonth = await this.leaveRepo.find({
         where: {
           startTime: Between(startOfMonth, endOfMonth),
