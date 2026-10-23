@@ -4,6 +4,9 @@ import request from '@/utils/request';
 export function getNoticeListApi(params: any) {
   return request({ url: '/ops/notice/list', method: 'get', params });
 }
+export function getLatestNoticesApi() {
+  return request({ url: '/ops/notice/latest', method: 'get' });
+}
 export function createNoticeApi(data: any) {
   return request({ url: '/ops/notice', method: 'post', data });
 }

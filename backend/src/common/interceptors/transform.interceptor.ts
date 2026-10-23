@@ -33,6 +33,11 @@ export class TransformInterceptor<T>
           return data;
         }
 
+        // 如果是 SSE 长连接事件流 (MessageEvent)，不作统一包装
+        if (data && typeof data === 'object' && 'data' in data && !('code' in data)) {
+          return data;
+        }
+
         // 如果返回值已经包含 code 和 msg 字段，直接返回
         if (
           data &&

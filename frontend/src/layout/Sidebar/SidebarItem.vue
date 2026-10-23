@@ -9,13 +9,7 @@
         <component :is="item.meta.icon" />
       </el-icon>
       <template #title>
-        <span class="menu-title-text">{{ item.meta?.title }}</span>
-        <el-badge
-          v-if="item.path === '/hr/leave' && pendingCount > 0"
-          :value="pendingCount"
-          :max="99"
-          class="menu-badge"
-        />
+        <span>{{ item.meta?.title }}</span>
       </template>
     </el-menu-item>
 
@@ -39,23 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useNotifyStore } from '@/stores/notify';
-
 defineProps<{
   item: any;
 }>();
-
-const notifyStore = useNotifyStore();
-const pendingCount = computed(() => notifyStore.pendingLeaveCount);
 </script>
-
-<style scoped>
-.menu-title-text {
-  margin-right: 8px;
-}
-:deep(.menu-badge .el-badge__content) {
-  top: 0;
-  right: -6px;
-}
-</style>

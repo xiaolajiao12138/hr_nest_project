@@ -200,9 +200,9 @@ export class DashboardService {
 
     return {
       overview: {
-        totalEmployees: totalEmployees || 87,
-        pendingLeaves: pendingLeaves || 3,
-        deptCount: deptCount || 6,
+        totalEmployees: typeof totalEmployees === 'number' ? totalEmployees : 0,
+        pendingLeaves: typeof pendingLeaves === 'number' ? pendingLeaves : 0,
+        deptCount: typeof deptCount === 'number' ? deptCount : 0,
         attendanceRate,
       },
       deptDistribution,

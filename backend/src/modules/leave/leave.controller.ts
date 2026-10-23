@@ -26,6 +26,15 @@ export class LeaveController {
   constructor(private readonly leaveService: LeaveService) {}
 
   /**
+   * 获取待审批请假任务总数
+   */
+  @Get('pending-count')
+  @Permissions('hr:leave:list')
+  async getPendingCount() {
+    return this.leaveService.getPendingCount();
+  }
+
+  /**
    * 分页查询请假审批单
    */
   @Get('list')

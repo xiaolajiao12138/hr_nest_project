@@ -8,6 +8,13 @@ export function getLeaveListApi(params: any) {
   });
 }
 
+export function getLeavePendingCountApi(): Promise<{ count: number }> {
+  return request({
+    url: '/hr/leave/pending-count',
+    method: 'get',
+  });
+}
+
 export function getAnnualBalanceApi(empId: number, year?: number) {
   return request({
     url: `/hr/leave/annual-balance/${empId}`,

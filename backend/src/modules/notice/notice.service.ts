@@ -49,6 +49,17 @@ export class NoticeService extends BaseService<Notice> {
     return PageResultDto.create(list, total, page, pageSize);
   }
 
+  /**
+   * 获取最新发布的系统公告 (用于客户端登录后初次同步未读通知)
+   */
+  async getLatestNotices(limit = 5): Promise<Notice[]> {
+    return this.noticeRepo.find({
+      where: { status: 1 },
+      order: { id: 'DESC' },
+      take: limit,
+    });
+  }
+
   override async create(data: any): Promise<Notice> {
     const notice = await super.create(data);
     if (Number(notice.status) === 1) {
@@ -69,11 +80,12 @@ export class NoticeService extends BaseService<Notice> {
   private broadcastNotice(notice: Notice) {
     this.sseService.broadcast({
       type: 'NOTICE_BROADCAST',
-      title: '系统新公告发布',
+      title: notice.noticeType === 'ANNOUNCEMENT' ? '📢 全员公告发布' : '📌 系统内部通知',
       message: notice.title,
       data: {
         id: notice.id,
         title: notice.title,
+        content: notice.content,
         noticeType: notice.noticeType,
         createdAt: notice.createdAt,
       },

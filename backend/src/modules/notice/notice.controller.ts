@@ -35,6 +35,14 @@ export class NoticeController {
     return this.noticeService.findNoticePage(query);
   }
 
+  /**
+   * 获取最新发布的系统公告 (任何登录用户均可查阅)
+   */
+  @Get('latest')
+  async getLatest() {
+    return this.noticeService.getLatestNotices(5);
+  }
+
   @Get(':id')
   @Permissions('ops:notice:list')
   async getDetail(@Param('id') id: number) {

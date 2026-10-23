@@ -26,6 +26,14 @@ export class LeaveService extends BaseService<Leave> {
   }
 
   /**
+   * 获取待审批请假申请总数
+   */
+  async getPendingCount(): Promise<{ count: number }> {
+    const count = await this.leaveRepo.count({ where: { status: 'PENDING' } });
+    return { count };
+  }
+
+  /**
    * 分页查询请假记录
    */
   async findLeavePage(query: QueryLeaveDto): Promise<PageResultDto<Leave>> {
