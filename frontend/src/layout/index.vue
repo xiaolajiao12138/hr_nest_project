@@ -22,11 +22,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import Sidebar from './Sidebar/index.vue';
 import Header from './Header.vue';
 import TagsView from './TagsView.vue';
 import { useNotifyStore } from '@/stores/notify';
+import { useUserStore } from '@/stores/user';
+import { useWatermark } from '@/hooks/useWatermark';
 
 /**
  * 侧边菜单栏折叠状态响应式变量
@@ -35,6 +37,23 @@ import { useNotifyStore } from '@/stores/notify';
 const isCollapse = ref(false);
 
 const notifyStore = useNotifyStore();
+const userStore = useUserStore();
+const { setWatermark, clearWatermark } = useWatermark();
+
+/**
+ * 更新背景防截屏防泄露水印
+ */
+const updateWatermark = () => {
+  const name = userStore.userInfo?.realName || userStore.userInfo?.username || 'HR系统';
+  const username = userStore.userInfo?.username ? `(${userStore.userInfo.username})` : '';
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  setWatermark({
+    text: `${name} ${username}`,
+    subText: `HR数字化系统 • ${dateStr}`,
+  });
+};
 
 /**
  * 切换侧边栏展开/折叠状态
@@ -45,18 +64,27 @@ const toggleCollapse = () => {
 
 /**
  * 主骨架挂载完成生命周期钩子
- * 启动 SSE 服务端实时推送长连接，自动拉取未读消息与待审批数量
+ * 启动 SSE 服务端实时推送长连接，挂载防截屏水印
  */
 onMounted(() => {
   notifyStore.initSSE();
+  updateWatermark();
 });
+
+watch(
+  () => userStore.userInfo,
+  () => {
+    updateWatermark();
+  }
+);
 
 /**
  * 主骨架卸载/销毁前生命周期钩子
- * 关闭 SSE 长连接并注销重连计时器，杜绝后台游离连接与内存泄漏
+ * 关闭 SSE 长连接并清除水印，杜绝后台游离连接与内存泄漏
  */
 onBeforeUnmount(() => {
   notifyStore.closeSSE();
+  clearWatermark();
 });
 </script>
 
