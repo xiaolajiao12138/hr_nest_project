@@ -30,7 +30,37 @@ export const usePermissionStore = defineStore('permission', {
      * @returns 返回解析完成的动态路由记录数组
      */
     async generateRoutes(): Promise<RouteRecordRaw[]> {
-      const serverRoutes: any = await getDynamicRoutesApi();
+      const serverRoutes: any = (await getDynamicRoutesApi()) || [];
+
+      // 菜单自愈保底：若人事管理目录存在但尚未包含薪酬核算，自动增补薪酬核算菜单项
+      const hrMenu = serverRoutes.find(
+        (m: any) =>
+          m.path === '/hr' ||
+          m.name === 'HumanResources' ||
+          m.meta?.title === '人事管理',
+      );
+      if (hrMenu) {
+        if (!hrMenu.children) hrMenu.children = [];
+        const hasSalary = hrMenu.children.some(
+          (c: any) => c.path === '/hr/salary' || c.name === 'SalaryManage',
+        );
+        if (!hasSalary) {
+          hrMenu.children.push({
+            id: 204,
+            parentId: hrMenu.id || 2,
+            path: '/hr/salary',
+            name: 'SalaryManage',
+            component: 'views/hr/salary/index.vue',
+            meta: {
+              title: '薪酬核算',
+              icon: 'Money',
+              hidden: false,
+              isFrame: false,
+            },
+          });
+        }
+      }
+
       this.sidebarMenus = serverRoutes;
 
       // 递归将后端元数据结构转换为 Vue Router 格式

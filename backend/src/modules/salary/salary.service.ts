@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between } from 'typeorm';
+import { Repository, In, Between, DataSource } from 'typeorm';
 import { SalaryRecord } from './entities/salary.entity';
 import { Employee } from '../employee/entities/employee.entity';
 import { Leave } from '../leave/entities/leave.entity';
@@ -17,7 +17,7 @@ import * as ExcelJS from 'exceljs';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
-export class SalaryService {
+export class SalaryService implements OnModuleInit {
   private readonly logger = new Logger(SalaryService.name);
 
   constructor(
@@ -29,7 +29,44 @@ export class SalaryService {
     private readonly leaveRepo: Repository<Leave>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
+
+  async onModuleInit() {
+    await this.initSalaryMenuAndPermissions();
+  }
+
+  /**
+   * 自动自愈同步薪酬核算菜单与按钮权限至 sys_menu 与 sys_role_menu
+   */
+  private async initSalaryMenuAndPermissions() {
+    try {
+      await this.dataSource.query(`
+        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
+        VALUES (204, 2, '薪酬核算', 'SalaryManage', '/hr/salary', 'views/hr/salary/index.vue', 'Money', 4, 'C', 'hr:salary:list', false, false, 1)
+        ON CONFLICT (id) DO UPDATE SET title = '薪酬核算', path = '/hr/salary', component = 'views/hr/salary/index.vue', icon = 'Money', status = 1;
+
+        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
+        VALUES
+          (230, 204, '薪资核算', '', '', '', '', 1, 'F', 'hr:salary:calc', false, false, 1),
+          (231, 204, '薪资调整', '', '', '', '', 2, 'F', 'hr:salary:edit', false, false, 1),
+          (232, 204, '发薪确认', '', '', '', '', 3, 'F', 'hr:salary:confirm', false, false, 1),
+          (233, 204, '薪资导出', '', '', '', '', 4, 'F', 'hr:salary:export', false, false, 1)
+        ON CONFLICT (id) DO NOTHING;
+
+        SELECT setval('sys_menu_id_seq', (SELECT MAX(id) FROM sys_menu));
+
+        INSERT INTO sys_role_menu (role_id, menu_id)
+        VALUES 
+          (1, 204), (1, 230), (1, 231), (1, 232), (1, 233),
+          (2, 204), (2, 230), (2, 231), (2, 232), (2, 233)
+        ON CONFLICT DO NOTHING;
+      `);
+      this.logger.log('薪酬核算系统菜单与权限数据自动装载完成');
+    } catch (err: any) {
+      this.logger.warn(`初始化薪酬菜单或权限警告: ${err?.message || err}`);
+    }
+  }
 
   /**
    * 一键全员月度薪酬智能核算引擎
