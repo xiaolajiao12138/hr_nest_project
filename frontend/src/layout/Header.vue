@@ -194,11 +194,15 @@
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">{{ t('common.profile') }}</el-dropdown-item>
+            <el-dropdown-item command="payslip">{{ t('header.myPayslip') }}</el-dropdown-item>
             <el-dropdown-item command="logout" divided>{{ t('common.logout') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
     </div>
+
+    <!-- 员工个人电子工资条安全查看抽屉 -->
+    <MyPayslipDrawer v-model="payslipDrawerVisible" />
   </div>
 </template>
 
@@ -221,6 +225,9 @@ import {
 } from '@element-plus/icons-vue';
 import Breadcrumb from './Breadcrumb.vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
+import MyPayslipDrawer from '@/views/hr/salary/components/MyPayslipDrawer.vue';
+
+const payslipDrawerVisible = ref(false);
 
 const themeStore = useThemeStore();
 const { locale, setLocale, t, availableLocales } = useI18n();
@@ -357,6 +364,8 @@ const handleGoLeave = () => {
 const handleCommand = (command: string) => {
   if (command === 'profile') {
     router.push('/profile');
+  } else if (command === 'payslip') {
+    payslipDrawerVisible.value = true;
   } else if (command === 'logout') {
     ElMessageBox.confirm('确定要退出当前系统吗？', '提示', {
       confirmButtonText: '确定退出',
