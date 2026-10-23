@@ -81,6 +81,16 @@
         </div>
       </template>
 
+      <!-- 手机号敏感数据脱敏插槽 -->
+      <template #phoneSlot="{ row }">
+        <SensitiveText :value="row.phone" type="phone" />
+      </template>
+
+      <!-- 身份证号敏感数据脱敏插槽 -->
+      <template #idCardSlot="{ row }">
+        <SensitiveText :value="row.idCard" type="idCard" />
+      </template>
+
       <!-- 附件预览插槽 -->
       <template #attachmentsSlot="{ row }">
         <div class="attachment-tags">
@@ -302,6 +312,7 @@ import BaseSearch from '@/components/BaseSearch.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import BaseUpload from '@/components/BaseUpload.vue';
 import BaseImportExcel from '@/components/BaseImportExcel.vue';
+import SensitiveText from '@/components/SensitiveText.vue';
 import { usePagination } from '@/hooks/usePagination';
 import {
   getEmployeeListApi,
@@ -331,8 +342,8 @@ const { pagination, handlePageChange, handleSizeChange, resetPage } =
 const columns: TableColumn[] = [
   { prop: 'name', label: '员工姓名', slot: 'nameSlot', width: 160 },
   { prop: 'gender', label: '性别', width: 80 },
-  { prop: 'phone', label: '联系电话', width: 140 },
-  { prop: 'idCard', label: '身份证号', width: 180 },
+  { prop: 'phone', label: '联系电话', slot: 'phoneSlot', width: 160 },
+  { prop: 'idCard', label: '身份证号', slot: 'idCardSlot', width: 220 },
   {
     prop: 'dept',
     label: '部门',
