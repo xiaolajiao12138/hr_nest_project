@@ -86,6 +86,24 @@ export class EmployeeController {
   }
 
   /**
+   * 根据员工主键 ID 获取员工完整人事档案详情 (Query 传参规范: ?id=xxx)
+   * 自动加载关联的部门、身份证正反面附件、学历证明附件实体
+   *
+   * @param id 员工记录主键 ID
+   * @returns 返回员工完整详情对象
+   */
+  @Get('detail')
+  @Permissions('hr:employee:list')
+  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
+    return this.employeeService.findById(id, [
+      'dept',
+      'idCardFront',
+      'idCardBack',
+      'eduCert',
+    ]);
+  }
+
+  /**
    * 根据员工主键 ID 获取员工完整人事档案详情
    * 自动加载关联的部门、身份证正反面附件、学历证明附件实体
    *

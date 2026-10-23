@@ -52,7 +52,8 @@ export class EmployeeService extends BaseService<Employee> {
   }
 
   /**
-   * 分页条件查询员工档案列表（级联加载所属部门与身份证/学历证附件）
+   * 分页条件查询员工档案列表（精简模式：轻量化返回列表所需字段，降低数据库联表与网络传输负载）
+   * 详细的身份证正反面及学历证明等大附件仅在点击编辑/详情时通过独立的 findById 按需查询
    * 
    * @param queryDto 查询过滤条件（工号/姓名/手机模糊关键字、部门ID、在职状态、岗位）
    * @returns 标准分页响应对象
@@ -64,13 +65,10 @@ export class EmployeeService extends BaseService<Employee> {
     const pageSize = Number(queryDto.pageSize) || 10;
     const skip = (page - 1) * pageSize;
 
-    // 联表预加载部门与 MinIO 附件文件实体
+    // 列表仅精简关联部门名称，杜绝多层深层附件大表冗余 Join
     const qb = this.empRepo
       .createQueryBuilder('emp')
       .leftJoinAndSelect('emp.dept', 'dept')
-      .leftJoinAndSelect('emp.idCardFront', 'idCardFront')
-      .leftJoinAndSelect('emp.idCardBack', 'idCardBack')
-      .leftJoinAndSelect('emp.eduCert', 'eduCert')
       .skip(skip)
       .take(pageSize)
       .orderBy('emp.id', 'DESC');

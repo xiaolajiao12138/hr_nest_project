@@ -10,8 +10,9 @@ export function getEmployeeListApi(params: any) {
 
 export function getEmployeeDetailApi(id: number) {
   return request({
-    url: `/hr/employee/${id}`,
+    url: '/hr/employee/detail',
     method: 'get',
+    params: { id },
   });
 }
 

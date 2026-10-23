@@ -132,12 +132,13 @@
       :confirm-loading="submitLoading"
       @confirm="handleSubmit"
     >
-      <el-form
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-width="100px"
-      >
+      <div v-loading="detailLoading">
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="formRules"
+          label-width="100px"
+        >
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="工号" prop="empNo">
@@ -281,7 +282,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-      </el-form>
+        </el-form>
+      </div>
     </BaseDialog>
 
     <!-- Excel 批量导入弹窗 (复用 BaseImportExcel) -->
@@ -316,6 +318,7 @@ import SensitiveText from '@/components/SensitiveText.vue';
 import { usePagination } from '@/hooks/usePagination';
 import {
   getEmployeeListApi,
+  getEmployeeDetailApi,
   createEmployeeApi,
   updateEmployeeApi,
   deleteEmployeeApi,
@@ -394,6 +397,7 @@ const actionColumn: ActionColumnConfig = {
 const dialogVisible = ref(false);
 const dialogTitle = ref('新增员工');
 const submitLoading = ref(false);
+const detailLoading = ref(false);
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 const importDialogVisible = ref(false);
@@ -491,29 +495,50 @@ const handleAdd = () => {
   dialogVisible.value = true;
 };
 
-const handleEdit = (row: any) => {
+/**
+ * 编辑员工档案
+ * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据员工 ID 异步请求后端独立详情接口获取最新完整档案数据
+ * 
+ * @param row 列表当前点击行（仅取其 id 与姓名作为标题初始提示）
+ */
+const handleEdit = async (row: any) => {
   currentId.value = row.id;
   dialogTitle.value = `编辑员工【${row.name}】档案`;
-  Object.assign(formData, {
-    empNo: row.empNo,
-    name: row.name,
-    gender: row.gender,
-    phone: row.phone,
-    idCard: row.idCard,
-    deptId: row.deptId,
-    post: row.post,
-    entryDate: row.entryDate,
-    education: row.education,
-    salary: row.salary,
-    status: row.status,
-    idCardFrontId: row.idCardFrontId,
-    idCardBackId: row.idCardBackId,
-    eduCertId: row.eduCertId,
-  });
-  frontUrl.value = row.idCardFront?.fileUrl || '';
-  backUrl.value = row.idCardBack?.fileUrl || '';
-  certUrl.value = row.eduCert?.fileUrl || '';
+  // 重置表单状态并开启弹窗加载中遮罩
+  frontUrl.value = '';
+  backUrl.value = '';
+  certUrl.value = '';
   dialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    // 异步查询数据库中最新的员工详细数据及证件附件
+    const detail: any = await getEmployeeDetailApi(row.id);
+    Object.assign(formData, {
+      empNo: detail.empNo,
+      name: detail.name,
+      gender: detail.gender,
+      phone: detail.phone,
+      idCard: detail.idCard,
+      deptId: detail.deptId,
+      post: detail.post,
+      entryDate: detail.entryDate,
+      education: detail.education,
+      salary: detail.salary,
+      status: detail.status,
+      idCardFrontId: detail.idCardFrontId,
+      idCardBackId: detail.idCardBackId,
+      eduCertId: detail.eduCertId,
+    });
+    frontUrl.value = detail.idCardFront?.fileUrl || '';
+    backUrl.value = detail.idCardBack?.fileUrl || '';
+    certUrl.value = detail.eduCert?.fileUrl || '';
+  } catch (err: any) {
+    ElMessage.error(err.message || '获取员工最新详情失败');
+    dialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const handleDelete = (row: any) => {
