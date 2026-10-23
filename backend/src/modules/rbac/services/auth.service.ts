@@ -10,6 +10,7 @@ import { BusinessException } from '../../../common/exceptions/business.exception
 import * as bcrypt from 'bcryptjs';
 import * as svgCaptcha from 'svg-captcha';
 import { MenuService } from './menu.service';
+import { RsaService } from '../../../common/security/rsa.service';
 
 /**
  * 身份认证与安全鉴权核心服务类
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly menuService: MenuService,
+    private readonly rsaService: RsaService,
   ) {}
 
   /**
@@ -117,8 +119,9 @@ export class AuthService {
       throw new BusinessException('该账号已被停用，请联系管理员');
     }
 
-    // 3. 校验密码哈希
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // 3. 校验密码哈希 (支持 RSA 密文自动解密，并向下兼容明文)
+    const plainPassword = this.rsaService.decrypt(password);
+    const isPasswordValid = await bcrypt.compare(plainPassword, user.password);
     if (!isPasswordValid) {
       throw new BusinessException('账号或密码不正确');
     }

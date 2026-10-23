@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { MenuService } from '../services/menu.service';
+import { RsaService } from '../../../common/security/rsa.service';
 import { LoginDto, RefreshTokenDto } from '../dto/auth.dto';
 import { Public, JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
@@ -22,7 +23,19 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly menuService: MenuService,
+    private readonly rsaService: RsaService,
   ) {}
+
+  /**
+   * 获取用于前端传输加密的 RSA 公钥
+   */
+  @Public()
+  @Get('rsa-public-key')
+  async getRsaPublicKey() {
+    return {
+      publicKey: this.rsaService.getPublicKey(),
+    };
+  }
 
   /**
    * 获取登录图形验证码

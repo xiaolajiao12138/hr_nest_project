@@ -18,6 +18,7 @@ import { UserController } from './controllers/user.controller';
 import { RoleController } from './controllers/role.controller';
 import { MenuController } from './controllers/menu.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { RsaService } from '../../common/security/rsa.service';
 
 @Module({
   imports: [
@@ -47,7 +48,8 @@ import { JwtStrategy } from './jwt.strategy';
     RoleService,
     MenuService,
     JwtStrategy,
+    RsaService,
   ],
-  exports: [AuthService, UserService, RoleService, MenuService],
+  exports: [AuthService, UserService, RoleService, MenuService, RsaService],
 })
 export class RbacModule {}
