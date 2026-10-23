@@ -33,26 +33,44 @@
     </BaseTable>
 
     <!-- 日志详情弹窗 -->
-    <el-dialog v-model="detailVisible" title="操作日志详情" width="600px">
-      <el-descriptions v-if="currentLog" :column="1" border>
-        <el-descriptions-item label="模块标题">{{ currentLog.title }}</el-descriptions-item>
-        <el-descriptions-item label="请求方式">{{ currentLog.requestMethod }}</el-descriptions-item>
-        <el-descriptions-item label="操作人员">{{ currentLog.operName }} (IP: {{ currentLog.operIp }})</el-descriptions-item>
-        <el-descriptions-item label="请求地址">{{ currentLog.operUrl }}</el-descriptions-item>
-        <el-descriptions-item label="调用方法">{{ currentLog.method }}</el-descriptions-item>
-        <el-descriptions-item label="请求入参">
-          <pre class="json-code">{{ currentLog.operParam }}</pre>
-        </el-descriptions-item>
-        <el-descriptions-item label="返回结果">
-          <pre class="json-code">{{ currentLog.jsonResult }}</pre>
-        </el-descriptions-item>
-        <el-descriptions-item v-if="currentLog.errorMsg" label="错误信息">
-          <span style="color: #f56c6c">{{ currentLog.errorMsg }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="耗时 / 时间">
-          {{ currentLog.costTime }} ms / {{ new Date(currentLog.operTime).toLocaleString() }}
-        </el-descriptions-item>
-      </el-descriptions>
+    <el-dialog
+      v-model="detailVisible"
+      title="操作日志详情"
+      width="700px"
+      top="7vh"
+      destroy-on-close
+      append-to-body
+    >
+      <div v-loading="detailLoading" style="min-height: 200px">
+        <el-scrollbar max-height="65vh" class="detail-scrollbar">
+          <el-descriptions v-if="currentLog" :column="1" border class="log-detail-desc">
+            <el-descriptions-item label="模块标题">{{ currentLog.title }}</el-descriptions-item>
+            <el-descriptions-item label="请求方式">
+              <el-tag size="small" effect="plain">{{ currentLog.requestMethod }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="操作人员">{{ currentLog.operName }} (IP: {{ currentLog.operIp }})</el-descriptions-item>
+            <el-descriptions-item label="请求地址">{{ currentLog.operUrl }}</el-descriptions-item>
+            <el-descriptions-item label="调用方法">{{ currentLog.method }}</el-descriptions-item>
+            <el-descriptions-item label="请求入参">
+              <pre class="json-code">{{ currentLog.operParam || '-' }}</pre>
+            </el-descriptions-item>
+            <el-descriptions-item label="返回结果">
+              <pre class="json-code">{{ currentLog.jsonResult || '-' }}</pre>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="currentLog.errorMsg" label="错误信息">
+              <span style="color: #f56c6c; word-break: break-all">{{ currentLog.errorMsg }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="耗时 / 时间">
+              {{ currentLog.costTime }} ms / {{ formatDateTime(currentLog.operTime) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-scrollbar>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="detailVisible = false">关 闭</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -63,7 +81,8 @@ import { ElMessage, ElMessageBox, ElTag } from 'element-plus';
 import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
 import BaseSearch from '@/components/BaseSearch.vue';
 import { usePagination } from '@/hooks/usePagination';
-import { getLogListApi, cleanLogApi } from '@/api/ops';
+import { getLogListApi, getLogDetailApi, cleanLogApi } from '@/api/ops';
+import { formatDateTime } from '@/utils/date';
 
 const loading = ref(false);
 const tableData = ref<any[]>([]);
@@ -97,8 +116,8 @@ const columns: TableColumn[] = [
   {
     prop: 'operTime',
     label: '操作时间',
-    width: 170,
-    formatter: (val) => (val ? new Date(val).toLocaleString() : '-'),
+    width: 175,
+    formatter: (val) => formatDateTime(val) || '-',
   },
 ];
 
@@ -117,6 +136,7 @@ const actionColumn: ActionColumnConfig = {
 };
 
 const detailVisible = ref(false);
+const detailLoading = ref(false);
 const currentLog = ref<any>(null);
 
 const fetchData = async () => {
@@ -145,9 +165,20 @@ const handleReset = () => {
   fetchData();
 };
 
-const viewDetail = (row: any) => {
-  currentLog.value = row;
+const viewDetail = async (row: any) => {
+  currentLog.value = null;
   detailVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const res: any = await getLogDetailApi(row.id);
+    currentLog.value = res;
+  } catch (error: any) {
+    ElMessage.error(error?.message || '获取操作日志详情失败');
+    detailVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const handleClean = () => {
@@ -168,16 +199,34 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.detail-scrollbar {
+  padding-right: 8px;
+}
+
+.log-detail-desc :deep(.el-descriptions__label) {
+  width: 100px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+}
+
 .json-code {
-  max-height: 150px;
+  max-height: 220px;
   overflow-y: auto;
-  background-color: #f5f7fa;
-  padding: 8px;
-  border-radius: 4px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  border-radius: 6px;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

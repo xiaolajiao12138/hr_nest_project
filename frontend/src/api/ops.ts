@@ -48,6 +48,13 @@ export function deleteDictApi(id: number) {
 export function getLogListApi(params: any) {
   return request({ url: '/ops/log/list', method: 'get', params });
 }
+/**
+ * 根据 ID 查询日志详情（包含入参、出参和异常信息）
+ * Query 参数规范: GET /ops/log/detail?id=4
+ */
+export function getLogDetailApi(id: number) {
+  return request({ url: '/ops/log/detail', method: 'get', params: { id } });
+}
 export function cleanLogApi() {
   return request({ url: '/ops/log/clean', method: 'delete' });
 }
