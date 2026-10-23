@@ -73,6 +73,18 @@ export function getSalaryListApi(params: QuerySalaryParams) {
 }
 
 /**
+ * 根据 ID 查询单条薪酬明细详情
+ * Query 参数规范: GET /salary/detail?id=4
+ */
+export function getSalaryDetailApi(id: number) {
+  return request<SalaryRecord>({
+    url: '/salary/detail',
+    method: 'get',
+    params: { id },
+  });
+}
+
+/**
  * 一键智能核算当月全员薪资草稿
  */
 export function calculateSalaryApi(data: { yearMonth: string; overwrite?: boolean }) {

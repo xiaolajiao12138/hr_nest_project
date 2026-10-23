@@ -324,6 +324,20 @@ export class SalaryService implements OnModuleInit {
   }
 
   /**
+   * 根据 ID 获取单条薪酬明细详情
+   */
+  async getSalaryDetail(id: number) {
+    const record = await this.salaryRepo.findOne({
+      where: { id },
+      relations: ['employee', 'employee.dept'],
+    });
+    if (!record) {
+      throw new BusinessException('薪资记录不存在');
+    }
+    return record;
+  }
+
+  /**
    * 单条薪酬明细修改并自动联动应发实发
    */
   async updateSalary(id: number, dto: UpdateSalaryDto) {

@@ -42,6 +42,16 @@ export class SalaryController {
   }
 
   /**
+   * 根据 ID 查询单条薪酬详情
+   * Query 风格: GET /salary/detail?id=4
+   */
+  @Get('detail')
+  @Permissions('hr:salary:list')
+  async getSalaryDetail(@Query('id', ParseIntPipe) id: number) {
+    return this.salaryService.getSalaryDetail(id);
+  }
+
+  /**
    * 分页查询薪酬列表与核心指标总览
    */
   @Get('list')

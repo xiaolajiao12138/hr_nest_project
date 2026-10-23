@@ -320,12 +320,13 @@
       :confirm-loading="editSubmitting"
       @confirm="submitEdit"
     >
-      <el-form
-        ref="editFormRef"
-        :model="editForm"
-        label-width="120px"
-        class="edit-salary-form"
-      >
+      <div v-loading="detailLoading">
+        <el-form
+          ref="editFormRef"
+          :model="editForm"
+          label-width="120px"
+          class="edit-salary-form"
+        >
         <el-divider content-position="left"
           >应发薪酬收入项 (自动累计应发)</el-divider
         >
@@ -473,6 +474,7 @@
           </div>
         </div>
       </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -499,6 +501,7 @@ import BaseTable, { type TableColumn } from "@/components/BaseTable.vue";
 import BaseDialog from "@/components/BaseDialog.vue";
 import {
   getSalaryListApi,
+  getSalaryDetailApi,
   calculateSalaryApi,
   updateSalaryApi,
   batchConfirmSalaryApi,
@@ -782,21 +785,36 @@ const editForm = reactive({
   remarks: "",
 });
 
-function openEditDialog(row: SalaryRecord) {
+const detailLoading = ref(false);
+
+async function openEditDialog(row: SalaryRecord) {
+  editDialogVisible.value = true;
+  detailLoading.value = true;
   currentEditing.value = row;
   editForm.id = row.id;
-  editForm.baseSalary = Number(row.baseSalary || 0);
-  editForm.postSalary = Number(row.postSalary || 0);
-  editForm.performanceSalary = Number(row.performanceSalary || 0);
-  editForm.overtimeSalary = Number(row.overtimeSalary || 0);
-  editForm.allowance = Number(row.allowance || 0);
-  editForm.leaveDeduction = Number(row.leaveDeduction || 0);
-  editForm.socialSecurity = Number(row.socialSecurity || 0);
-  editForm.housingFund = Number(row.housingFund || 0);
-  editForm.tax = Number(row.tax || 0);
   editForm.payslipPassword = "";
-  editForm.remarks = row.remarks || "";
-  editDialogVisible.value = true;
+
+  try {
+    const detail: any = await getSalaryDetailApi(row.id);
+    currentEditing.value = detail;
+    editForm.id = detail.id;
+    editForm.baseSalary = Number(detail.baseSalary || 0);
+    editForm.postSalary = Number(detail.postSalary || 0);
+    editForm.performanceSalary = Number(detail.performanceSalary || 0);
+    editForm.overtimeSalary = Number(detail.overtimeSalary || 0);
+    editForm.allowance = Number(detail.allowance || 0);
+    editForm.leaveDeduction = Number(detail.leaveDeduction || 0);
+    editForm.socialSecurity = Number(detail.socialSecurity || 0);
+    editForm.housingFund = Number(detail.housingFund || 0);
+    editForm.tax = Number(detail.tax || 0);
+    editForm.payslipPassword = "";
+    editForm.remarks = detail.remarks || "";
+  } catch (error: any) {
+    ElMessage.error(error?.message || "获取薪资明细失败");
+    editDialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 }
 
 // 动态测算实发金额实时联动
