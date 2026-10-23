@@ -27,6 +27,32 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       sourcemap: mode !== 'production',
       chunkSizeWarningLimit: 1500,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('echarts')) {
+                return 'echarts-vendor';
+              }
+              if (id.includes('element-plus')) {
+                return 'element-plus-vendor';
+              }
+              if (id.includes('@element-plus/icons-vue')) {
+                return 'element-icons-vendor';
+              }
+              if (
+                id.includes('vue') ||
+                id.includes('pinia') ||
+                id.includes('vue-router') ||
+                id.includes('axios')
+              ) {
+                return 'vue-core-vendor';
+              }
+              return 'common-vendor';
+            }
+          },
+        },
+      },
     },
   };
 });
