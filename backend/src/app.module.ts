@@ -48,6 +48,9 @@ const env = process.env.NODE_ENV || 'development';
           synchronize: dbConf.synchronize,
           logging: dbConf.logging,
           autoLoadEntities: true,
+          extra: {
+            timezone: '+08:00',
+          },
         };
       },
     }),

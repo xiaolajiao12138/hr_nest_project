@@ -1,3 +1,6 @@
+// 强制全系统统一运行环境为北京时间 (UTC+8)
+process.env.TZ = 'Asia/Shanghai';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
