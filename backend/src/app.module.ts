@@ -22,6 +22,7 @@ import { LogModule } from './modules/log/log.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SseModule } from './modules/sse/sse.module';
 import { SalaryModule } from './modules/salary/salary.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -68,6 +69,7 @@ const env = process.env.NODE_ENV || 'development';
     DashboardModule,
     SseModule,
     SalaryModule,
+    AttendanceModule,
   ],
   providers: [
     {

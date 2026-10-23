@@ -59,6 +59,25 @@ export const usePermissionStore = defineStore('permission', {
             },
           });
         }
+
+        const hasAttendance = hrMenu.children.some(
+          (c: any) => c.path === '/hr/attendance' || c.name === 'AttendanceManage',
+        );
+        if (!hasAttendance) {
+          hrMenu.children.push({
+            id: 205,
+            parentId: hrMenu.id || 2,
+            path: '/hr/attendance',
+            name: 'AttendanceManage',
+            component: 'views/hr/attendance/index.vue',
+            meta: {
+              title: '考勤管理',
+              icon: 'Calendar',
+              hidden: false,
+              isFrame: false,
+            },
+          });
+        }
       }
 
       this.sidebarMenus = serverRoutes;
