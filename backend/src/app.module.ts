@@ -19,6 +19,7 @@ import { LeaveModule } from './modules/leave/leave.module';
 import { NoticeModule } from './modules/notice/notice.module';
 import { DictModule } from './modules/dict/dict.module';
 import { LogModule } from './modules/log/log.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -59,6 +60,7 @@ const env = process.env.NODE_ENV || 'development';
     NoticeModule,
     DictModule,
     LogModule,
+    DashboardModule,
   ],
   providers: [
     {
