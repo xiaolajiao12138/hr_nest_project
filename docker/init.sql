@@ -310,6 +310,15 @@ INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, m
 (242, 205, '班次配置', '', '', '', '', 3, 'F', 'hr:attendance:shift', false, false, 1),
 (243, 205, '补卡修正', '', '', '', '', 4, 'F', 'hr:attendance:repair', false, false, 1),
 
+(206, 2, '绩效考评', 'PerformanceManage', '/hr/performance', 'views/hr/performance/index.vue', 'Trophy', 6, 'C', 'hr:performance:list', false, false, 1),
+
+-- 绩效考评按钮权限
+(250, 206, '方案发布', '', '', '', '', 1, 'F', 'hr:performance:plan', false, false, 1),
+(251, 206, '发起考评', '', '', '', '', 2, 'F', 'hr:performance:start', false, false, 1),
+(252, 206, '评审打分', '', '', '', '', 3, 'F', 'hr:performance:eval', false, false, 1),
+(253, 206, '绩效归档', '', '', '', '', 4, 'F', 'hr:performance:archive', false, false, 1),
+(254, 206, '报表导出', '', '', '', '', 5, 'F', 'hr:performance:export', false, false, 1),
+
 -- 3. 系统权限管理目录
 (3, 0, '系统权限', 'SystemManage', '/system', 'Layout', 'Setting', 3, 'M', '', false, false, 1),
 (301, 3, '用户管理', 'UserManage', '/system/user', 'views/system/user/index.vue', 'User', 1, 'C', 'system:user:list', false, false, 1),

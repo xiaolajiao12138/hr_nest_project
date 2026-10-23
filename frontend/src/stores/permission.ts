@@ -78,6 +78,25 @@ export const usePermissionStore = defineStore('permission', {
             },
           });
         }
+
+        const hasPerformance = hrMenu.children.some(
+          (c: any) => c.path === '/hr/performance' || c.name === 'PerformanceManage',
+        );
+        if (!hasPerformance) {
+          hrMenu.children.push({
+            id: 206,
+            parentId: hrMenu.id || 2,
+            path: '/hr/performance',
+            name: 'PerformanceManage',
+            component: 'views/hr/performance/index.vue',
+            meta: {
+              title: '绩效考评',
+              icon: 'Trophy',
+              hidden: false,
+              isFrame: false,
+            },
+          });
+        }
       }
 
       this.sidebarMenus = serverRoutes;
