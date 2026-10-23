@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { DictService } from './dict.service';
 import { PageParamDto } from '../../common/dto/page-param.dto';
@@ -28,6 +29,16 @@ export class DictController {
   @Get('data/:dictType')
   async getByType(@Param('dictType') dictType: string) {
     return this.dictService.getDictDataByType(dictType);
+  }
+
+  /**
+   * 根据 ID 查询字典项详情
+   * Query 风格: GET /ops/dict/detail?id=4
+   */
+  @Get('detail')
+  @Permissions('ops:dict:list')
+  async getDetail(@Query('id', ParseIntPipe) id: number) {
+    return this.dictService.getDictDetail(id);
   }
 
   /**

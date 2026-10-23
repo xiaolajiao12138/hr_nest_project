@@ -27,6 +27,13 @@ export function getDictDataByTypeApi(dictType: string) {
 export function getDictListApi(params: any) {
   return request({ url: '/ops/dict/list', method: 'get', params });
 }
+/**
+ * 根据 ID 查询字典详情
+ * Query 参数规范: GET /ops/dict/detail?id=4
+ */
+export function getDictDetailApi(id: number) {
+  return request({ url: '/ops/dict/detail', method: 'get', params: { id } });
+}
 export function createDictApi(data: any) {
   return request({ url: '/ops/dict', method: 'post', data });
 }

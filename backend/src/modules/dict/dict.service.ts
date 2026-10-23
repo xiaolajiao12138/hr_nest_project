@@ -5,6 +5,7 @@ import { Dict } from './entities/dict.entity';
 import { BaseService } from '../../common/base/base.service';
 import { PageParamDto } from '../../common/dto/page-param.dto';
 import { PageResultDto } from '../../common/dto/page-result.dto';
+import { BusinessException } from '../../common/exceptions/business.exception';
 
 @Injectable()
 export class DictService extends BaseService<Dict> {
@@ -54,5 +55,16 @@ export class DictService extends BaseService<Dict> {
 
     const [list, total] = await qb.getManyAndCount();
     return PageResultDto.create(list, total, page, pageSize);
+  }
+
+  /**
+   * 根据 ID 获取字典详情
+   */
+  async getDictDetail(id: number): Promise<Dict> {
+    const dict = await this.dictRepo.findOne({ where: { id } });
+    if (!dict) {
+      throw new BusinessException('字典数据不存在');
+    }
+    return dict;
   }
 }
