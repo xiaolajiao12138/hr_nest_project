@@ -22,16 +22,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import Sidebar from './Sidebar/index.vue';
 import Header from './Header.vue';
 import TagsView from './TagsView.vue';
+import { useNotifyStore } from '@/stores/notify';
 
 const isCollapse = ref(false);
+const notifyStore = useNotifyStore();
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value;
 };
+
+// 挂载布局时自动连接 SSE 实时推送通道
+onMounted(() => {
+  notifyStore.initSSE();
+});
+
+// 销毁时释放 SSE 长连接资源
+onBeforeUnmount(() => {
+  notifyStore.closeSSE();
+});
 </script>
 
 <style scoped>

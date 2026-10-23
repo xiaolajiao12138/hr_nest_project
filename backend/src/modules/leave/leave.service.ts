@@ -8,6 +8,7 @@ import { BaseService } from '../../common/base/base.service';
 import { CreateLeaveDto, AuditLeaveDto, QueryLeaveDto } from './dto/leave.dto';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { PageResultDto } from '../../common/dto/page-result.dto';
+import { SseService } from '../sse/sse.service';
 
 @Injectable()
 export class LeaveService extends BaseService<Leave> {
@@ -19,6 +20,7 @@ export class LeaveService extends BaseService<Leave> {
     @InjectRepository(Employee)
     private readonly empRepo: Repository<Employee>,
     dataSource: DataSource,
+    private readonly sseService: SseService,
   ) {
     super(leaveRepo, dataSource);
   }
@@ -103,7 +105,7 @@ export class LeaveService extends BaseService<Leave> {
     const currentYear = new Date(dto.startTime).getFullYear();
     const leaveNo = `LV${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
 
-    return this.withTransaction(async (manager) => {
+    const savedLeave = await this.withTransaction(async (manager) => {
       // 1. 如果是年假，强校验并预扣减/冻结年假余额
       if (dto.leaveType === 'ANNUAL') {
         const annualRecord = await manager.findOne(AnnualLeave, {
@@ -150,6 +152,26 @@ export class LeaveService extends BaseService<Leave> {
 
       return manager.save(leave);
     });
+
+    // 触发 SSE 实时推送：更新全员待办审批徽标数字
+    this.leaveRepo.count({ where: { status: 'PENDING' } }).then((pendingCount) => {
+      this.sseService.sendPendingBadgeUpdate(pendingCount);
+    }).catch(() => {});
+
+    // 触发 SSE 实时推送：新请假待办提交通知
+    this.sseService.broadcast({
+      type: 'LEAVE_AUDIT_NOTIFY',
+      title: '新请假审批待办',
+      message: `员工【${savedLeave.empName}】提交了请假申请(${savedLeave.leaveNo})，天数: ${savedLeave.days}天，等待审批`,
+      data: {
+        leaveId: savedLeave.id,
+        empName: savedLeave.empName,
+        days: savedLeave.days,
+        status: 'PENDING',
+      },
+    });
+
+    return savedLeave;
   }
 
   /**
@@ -173,7 +195,7 @@ export class LeaveService extends BaseService<Leave> {
       throw new BusinessException('该请假单已被审批处理，无法重复操作');
     }
 
-    return this.withTransaction(async (manager) => {
+    const savedLeave = await this.withTransaction(async (manager) => {
       leave.status = auditDto.action;
       leave.auditRemark = auditDto.auditRemark || '';
       leave.auditUserId = auditUserId;
@@ -200,5 +222,27 @@ export class LeaveService extends BaseService<Leave> {
 
       return manager.save(leave);
     });
+
+    // 触发 SSE 实时推送：更新全员待办审批徽标数字
+    this.leaveRepo.count({ where: { status: 'PENDING' } }).then((pendingCount) => {
+      this.sseService.sendPendingBadgeUpdate(pendingCount);
+    }).catch(() => {});
+
+    // 触发 SSE 实时推送：审批结果提醒通知
+    const actionText = auditDto.action === 'APPROVED' ? '已通过' : '已驳回';
+    this.sseService.broadcast({
+      type: 'LEAVE_AUDIT_NOTIFY',
+      title: '请假审批提醒',
+      message: `员工【${savedLeave.empName}】的请假单(${savedLeave.leaveNo})审批结果：${actionText}${auditDto.auditRemark ? ` (批注: ${auditDto.auditRemark})` : ''}`,
+      data: {
+        leaveId: savedLeave.id,
+        empName: savedLeave.empName,
+        action: auditDto.action,
+        actionText,
+        auditRemark: auditDto.auditRemark,
+      },
+    });
+
+    return savedLeave;
   }
 }

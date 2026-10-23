@@ -5,6 +5,7 @@ import { Notice } from './entities/notice.entity';
 import { BaseService } from '../../common/base/base.service';
 import { QueryNoticeDto } from './dto/notice.dto';
 import { PageResultDto } from '../../common/dto/page-result.dto';
+import { SseService } from '../sse/sse.service';
 
 @Injectable()
 export class NoticeService extends BaseService<Notice> {
@@ -12,6 +13,7 @@ export class NoticeService extends BaseService<Notice> {
     @InjectRepository(Notice)
     private readonly noticeRepo: Repository<Notice>,
     dataSource: DataSource,
+    private readonly sseService: SseService,
   ) {
     super(noticeRepo, dataSource);
   }
@@ -47,9 +49,34 @@ export class NoticeService extends BaseService<Notice> {
     return PageResultDto.create(list, total, page, pageSize);
   }
 
+  override async create(data: any): Promise<Notice> {
+    const notice = await super.create(data);
+    if (Number(notice.status) === 1) {
+      this.broadcastNotice(notice);
+    }
+    return notice;
+  }
+
   async changeStatus(id: number, status: number): Promise<boolean> {
-    await this.findById(id);
+    const notice = await this.findById(id);
     await this.noticeRepo.update(id, { status: Number(status) });
+    if (Number(status) === 1) {
+      this.broadcastNotice({ ...notice, status: 1 });
+    }
     return true;
+  }
+
+  private broadcastNotice(notice: Notice) {
+    this.sseService.broadcast({
+      type: 'NOTICE_BROADCAST',
+      title: '系统新公告发布',
+      message: notice.title,
+      data: {
+        id: notice.id,
+        title: notice.title,
+        noticeType: notice.noticeType,
+        createdAt: notice.createdAt,
+      },
+    });
   }
 }

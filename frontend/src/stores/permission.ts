@@ -35,25 +35,14 @@ export const usePermissionStore = defineStore('permission', {
     /**
      * 递归转换路由结构
      */
-    transformRoutes(asyncRoutes: any[]): RouteRecordRaw[] {
+    transformRoutes(asyncRoutes: any[], isRoot = true): RouteRecordRaw[] {
       const res: RouteRecordRaw[] = [];
 
       for (const item of asyncRoutes) {
-        // 构建路由元信息
-        const routeRecord: any = {
-          path: item.path,
-          name: item.name,
-          meta: {
-            title: item.meta?.title || '',
-            icon: item.meta?.icon || '',
-            hidden: Boolean(item.meta?.hidden),
-            isFrame: Boolean(item.meta?.isFrame),
-          },
-        };
-
-        // 处理组件 Component
+        // 查找或映射组件
+        let viewComponent: any = null;
         if (item.component === 'Layout') {
-          routeRecord.component = Layout;
+          viewComponent = Layout;
         } else if (item.component) {
           // 规范路径格式，匹配 modules
           let compPath = item.component.replace(/^\//, '');
@@ -63,17 +52,50 @@ export const usePermissionStore = defineStore('permission', {
           const moduleKey = `../${compPath}`;
 
           if (modules[moduleKey]) {
-            routeRecord.component = modules[moduleKey];
+            viewComponent = modules[moduleKey];
           } else {
             console.warn(`[动态路由] 未找到组件路径: ${moduleKey}`);
             // 找不到时降级为空视图，避免页面崩溃
-            routeRecord.component = () => import('@/views/404.vue');
+            viewComponent = () => import('@/views/404.vue');
           }
         }
 
+        const meta = {
+          title: item.meta?.title || '',
+          icon: item.meta?.icon || '',
+          hidden: Boolean(item.meta?.hidden),
+          isFrame: Boolean(item.meta?.isFrame),
+        };
+
+        // 核心：若为根级独立页面（非 Layout 容器且无 children，例如工作台 /dashboard）
+        // 自动在外层包裹 Layout 布局骨架，确保侧边栏菜单与顶部导航正常可见
+        if (isRoot && item.component !== 'Layout') {
+          res.push({
+            path: item.path,
+            component: Layout,
+            children: [
+              {
+                path: '',
+                name: item.name || `Route_${item.id}`,
+                component: viewComponent || (() => import('@/views/404.vue')),
+                meta,
+              },
+            ],
+          } as RouteRecordRaw);
+          continue;
+        }
+
+        // 常规目录或多级菜单节点
+        const routeRecord: any = {
+          path: item.path,
+          name: item.name,
+          component: viewComponent,
+          meta,
+        };
+
         // 处理子路由
         if (item.children && item.children.length > 0) {
-          routeRecord.children = this.transformRoutes(item.children);
+          routeRecord.children = this.transformRoutes(item.children, false);
         }
 
         res.push(routeRecord as RouteRecordRaw);
