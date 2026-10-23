@@ -21,6 +21,7 @@ import { DictModule } from './modules/dict/dict.module';
 import { LogModule } from './modules/log/log.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SseModule } from './modules/sse/sse.module';
+import { SalaryModule } from './modules/salary/salary.module';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -63,6 +64,7 @@ const env = process.env.NODE_ENV || 'development';
     LogModule,
     DashboardModule,
     SseModule,
+    SalaryModule,
   ],
   providers: [
     {
