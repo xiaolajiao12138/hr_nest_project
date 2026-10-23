@@ -42,6 +42,16 @@ export class LeaveController {
   }
 
   /**
+   * 根据 ID 查询请假单详情
+   * Query 风格: GET /hr/leave/detail?id=4
+   */
+  @Get('detail')
+  @Permissions('hr:leave:list')
+  async getDetail(@Query('id', ParseIntPipe) id: number) {
+    return this.leaveService.getLeaveDetail(id);
+  }
+
+  /**
    * 分页查询请假审批单列表
    *
    * @param query 分页与筛选条件（包含页码、页大小、员工ID、审批状态、请假类型等）

@@ -157,39 +157,41 @@
       :confirm-loading="auditLoading"
       @confirm="submitAudit"
     >
-      <div
-        v-if="currentLeave"
-        style="margin-bottom: 16px; font-size: 13px; color: #606266"
-      >
-        <p><strong>申请人：</strong>{{ currentLeave.empName }}</p>
-        <p>
-          <strong>请假天数：</strong>{{ currentLeave.days }} 天 ({{
-            currentLeave.leaveType === "ANNUAL"
-              ? "年假"
-              : currentLeave.leaveType === "SICK"
-                ? "病假"
-                : "事假"
-          }})
-        </p>
-        <p><strong>请假事由：</strong>{{ currentLeave.reason }}</p>
-      </div>
+      <div v-loading="detailLoading">
+        <div
+          v-if="currentLeave"
+          style="margin-bottom: 16px; font-size: 13px; color: #606266"
+        >
+          <p><strong>申请人：</strong>{{ currentLeave.empName }}</p>
+          <p>
+            <strong>请假天数：</strong>{{ currentLeave.days }} 天 ({{
+              currentLeave.leaveType === "ANNUAL"
+                ? "年假"
+                : currentLeave.leaveType === "SICK"
+                  ? "病假"
+                  : "事假"
+            }})
+          </p>
+          <p><strong>请假事由：</strong>{{ currentLeave.reason }}</p>
+        </div>
 
-      <el-form :model="auditForm" label-width="90px">
-        <el-form-item label="审批结果">
-          <el-radio-group v-model="auditForm.action">
-            <el-radio label="APPROVED">通过</el-radio>
-            <el-radio label="REJECTED">驳回</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="审批意见">
-          <el-input
-            v-model="auditForm.auditRemark"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入审批批注意见"
-          />
-        </el-form-item>
-      </el-form>
+        <el-form :model="auditForm" label-width="90px">
+          <el-form-item label="审批结果">
+            <el-radio-group v-model="auditForm.action">
+              <el-radio label="APPROVED">通过</el-radio>
+              <el-radio label="REJECTED">驳回</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="审批意见">
+            <el-input
+              v-model="auditForm.auditRemark"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入审批批注意见"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
     </BaseDialog>
   </div>
 </template>
@@ -204,6 +206,7 @@ import BaseDialog from "@/components/BaseDialog.vue";
 import { usePagination } from "@/hooks/usePagination";
 import {
   getLeaveListApi,
+  getLeaveDetailApi,
   applyLeaveApi,
   auditLeaveApi,
   getAnnualBalanceApi,
@@ -326,6 +329,7 @@ const applyRules = {
 
 const auditDialogVisible = ref(false);
 const auditLoading = ref(false);
+const detailLoading = ref(false);
 const currentLeave = ref<any>(null);
 const auditForm = reactive({
   action: "APPROVED" as "APPROVED" | "REJECTED",
@@ -437,11 +441,22 @@ const submitApply = async () => {
   });
 };
 
-const openAudit = (row: any) => {
-  currentLeave.value = row;
+const openAudit = async (row: any) => {
+  currentLeave.value = null;
   auditForm.action = "APPROVED";
   auditForm.auditRemark = "";
   auditDialogVisible.value = true;
+  detailLoading.value = true;
+
+  try {
+    const res: any = await getLeaveDetailApi(row.id);
+    currentLeave.value = res;
+  } catch (error: any) {
+    ElMessage.error(error?.message || "获取请假单详情失败");
+    auditDialogVisible.value = false;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 const submitAudit = async () => {

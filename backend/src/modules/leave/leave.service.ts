@@ -308,4 +308,19 @@ export class LeaveService extends BaseService<Leave> {
 
     return savedLeave;
   }
+
+  /**
+   * 根据 ID 查询请假单详情
+   * @param id 请假单主键
+   */
+  async getLeaveDetail(id: number): Promise<Leave> {
+    const leave = await this.leaveRepo.findOne({
+      where: { id },
+      relations: ['employee', 'employee.dept', 'auditUser'],
+    });
+    if (!leave) {
+      throw new BusinessException('请假单不存在');
+    }
+    return leave;
+  }
 }

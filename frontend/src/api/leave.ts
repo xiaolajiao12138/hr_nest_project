@@ -8,6 +8,18 @@ export function getLeaveListApi(params: any) {
   });
 }
 
+/**
+ * 根据 ID 查询请假单详情
+ * Query 参数规范: GET /hr/leave/detail?id=4
+ */
+export function getLeaveDetailApi(id: number) {
+  return request({
+    url: '/hr/leave/detail',
+    method: 'get',
+    params: { id },
+  });
+}
+
 export function getLeavePendingCountApi(): Promise<{ count: number }> {
   return request({
     url: '/hr/leave/pending-count',
