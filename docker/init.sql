@@ -173,6 +173,7 @@ CREATE TABLE hr_annual (
     total_days NUMERIC(4, 1) DEFAULT 5.0,
     used_days NUMERIC(4, 1) DEFAULT 0.0,
     remain_days NUMERIC(4, 1) DEFAULT 5.0,
+    remark VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (emp_id, year)
@@ -238,6 +239,129 @@ CREATE TABLE sys_oper_log (
 );
 
 COMMENT ON TABLE sys_oper_log IS '操作日志表';
+
+-- 14. 员工月度薪酬核算表 (hr_salary_record)
+DROP TABLE IF EXISTS hr_salary_record CASCADE;
+CREATE TABLE hr_salary_record (
+    id SERIAL PRIMARY KEY,
+    emp_id INT NOT NULL REFERENCES hr_employee(id) ON DELETE CASCADE,
+    year_month VARCHAR(10) NOT NULL,
+    base_salary NUMERIC(12, 2) DEFAULT 0.00,
+    post_salary NUMERIC(12, 2) DEFAULT 0.00,
+    performance_salary NUMERIC(12, 2) DEFAULT 0.00,
+    overtime_salary NUMERIC(12, 2) DEFAULT 0.00,
+    allowance NUMERIC(12, 2) DEFAULT 0.00,
+    leave_deduction NUMERIC(12, 2) DEFAULT 0.00,
+    social_security NUMERIC(12, 2) DEFAULT 0.00,
+    housing_fund NUMERIC(12, 2) DEFAULT 0.00,
+    tax NUMERIC(12, 2) DEFAULT 0.00,
+    gross_salary NUMERIC(12, 2) DEFAULT 0.00,
+    net_salary NUMERIC(12, 2) DEFAULT 0.00,
+    status SMALLINT DEFAULT 1, -- 1: 核算草稿, 2: 核准待发, 3: 已发放
+    payslip_password VARCHAR(128),
+    remark VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (emp_id, year_month)
+);
+COMMENT ON TABLE hr_salary_record IS '员工月度薪酬核算与发薪记录表';
+
+-- 15. 考勤班次规则配置表 (hr_attendance_shift)
+DROP TABLE IF EXISTS hr_attendance_shift CASCADE;
+CREATE TABLE hr_attendance_shift (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    start_time VARCHAR(10) NOT NULL,
+    end_time VARCHAR(10) NOT NULL,
+    late_tolerance INT DEFAULT 10,
+    early_tolerance INT DEFAULT 0,
+    work_hours NUMERIC(4, 1) DEFAULT 8.0,
+    is_default BOOLEAN DEFAULT FALSE,
+    status SMALLINT DEFAULT 1,
+    remark VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE hr_attendance_shift IS '考勤班次规则配置表';
+
+-- 16. 员工考勤排班表 (hr_attendance_schedule)
+DROP TABLE IF EXISTS hr_attendance_schedule CASCADE;
+CREATE TABLE hr_attendance_schedule (
+    id SERIAL PRIMARY KEY,
+    emp_id INT NOT NULL REFERENCES hr_employee(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    shift_id INT REFERENCES hr_attendance_shift(id) ON DELETE SET NULL,
+    is_rest BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (emp_id, date)
+);
+COMMENT ON TABLE hr_attendance_schedule IS '员工考勤排班记录表';
+
+-- 17. 考勤打卡明细与综合判定表 (hr_attendance_record)
+DROP TABLE IF EXISTS hr_attendance_record CASCADE;
+CREATE TABLE hr_attendance_record (
+    id SERIAL PRIMARY KEY,
+    emp_id INT NOT NULL REFERENCES hr_employee(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    check_in_time TIMESTAMP WITH TIME ZONE,
+    check_out_time TIMESTAMP WITH TIME ZONE,
+    shift_id INT REFERENCES hr_attendance_shift(id) ON DELETE SET NULL,
+    check_in_status INT DEFAULT 3, -- 1: 正常, 2: 迟到, 3: 缺卡
+    check_out_status INT DEFAULT 3, -- 1: 正常, 2: 早退, 3: 缺卡
+    status INT DEFAULT 4, -- 1: 正常, 2: 迟到, 3: 早退, 4: 旷工/严重缺卡, 5: 请假中, 6: 休息
+    work_hours NUMERIC(4, 1) DEFAULT 0.0,
+    check_in_ip VARCHAR(50),
+    check_out_ip VARCHAR(50),
+    remark VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (emp_id, date)
+);
+COMMENT ON TABLE hr_attendance_record IS '考勤打卡明细与综合判定表';
+
+-- 18. 绩效考评方案表 (hr_performance_plan)
+DROP TABLE IF EXISTS hr_performance_plan CASCADE;
+CREATE TABLE hr_performance_plan (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    cycle_type VARCHAR(20) DEFAULT 'QUARTERLY',
+    start_date VARCHAR(20) NOT NULL,
+    end_date VARCHAR(20) NOT NULL,
+    weight_self INT DEFAULT 30,
+    weight_manager INT DEFAULT 70,
+    metrics TEXT,
+    status VARCHAR(20) DEFAULT 'IN_PROGRESS',
+    remark VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE hr_performance_plan IS '绩效考评方案与周期规划表';
+
+-- 19. 员工绩效考评明细与闭环评定记录表 (hr_performance_record)
+DROP TABLE IF EXISTS hr_performance_record CASCADE;
+CREATE TABLE hr_performance_record (
+    id SERIAL PRIMARY KEY,
+    plan_id INT NOT NULL REFERENCES hr_performance_plan(id) ON DELETE CASCADE,
+    emp_id INT NOT NULL REFERENCES hr_employee(id) ON DELETE CASCADE,
+    emp_name VARCHAR(50) NOT NULL,
+    emp_no VARCHAR(50) NOT NULL,
+    dept_id INT,
+    dept_name VARCHAR(50),
+    post VARCHAR(50),
+    self_score NUMERIC(5, 1),
+    self_comment TEXT,
+    manager_score NUMERIC(5, 1),
+    manager_comment TEXT,
+    final_score NUMERIC(5, 1),
+    rating VARCHAR(10),
+    coefficient NUMERIC(4, 2) DEFAULT 1.00,
+    status VARCHAR(25) DEFAULT 'PENDING_SELF',
+    evaluated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+COMMENT ON TABLE hr_performance_record IS '员工绩效考评明细与闭环评定记录表';
 
 -- ========================================================
 -- 初始化基础演示数据
@@ -345,7 +469,15 @@ SELECT 1, id FROM sys_menu;
 
 -- 人事专员分配部分权限 (工作台、人事管理及其所有子菜单和按钮、系统公告)
 INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 2, id FROM sys_menu WHERE id IN (1, 2, 201, 202, 203, 204, 205, 210, 211, 212, 213, 214, 220, 221, 230, 231, 232, 233, 240, 241, 242, 243, 4, 401);
+SELECT 2, id FROM sys_menu WHERE id IN (
+    1, 2, 201, 202, 203, 204, 205, 206,
+    210, 211, 212, 213, 214,
+    220, 221,
+    230, 231, 232, 233,
+    240, 241, 242, 243,
+    250, 251, 252, 253, 254,
+    4, 401
+);
 
 -- 初始化数据字典
 INSERT INTO sys_dict (dict_name, dict_type, dict_label, dict_value, sort, status, remark) VALUES
@@ -381,3 +513,28 @@ INSERT INTO hr_leave (leave_no, emp_id, emp_name, dept_id, leave_type, start_tim
 -- 初始化一条系统公告
 INSERT INTO sys_notice (title, content, notice_type, status, created_by) VALUES
 ('2026年度企业人事管理系统升级通知', '各位同仁好：全新企业级HR人事后台管理系统已正式部署上线，支持动态权限、在线请假审批与档案管理。', 'ANNOUNCEMENT', 1, '超级管理员');
+
+-- 初始化考勤班次规则 (标准常白班)
+INSERT INTO hr_attendance_shift (id, name, start_time, end_time, late_tolerance, early_tolerance, work_hours, is_default, status, remark) VALUES
+(1, '标准常白班 (09:00-18:00)', '09:00', '18:00', 10, 0, 8.0, true, 1, '全员通用标准工时班次，包含10分钟弹性打卡缓冲');
+
+SELECT setval('hr_attendance_shift_id_seq', (SELECT MAX(id) FROM hr_attendance_shift));
+
+-- 初始化演示薪资记录 (2026-10 包含基础、岗位津贴、绩效)
+INSERT INTO hr_salary_record (emp_id, year_month, base_salary, post_salary, performance_salary, overtime_salary, allowance, leave_deduction, social_security, housing_fund, tax, gross_salary, net_salary, status, remark) VALUES
+(1, '2026-10', 10000.00, 4500.00, 2220.00, 800.00, 1000.00, 0.00, 1050.00, 700.00, 380.00, 18520.00, 16390.00, 2, '前端架构负责人月度薪资'),
+(2, '2026-10', 12000.00, 5500.00, 3300.00, 1200.00, 1000.00, 0.00, 1260.00, 840.00, 620.00, 23000.00, 20280.00, 2, '后端架构专家月度薪资'),
+(3, '2026-10', 5000.00, 2200.00, 1000.00, 0.00, 800.00, 0.00, 560.00, 380.00, 80.00, 9000.00, 7980.00, 1, 'HR专员月度薪资');
+
+-- 初始化绩效考评方案与评定记录
+INSERT INTO hr_performance_plan (id, title, cycle_type, start_date, end_date, weight_self, weight_manager, metrics, status, remark) VALUES
+(1, '2026年Q1研发与运营综合绩效考评', 'QUARTERLY', '2026-01-01', '2026-03-31', 30, 70, '[{"key":"M1","name":"核心交付","type":"KPI","weight":40,"target":"季度重点特性与高可用架构达标率>=98%"},{"key":"M2","name":"业务赋能","type":"KPI","weight":30,"target":"跨部门协作响应及时率与满意度>=95分"},{"key":"M3","name":"技术创新与OKR","type":"OKR","weight":30,"target":"完成技术体系优化演化，产出最佳实践规范"}]', 'IN_PROGRESS', '2026年度第一季度全员KPI/OKR考评闭环'),
+(2, '2025年度企业经营与效能年度总评', 'ANNUAL', '2025-01-01', '2025-12-31', 30, 70, '[{"key":"M1","name":"业务指标","type":"KPI","weight":50,"target":"年度业务营收指标与战略目标达成"},{"key":"M2","name":"组织建设","type":"OKR","weight":50,"target":"团队人才梯队搭建与核心知识沉淀"}]', 'COMPLETED', '上一年度度度考评已归档');
+
+SELECT setval('hr_performance_plan_id_seq', (SELECT MAX(id) FROM hr_performance_plan));
+
+INSERT INTO hr_performance_record (plan_id, emp_id, emp_name, emp_no, dept_id, dept_name, post, self_score, self_comment, manager_score, manager_comment, final_score, rating, coefficient, status, evaluated_at) VALUES
+(1, 1, '张三', 'EMP1001', 5, '前端架构组', '前端高级工程师', 92.0, '完成了管理后台前端架构现代化升级、微前端与动态路由改造，按时高质交付各模块。', 94.0, '技术交付稳健，组件化与交互质感表现优异，具备良好的团队协同意识。', 93.4, 'A', 1.20, 'COMPLETED', '2026-03-30 15:30:00+08'),
+(1, 2, '李四', 'EMP1002', 6, '后端架构组', 'NestJS后端专家', 96.0, '主导了RBAC多权限架构升级、TypeORM性能优化与大数据流式防OOM导出，接口平均耗时<50ms。', 97.0, '架构攻坚能力过硬，多次化解高并发瓶颈，积极指导初中级工程师，表现卓越。', 96.7, 'S', 1.50, 'COMPLETED', '2026-03-30 16:10:00+08'),
+(1, 3, '王五', 'EMP1003', 3, '人事行政部', 'HR人事专员', 88.0, '推进了考勤排班日历、薪资一键全员核算与保密工资条闭环系统的落地，员工满意度高。', NULL, NULL, NULL, NULL, 1.00, 'PENDING_MANAGER', NULL);
+

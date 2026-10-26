@@ -334,6 +334,7 @@ import {
   archivePerformancePlanApi,
   deletePlanApi,
   syncPerformanceToSalaryApi,
+  exportPerformanceReportApi,
   PerformancePlanItem,
   PerformanceRecordItem,
 } from '@/api/performance';
@@ -732,10 +733,26 @@ const handleConfirmSyncSalary = async () => {
   }
 };
 
-const handleExportReport = () => {
+const handleExportReport = async () => {
   if (!currentPlan.value) return;
-  const url = `/api/hr/performance/export/${currentPlan.value.id}`;
-  window.open(url, '_blank');
+  try {
+    ElMessage.info('正在生成考评报表，请稍候...');
+    const res: any = await exportPerformanceReportApi(currentPlan.value.id);
+    const blob = new Blob([res], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${currentPlan.value.title || '绩效考评结果报表'}_${Date.now()}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    ElMessage.success('考评报表导出成功');
+  } catch (error: any) {
+    ElMessage.error(error?.message || '导出报表失败');
+  }
 };
 
 const handleDeletePlan = (row: any) => {
