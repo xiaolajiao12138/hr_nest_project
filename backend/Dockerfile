@@ -6,11 +6,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 安装 pnpm 并配置国内镜像加速
-RUN corepack enable && corepack prepare pnpm@latest --activate \
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm install -g pnpm \
     && pnpm config set registry https://registry.npmmirror.com
 
 # 拷贝依赖描述文件
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 
 # 完整安装依赖 (含 devDependencies)
 RUN pnpm install --frozen-lockfile
@@ -34,7 +35,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV TZ=Asia/Shanghai
 
-RUN apk add --no-cache tzdata \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add --no-cache tzdata \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
@@ -46,5 +48,5 @@ COPY --from=builder /app/dist ./dist
 # 暴露 NestJS 服务端口
 EXPOSE 3000
 
-# 生产环境启动指令
-CMD ["node", "dist/main.js"]
+# 生产环境启动指令 (兼容 Node 20 对前端 JSEncrypt RSA PKCS#1 v1.5 密码密文的私钥解密)
+CMD ["node", "--security-revert=CVE-2023-46809", "dist/main.js"]

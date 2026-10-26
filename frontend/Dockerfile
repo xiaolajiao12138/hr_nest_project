@@ -6,11 +6,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 安装 pnpm 并配置国内镜像加速
-RUN corepack enable && corepack prepare pnpm@latest --activate \
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm install -g pnpm \
     && pnpm config set registry https://registry.npmmirror.com
 
 # 拷贝依赖配置并安装
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 # 拷贝前端代码并进行生产构建
@@ -27,7 +28,8 @@ FROM nginx:alpine AS runner
 
 # 设置东八区时区
 ENV TZ=Asia/Shanghai
-RUN apk add --no-cache tzdata \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk add --no-cache tzdata \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 

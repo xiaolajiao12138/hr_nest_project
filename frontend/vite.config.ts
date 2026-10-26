@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: '0.0.0.0',
+      // 允许内网穿透工具（如 cpolar、NatApp、Cloudflare Tunnel）生成的外部域名访问
+      allowedHosts: true,
       open: false,
       proxy: {
         '/api': {
