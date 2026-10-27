@@ -185,8 +185,9 @@
       <el-dropdown trigger="click" @command="handleCommand">
         <span class="user-profile">
           <el-avatar
+            :key="userInfo?.avatar || 'header-avatar'"
             :size="32"
-            :src="userInfo?.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'"
+            :src="userInfo?.avatar || '/avatars/avatar-1.svg'"
           />
           <span class="username">{{ userInfo?.realName || userInfo?.username || '用户' }}</span>
           <el-icon><CaretBottom /></el-icon>

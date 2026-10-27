@@ -9,7 +9,12 @@
           <!-- 头像展示与互动区 -->
           <div class="avatar-wrapper">
             <div class="avatar-box" @click="openAvatarDialog">
-              <el-avatar :size="100" :src="profileData.avatar || defaultAvatar" class="main-avatar">
+              <el-avatar
+                :key="profileData.avatar || 'main-avatar'"
+                :size="100"
+                :src="profileData.avatar || defaultAvatar"
+                class="main-avatar"
+              >
                 <el-icon :size="50"><UserFilled /></el-icon>
               </el-avatar>
               <div class="avatar-mask">
@@ -518,17 +523,17 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type Upload
 const router = useRouter();
 const userStore = useUserStore();
 
-// 默认高保真职场头像
-const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png';
+// 默认高保真职场头像（本地高可用矢量，零外网依赖）
+const defaultAvatar = '/avatars/avatar-1.svg';
 
-// 预设企业职场头像库 (多种风格商务角色)
+// 预设企业职场头像库 (6款各具特色的企业级矢量商务形象，支持离线/内网与高可用)
 const presetAvatars = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+  '/avatars/avatar-1.svg',
+  '/avatars/avatar-2.svg',
+  '/avatars/avatar-3.svg',
+  '/avatars/avatar-4.svg',
+  '/avatars/avatar-5.svg',
+  '/avatars/avatar-6.svg',
 ];
 
 // 当前标签页
@@ -722,9 +727,12 @@ const selectedPresetUrl = ref('');
 const uploadingAvatar = ref(false);
 
 const openAvatarDialog = () => {
+  if (previewAvatarUrl.value && previewAvatarUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewAvatarUrl.value);
+  }
   previewAvatarUrl.value = '';
   selectedAvatarFile.value = null;
-  selectedPresetUrl.value = profileData.value.avatar || '';
+  selectedPresetUrl.value = profileData.value.avatar || presetAvatars[0];
   avatarDialogVisible.value = true;
 };
 
@@ -742,12 +750,16 @@ const handleAvatarFileChange = (uploadFile: UploadFile) => {
     return;
   }
 
+  if (previewAvatarUrl.value && previewAvatarUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewAvatarUrl.value);
+  }
   selectedAvatarFile.value = uploadFile.raw;
   previewAvatarUrl.value = URL.createObjectURL(uploadFile.raw);
 };
 
 // 确认更换头像
 const handleConfirmAvatar = async () => {
+  let newAvatarUrl = '';
   if (avatarTab.value === 'upload') {
     if (!selectedAvatarFile.value) {
       ElMessage.warning('请先选择要上传的本地头像图片');
@@ -756,18 +768,11 @@ const handleConfirmAvatar = async () => {
     try {
       uploadingAvatar.value = true;
       const res: any = await uploadAvatarApi(selectedAvatarFile.value);
-      const newAvatarUrl = res.fileUrl || res.filePath;
-
-      // 保存至用户档案
-      await updateUserProfileApi({ avatar: newAvatarUrl });
-      profileData.value.avatar = newAvatarUrl;
-      userStore.updateUserProfile({ avatar: newAvatarUrl });
-      ElMessage.success('头像更换成功！');
-      avatarDialogVisible.value = false;
+      newAvatarUrl = res.fileUrl || res.filePath;
     } catch (err: any) {
       ElMessage.error(err.message || '头像上传失败');
-    } finally {
       uploadingAvatar.value = false;
+      return;
     }
   } else {
     // 预设头像
@@ -775,18 +780,37 @@ const handleConfirmAvatar = async () => {
       ElMessage.warning('请选择一个预设头像');
       return;
     }
-    try {
-      uploadingAvatar.value = true;
-      await updateUserProfileApi({ avatar: selectedPresetUrl.value });
-      profileData.value.avatar = selectedPresetUrl.value;
-      userStore.updateUserProfile({ avatar: selectedPresetUrl.value });
-      ElMessage.success('头像更换成功！');
-      avatarDialogVisible.value = false;
-    } catch (err: any) {
-      ElMessage.error(err.message || '更换头像失败');
-    } finally {
-      uploadingAvatar.value = false;
+    newAvatarUrl = selectedPresetUrl.value;
+  }
+
+  try {
+    uploadingAvatar.value = true;
+    await updateUserProfileApi({ avatar: newAvatarUrl });
+
+    // 1. 本地响应式状态即时更新
+    profileData.value.avatar = newAvatarUrl;
+
+    // 2. 同步全局 User Store 状态与本地存储
+    userStore.updateUserProfile({ avatar: newAvatarUrl });
+
+    // 3. 权威刷新全局用户信息、个人中心档案以及操作审计日志
+    await userStore.getInfo();
+    await fetchProfileData();
+    await fetchUserLogs();
+
+    ElMessage.success('头像更换成功！');
+
+    // 4. 清理预览资源并关闭弹窗
+    if (previewAvatarUrl.value && previewAvatarUrl.value.startsWith('blob:')) {
+      URL.revokeObjectURL(previewAvatarUrl.value);
     }
+    previewAvatarUrl.value = '';
+    selectedAvatarFile.value = null;
+    avatarDialogVisible.value = false;
+  } catch (err: any) {
+    ElMessage.error(err.message || '更换头像失败');
+  } finally {
+    uploadingAvatar.value = false;
   }
 };
 

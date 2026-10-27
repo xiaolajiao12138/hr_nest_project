@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg1)"/>
+  <!-- 头颈身体 -->
+  <path d="M60 68 C45 68 32 80 28 98 C36 112 50 120 60 120 C70 120 84 112 92 98 C88 80 75 68 60 68 Z" fill="#1e293b"/>
+  <!-- 衬衫领与领带 -->
+  <polygon points="60,78 50,68 70,68" fill="#ffffff"/>
+  <polygon points="60,75 57,88 60,98 63,88" fill="#ef4444"/>
+  <!-- 头部与面部 -->
+  <ellipse cx="60" cy="46" rx="22" ry="26" fill="#fed7aa"/>
+  <!-- 头发 -->
+  <path d="M38 42 C38 25 50 18 60 18 C70 18 82 25 82 42 C82 30 76 24 60 24 C44 24 38 30 38 42 Z" fill="#0f172a"/>
+  <!-- 眼睛与微笑 -->
+  <circle cx="52" cy="46" r="2.5" fill="#334155"/>
+  <circle cx="68" cy="46" r="2.5" fill="#334155"/>
+  <path d="M54 56 Q60 61 66 56" stroke="#ea580c" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

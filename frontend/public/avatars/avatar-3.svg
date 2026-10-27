@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg3)"/>
+  <!-- 身体与立领衬衫 -->
+  <path d="M60 68 C45 68 32 80 28 98 C36 112 50 120 60 120 C70 120 84 112 92 98 C88 80 75 68 60 68 Z" fill="#334155"/>
+  <path d="M52 68 L60 78 L68 68 Z" fill="#60a5fa"/>
+  <!-- 头部与面部 -->
+  <ellipse cx="60" cy="46" rx="21" ry="25" fill="#fde047" opacity="0.9"/>
+  <!-- 卷曲棕黑短发 -->
+  <path d="M38 40 C36 22 52 16 60 16 C70 16 84 22 82 40 C78 28 70 24 60 24 C48 24 42 28 38 40 Z" fill="#18181b"/>
+  <!-- 斯文黑框眼镜 -->
+  <rect x="44" y="42" width="13" height="9" rx="2" fill="none" stroke="#09090b" stroke-width="2"/>
+  <rect x="63" y="42" width="13" height="9" rx="2" fill="none" stroke="#09090b" stroke-width="2"/>
+  <line x1="57" y1="46" x2="63" y2="46" stroke="#09090b" stroke-width="2"/>
+  <circle cx="50.5" cy="46.5" r="2" fill="#09090b"/>
+  <circle cx="69.5" cy="46.5" r="2" fill="#09090b"/>
+  <path d="M54 57 Q60 62 66 57" stroke="#b45309" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

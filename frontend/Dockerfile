@@ -17,6 +17,7 @@ RUN pnpm install --frozen-lockfile
 # 拷贝前端代码并进行生产构建
 COPY index.html vite.config.ts tsconfig.json tsconfig.node.json ./
 COPY .env.production ./
+COPY public/ ./public/
 COPY src/ ./src/
 
 RUN pnpm run build

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg5)"/>
+  <!-- 商务深色正装 -->
+  <path d="M60 68 C45 68 32 80 28 98 C36 112 50 120 60 120 C70 120 84 112 92 98 C88 80 75 68 60 68 Z" fill="#18181b"/>
+  <polygon points="60,78 50,68 70,68" fill="#ffffff"/>
+  <polygon points="60,75 57,86 60,96 63,86" fill="#0284c7"/>
+  <!-- 头部与面部 -->
+  <ellipse cx="60" cy="46" rx="22" ry="25" fill="#fde68a"/>
+  <!-- 大背头短发 -->
+  <path d="M38 40 C38 20 50 16 60 16 C70 16 82 20 82 40 C80 26 72 22 60 22 C48 22 40 26 38 40 Z" fill="#3f3f46"/>
+  <!-- 眼睛与自信微笑 -->
+  <circle cx="52" cy="45" r="2.2" fill="#27272a"/>
+  <circle cx="68" cy="45" r="2.2" fill="#27272a"/>
+  <path d="M54 55 Q60 60 66 55" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

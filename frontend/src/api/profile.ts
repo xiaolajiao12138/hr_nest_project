@@ -87,8 +87,5 @@ export function uploadAvatarApi(file: File) {
     url: '/upload/file',
     method: 'post',
     data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
   });
 }
