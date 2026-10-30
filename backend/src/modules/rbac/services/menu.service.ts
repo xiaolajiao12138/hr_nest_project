@@ -4,6 +4,8 @@ import { Repository, DataSource, In } from 'typeorm';
 import { Menu } from '../entities/menu.entity';
 import { BaseService } from '../../../common/base/base.service';
 import { User } from '../entities/user.entity';
+import { AuthCacheService } from './auth-cache.service';
+import { SseService } from '../../sse/sse.service';
 
 /**
  * 前端 Vue Router 路由结构项接口
@@ -52,9 +54,41 @@ export class MenuService extends BaseService<Menu> {
     private readonly menuRepository: Repository<Menu>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly authCacheService: AuthCacheService,
+    private readonly sseService: SseService,
     dataSource: DataSource,
   ) {
     super(menuRepository, dataSource);
+  }
+
+  /**
+   * 重写新增菜单
+   */
+  async create(attrs: any): Promise<Menu> {
+    const created = await super.create(attrs);
+    await this.authCacheService.clearAllAuthorities();
+    this.sseService.broadcastPermissionUpdate('系统功能菜单与权限树已更新');
+    return created;
+  }
+
+  /**
+   * 重写编辑菜单
+   */
+  async update(id: number, attrs: any): Promise<Menu> {
+    const updated = await super.update(id, attrs);
+    await this.authCacheService.clearAllAuthorities();
+    this.sseService.broadcastPermissionUpdate('系统功能菜单与权限树已更新');
+    return updated;
+  }
+
+  /**
+   * 重写删除菜单
+   */
+  async deleteById(id: number): Promise<boolean> {
+    const res = await super.deleteById(id);
+    await this.authCacheService.clearAllAuthorities();
+    this.sseService.broadcastPermissionUpdate('系统功能菜单与权限树已更新');
+    return res;
   }
 
   /**

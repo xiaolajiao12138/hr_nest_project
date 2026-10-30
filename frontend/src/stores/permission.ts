@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { RouteRecordRaw } from 'vue-router';
 import { getDynamicRoutesApi } from '@/api/auth';
 import Layout from '@/layout/index.vue';
+import { ElNotification } from 'element-plus';
 
 /**
  * 基于 Vite 的 import.meta.glob 机制预先扫描 views 目录下的所有 Vue 单文件组件
@@ -21,6 +22,8 @@ export const usePermissionStore = defineStore('permission', {
     sidebarMenus: [] as any[],
     /** 标识当前应用生命周期内是否已经完成动态路由挂载（防止路由守卫死循环触发） */
     isRoutesLoaded: false,
+    /** 当前已挂载的动态路由名称清单，用于热重载时精准卸载 */
+    registeredRouteNames: [] as string[],
   }),
 
   actions: {
@@ -187,11 +190,95 @@ export const usePermissionStore = defineStore('permission', {
     },
 
     /**
+     * 递归判断目标路由路径是否存在于最新的已授权菜单树中
+     */
+    checkPathAccess(menus: any[], targetPath: string): boolean {
+      if (!menus || menus.length === 0) return false;
+      for (const item of menus) {
+        if (item.path === targetPath) return true;
+        if (item.children && item.children.length > 0) {
+          if (this.checkPathAccess(item.children, targetPath)) return true;
+        }
+      }
+      return false;
+    },
+
+    /**
+     * 实时无感热重载动态路由与侧边栏（无需退出重新登录）
+     *
+     * 核心步骤：
+     * 1. 彻底卸载旧的动态路由记录，杜绝路由残留
+     * 2. 重新向后端拉取最新的权限菜单树并转换
+     * 3. 动态注册挂载最新路由
+     * 4. 响应式刷新 sidebarMenus，驱动左侧导航栏自适应增减
+     * 5. 若当前访问页面已被剥夺权限，平滑重定向至工作台
+     */
+    async reloadRoutes(router?: any): Promise<RouteRecordRaw[]> {
+      // 1. 先安全移除已注册的旧动态路由
+      if (router && this.registeredRouteNames.length > 0) {
+        for (const name of this.registeredRouteNames) {
+          if (router.hasRoute(name)) {
+            try {
+              router.removeRoute(name);
+            } catch (_) {}
+          }
+        }
+      }
+      this.registeredRouteNames = [];
+
+      // 2. 重新向后端发起菜单树请求并生成路由
+      const accessedRoutes = await this.generateRoutes();
+
+      // 3. 循环重新挂载至 Vue Router
+      if (router) {
+        accessedRoutes.forEach((route) => {
+          router.addRoute(route);
+          if (route.name) {
+            this.registeredRouteNames.push(String(route.name));
+          }
+          if (route.children) {
+            route.children.forEach((c) => {
+              if (c.name) {
+                this.registeredRouteNames.push(String(c.name));
+              }
+            });
+          }
+        });
+
+        // 重新确保 404 兜底路由置于最后
+        router.addRoute({
+          path: '/:pathMatch(.*)*',
+          name: 'DynamicCatchAll',
+          redirect: '/404',
+        });
+        this.registeredRouteNames.push('DynamicCatchAll');
+
+        // 4. 检查当前用户停留在的页面是否仍然具有权限
+        const currentPath = router.currentRoute?.value?.path;
+        const whiteList = ['/login', '/404', '/profile', '/dashboard', '/'];
+        if (currentPath && !whiteList.includes(currentPath)) {
+          const hasAccess = this.checkPathAccess(this.sidebarMenus, currentPath);
+          if (!hasAccess) {
+            ElNotification.warning({
+              title: '岗位权限已变更',
+              message: '您当前浏览的业务模块访问权限已被调整，系统已自动为您返回工作台。',
+              duration: 5000,
+            });
+            router.replace('/dashboard');
+          }
+        }
+      }
+
+      return accessedRoutes;
+    },
+
+    /**
      * 用户登出时重置路由加载状态与缓存
      */
     resetRoutes() {
       this.routes = [];
       this.sidebarMenus = [];
+      this.registeredRouteNames = [];
       this.isRoutesLoaded = false;
     },
   },

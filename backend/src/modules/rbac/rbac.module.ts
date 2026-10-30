@@ -12,6 +12,7 @@ import { AuthService } from './services/auth.service';
 import { UserService } from './services/user.service';
 import { RoleService } from './services/role.service';
 import { MenuService } from './services/menu.service';
+import { AuthCacheService } from './services/auth-cache.service';
 
 import { AuthController } from './controllers/auth.controller';
 import { UserController } from './controllers/user.controller';
@@ -47,9 +48,17 @@ import { RsaService } from '../../common/security/rsa.service';
     UserService,
     RoleService,
     MenuService,
+    AuthCacheService,
     JwtStrategy,
     RsaService,
   ],
-  exports: [AuthService, UserService, RoleService, MenuService, RsaService],
+  exports: [
+    AuthService,
+    UserService,
+    RoleService,
+    MenuService,
+    AuthCacheService,
+    RsaService,
+  ],
 })
 export class RbacModule {}

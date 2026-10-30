@@ -6,6 +6,9 @@ import {
   getRefreshToken,
   removeToken,
 } from './auth';
+import router from '@/router';
+import { useUserStore } from '@/stores/user';
+import { usePermissionStore } from '@/stores/permission';
 
 /**
  * 标记当前是否正在向后端申请刷新 Token
@@ -128,6 +131,15 @@ service.interceptors.response.use(
       if (error.response.status === 401) {
         handleRelogin();
         return Promise.reject(error);
+      }
+      if (error.response.status === 403) {
+        // 权限不足/被调整兜底：静默触发全量权限与路由热重载自愈
+        try {
+          const userStore = useUserStore();
+          const permissionStore = usePermissionStore();
+          userStore.getInfo().catch(() => {});
+          permissionStore.reloadRoutes(router).catch(() => {});
+        } catch (_) {}
       }
       msg = error.response.data?.msg || `服务响应异常 (${error.response.status})`;
     }

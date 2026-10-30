@@ -83,4 +83,30 @@ export class RedisService implements OnModuleInit {
     }
     this.fallbackMemory.delete(key);
   }
+
+  /**
+   * 根据前缀批量删除键（如 auth:user_auth:）
+   * 优先使用 Redis SCAN / KEYS 批量清理，降级模式下直接清理内存字典
+   *
+   * @param prefix 键前缀
+   */
+  async delByPrefix(prefix: string): Promise<void> {
+    if (this.client && this.client.status === 'ready') {
+      try {
+        const keys = await this.client.keys(`${prefix}*`);
+        if (keys && keys.length > 0) {
+          await this.client.del(...keys);
+        }
+      } catch (err) {
+        this.logger.warn(`Redis 批量删除前缀 ${prefix} 异常: ${err.message}`);
+      }
+      return;
+    }
+
+    for (const key of this.fallbackMemory.keys()) {
+      if (key.startsWith(prefix)) {
+        this.fallbackMemory.delete(key);
+      }
+    }
+  }
 }

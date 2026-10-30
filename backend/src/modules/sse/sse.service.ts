@@ -6,7 +6,12 @@ import { Observable, Subject, merge, interval, map } from 'rxjs';
  */
 export interface SsePayload {
   /** 消息事件分类标识 */
-  type: 'NOTICE_BROADCAST' | 'LEAVE_AUDIT_NOTIFY' | 'TODO_BADGE_UPDATE' | 'HEARTBEAT';
+  type:
+    | 'NOTICE_BROADCAST'
+    | 'LEAVE_AUDIT_NOTIFY'
+    | 'TODO_BADGE_UPDATE'
+    | 'HEARTBEAT'
+    | 'PERMISSION_UPDATE';
   /** 消息标题（弹窗顶部展示） */
   title?: string;
   /** 消息主体正文提示 */
@@ -125,6 +130,22 @@ export class SseService {
     this.broadcast({
       type: 'TODO_BADGE_UPDATE',
       data: { pendingCount },
+    });
+  }
+
+  /**
+   * 广播岗位权限与系统功能菜单配置变更事件
+   * 通知全站所有在线客户端静默拉取最新权限并热重载动态路由与侧边栏
+   *
+   * @param message 友好通知提示语
+   */
+  broadcastPermissionUpdate(message = '系统权限与功能配置已更新') {
+    this.broadcast({
+      type: 'PERMISSION_UPDATE',
+      title: '权限实时同步',
+      message,
+      data: { reloadRoutes: true },
+      timestamp: Date.now(),
     });
   }
 }

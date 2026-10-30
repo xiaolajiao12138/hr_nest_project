@@ -16,6 +16,8 @@ import { BusinessException } from '../../../common/exceptions/business.exception
 import * as bcrypt from 'bcryptjs';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
 import { PageResultDto } from '../../../common/dto/page-result.dto';
+import { AuthCacheService } from './auth-cache.service';
+import { SseService } from '../../sse/sse.service';
 
 @Injectable()
 export class UserService extends BaseService<User> {
@@ -24,6 +26,8 @@ export class UserService extends BaseService<User> {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepo: Repository<Role>,
+    private readonly authCacheService: AuthCacheService,
+    private readonly sseService: SseService,
     dataSource: DataSource,
   ) {
     super(userRepo, dataSource);
@@ -113,7 +117,13 @@ export class UserService extends BaseService<User> {
       user.roles = await this.roleRepo.findBy({ id: In(dto.roleIds) });
     }
 
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+
+    // 实时清除权限缓存并通知前端热重载
+    await this.authCacheService.clearUserAuthorities(id);
+    this.sseService.broadcastPermissionUpdate('用户角色分配与状态已更新');
+
+    return saved;
   }
 
   /**
@@ -139,7 +149,22 @@ export class UserService extends BaseService<User> {
       throw new BusinessException('系统安全保护：超级管理员账号禁止停用');
     }
     await this.userRepo.update(id, { status: Number(status) });
+
+    // 状态修改立即清除缓存，若停用则下一次请求立即被熔断拦截
+    await this.authCacheService.clearUserAuthorities(id);
+    this.sseService.broadcastPermissionUpdate('用户账号启停状态已更新');
+
     return true;
+  }
+
+  /**
+   * 重写用户删除
+   */
+  async deleteById(id: number): Promise<boolean> {
+    const res = await super.deleteById(id);
+    await this.authCacheService.clearUserAuthorities(id);
+    this.sseService.broadcastPermissionUpdate('用户已被移除');
+    return res;
   }
 
   /**

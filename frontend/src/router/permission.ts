@@ -39,22 +39,36 @@ router.beforeEach(async (to, from, next) => {
         try {
           const accessRoutes = await permissionStore.generateRoutes();
 
-          // 循环动态挂载路由
+          // 循环动态挂载路由并记录名称供热重载
           accessRoutes.forEach((route) => {
             router.addRoute(route);
+            if (route.name) {
+              permissionStore.registeredRouteNames.push(String(route.name));
+            }
+            if (route.children) {
+              route.children.forEach((c) => {
+                if (c.name) {
+                  permissionStore.registeredRouteNames.push(String(c.name));
+                }
+              });
+            }
           });
 
           // 动态注册根路径重定向
           router.addRoute({
             path: '/',
+            name: 'RootRedirect',
             redirect: '/dashboard',
           });
+          permissionStore.registeredRouteNames.push('RootRedirect');
 
           // 动态捕获所有未定义路径至 404
           router.addRoute({
             path: '/:pathMatch(.*)*',
+            name: 'DynamicCatchAll',
             redirect: '/404',
           });
+          permissionStore.registeredRouteNames.push('DynamicCatchAll');
 
           // 确保 addRoute 注册完成，replace 进入目标路由
           next({ ...to, replace: true });

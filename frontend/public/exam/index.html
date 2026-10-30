@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#C9211E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>2026年入党积极分子考试与练习系统</title>
+  <style>
+    :root {
+      --primary: #C9211E;
+      --primary-dark: #A61714;
+      --primary-light: #FDE8E8;
+      --primary-hover: #D93835;
+      --gold: #D97706;
+      --gold-light: #FEF3C7;
+      --gold-gradient: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      --red-gradient: linear-gradient(135deg, #E02E2A 0%, #B91C1C 100%);
+      --blue-gradient: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+      --confirm-gradient: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+      --success: #059669;
+      --success-light: #ECFDF5;
+      --danger: #DC2626;
+      --danger-light: #FEF2F2;
+      --bg: #F4F6F9;
+      --card: #FFFFFF;
+      --text-main: #1F2937;
+      --text-sub: #4B5563;
+      --text-muted: #9CA3AF;
+      --border: #E5E7EB;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      touch-action: manipulation;
+    }
+
+    #app-container {
+      width: 100%;
+      max-width: 520px;
+      min-height: 100vh;
+      background-color: #FAFAFA;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 30px rgba(0,0,0,0.06);
+    }
+
+    /* 视图切换 */
+    .view-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      width: 100%;
+      min-height: 100vh;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .view-screen.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    button {
+      border: none;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+    button:active {
+      transform: scale(0.97);
+    }
+
+    /* ------------------------------
+       1. 首页样式 (Home View)
+       ------------------------------ */
+    .home-header {
+      background: var(--red-gradient);
+      color: #fff;
+      padding: 28px 20px 22px;
+      border-radius: 0 0 24px 24px;
+      box-shadow: 0 6px 20px rgba(185, 28, 28, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+    .home-header::after {
+      content: "";
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 130px;
+      height: 130px;
+      background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%);
+      border-radius: 50%;
+    }
+    .home-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(4px);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .home-title {
+      font-size: 23px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .home-subtitle {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .home-body {
+      padding: 16px 16px calc(24px + var(--safe-bottom));
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 模式选择按钮组 */
+    .mode-cards-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .mode-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+    .mode-card:hover, .mode-card:active {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(201, 33, 30, 0.1);
+    }
+    .mode-card.primary-mode {
+      background: linear-gradient(135deg, #FFF9F9 0%, #FFFFFF 100%);
+      border-color: #FCA5A5;
+    }
+    .mode-card.practice-mode {
+      background: linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 100%);
+      border-color: #BAE6FD;
+    }
+    .mode-card-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .mode-icon-box {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .primary-mode .mode-icon-box {
+      background: var(--red-gradient);
+      color: #fff;
+    }
+    .practice-mode .mode-icon-box {
+      background: var(--blue-gradient);
+      color: #fff;
+    }
+    .mode-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mode-pill {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .pill-red {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    .pill-blue {
+      background: #E0F2FE;
+      color: #0369A1;
+    }
+    .mode-desc {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 3px;
+    }
+    .mode-arrow {
+      font-size: 20px;
+      color: var(--text-muted);
+      font-weight: 300;
+    }
+    .badge-draft {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: #F59E0B;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 0 14px 0 10px;
+    }
+
+    .info-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+    .info-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .info-item {
+      background: var(--bg);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+    }
+    .info-item-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .info-item-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* 历史记录卡片列表 */
+    .history-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      flex: 1;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .history-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .history-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .history-tag {
+      font-size: 11px;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .btn-clear-history {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .history-empty {
+      text-align: center;
+      padding: 24px 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .history-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .history-item:hover, .history-item:active {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .history-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .history-item-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .history-item-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+    .history-item-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .history-score {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--primary);
+      font-family: -apple-system, "DIN", sans-serif;
+    }
+    .history-score-unit {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .arrow-icon {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+
+    /* ------------------------------
+       2. 考试答题页面 (Exam View)
+       ------------------------------ */
+    .exam-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-btn {
+      background: none;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .exam-progress-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .exam-timer {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--gold-light);
+      padding: 4px 10px;
+      border-radius: 14px;
+    }
+
+    /* 顶部进度条 */
+    .progress-bar-wrap {
+      width: 100%;
+      height: 4px;
+      background: #E5E7EB;
+      position: sticky;
+      top: 53px;
+      z-index: 19;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 1%;
+      background: var(--red-gradient);
+      transition: width 0.25s ease;
+    }
+    .progress-bar-fill.blue {
+      background: var(--blue-gradient);
+    }
+
+    .exam-content {
+      flex: 1;
+      padding: 16px 16px calc(80px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+    }
+
+    .question-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 20px 18px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      position: relative;
+    }
+    .question-type-tag {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    .question-type-tag.blue {
+      color: #0284C7;
+      background: #E0F2FE;
+    }
+    .question-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.6;
+      word-break: break-all;
+    }
+
+    /* 选项列表 */
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .option-item {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .option-item:active {
+      transform: scale(0.985);
+    }
+    /* 模拟考选中态 */
+    .option-item.selected {
+      border-color: var(--primary);
+      background: #FFF5F5;
+      box-shadow: 0 2px 8px rgba(201, 33, 30, 0.12);
+    }
+    /* 练题模式选中态（允许修改重选） */
+    .option-item.practice-chosen {
+      border-color: #0284C7;
+      background: #F0F9FF;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+    }
+    .option-item.practice-chosen .option-letter {
+      background: #0284C7;
+      border-color: #0284C7;
+      color: #fff;
+    }
+    .option-item.practice-chosen .option-text {
+      color: #0369A1;
+      font-weight: 600;
+    }
+
+    /* 练题模式已确认锁定的反馈样式 */
+    .option-item.feedback-correct {
+      border-color: #10B981 !important;
+      background: #ECFDF5 !important;
+      color: #065F46;
+    }
+    .option-item.feedback-correct .option-letter {
+      background: #10B981 !important;
+      border-color: #10B981 !important;
+      color: #fff !important;
+    }
+    .option-item.feedback-wrong {
+      border-color: #EF4444 !important;
+      background: #FEF2F2 !important;
+      color: #991B1B;
+    }
+    .option-item.feedback-wrong .option-letter {
+      background: #EF4444 !important;
+      border-color: #EF4444 !important;
+      color: #fff !important;
+    }
+
+    .option-letter {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .option-item.selected .option-letter {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .option-text {
+      font-size: 15px;
+      color: var(--text-main);
+      line-height: 1.45;
+      flex: 1;
+      word-break: break-word;
+    }
+    .option-item.selected .option-text {
+      color: var(--primary-dark);
+      font-weight: 600;
+    }
+    .check-mark {
+      display: none;
+      color: var(--primary);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .option-item.selected .check-mark,
+    .option-item.practice-chosen .check-mark {
+      display: block;
+    }
+    .option-item.practice-chosen .check-mark {
+      color: #0284C7;
+    }
+
+    /* 练题即时解析卡片 */
+    .practice-feedback-card {
+      margin-top: 14px;
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      animation: fadeIn 0.2s ease;
+    }
+    .practice-feedback-card.correct {
+      display: flex;
+      background: var(--success-light);
+      border: 1px solid #A7F3D0;
+    }
+    .practice-feedback-card.wrong {
+      display: flex;
+      background: var(--danger-light);
+      border: 1px solid #FECACA;
+    }
+    .feedback-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .practice-feedback-card.correct .feedback-head {
+      color: var(--success);
+    }
+    .practice-feedback-card.wrong .feedback-head {
+      color: var(--danger);
+    }
+    .feedback-body {
+      font-size: 13px;
+      color: var(--text-sub);
+      line-height: 1.5;
+    }
+    .feedback-ans-tag {
+      font-weight: 700;
+      color: var(--success);
+      background: #D1FAE5;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 底部操作底栏 */
+    .exam-bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 520px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px calc(10px + var(--safe-bottom));
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 25;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.04);
+    }
+
+    .btn-prev {
+      flex: 1;
+      height: 46px;
+      border-radius: 23px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .btn-prev:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none !important;
+      background: #ECEFF1;
+      border-color: #E2E8F0;
+      color: #94A3B8;
+    }
+
+    .btn-card-toggle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .btn-next {
+      flex: 1.4;
+      height: 46px;
+      border-radius: 23px;
+      background: var(--red-gradient);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(201, 33, 30, 0.28);
+    }
+    .btn-next.btn-confirm-stage {
+      background: var(--confirm-gradient) !important;
+      box-shadow: 0 4px 12px rgba(3, 105, 161, 0.3) !important;
+    }
+    .btn-next.btn-blue {
+      background: var(--blue-gradient) !important;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28) !important;
+    }
+    .btn-next:disabled {
+      background: #D1D5DB !important;
+      color: #9CA3AF !important;
+      box-shadow: none !important;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    .btn-next.btn-submit-ready {
+      background: var(--gold-gradient) !important;
+      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35) !important;
+    }
+
+    /* ------------------------------
+       3. 答题卡抽屉 (Sheet Modal)
+       ------------------------------ */
+    .card-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    .card-modal-overlay.open {
+      display: flex;
+      opacity: 1;
+    }
+    .card-sheet {
+      width: 100%;
+      max-width: 520px;
+      max-height: 82vh;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 18px 18px calc(18px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.25s ease-out;
+    }
+    .card-modal-overlay.open .card-sheet {
+      transform: translateY(0);
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .sheet-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .legend-dot.answered { background: var(--primary); }
+    .legend-dot.correct { background: var(--success); }
+    .legend-dot.wrong { background: var(--danger); }
+    .legend-dot.unanswered { background: #E5E7EB; }
+
+    .sheet-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      overflow-y: auto;
+      padding: 4px;
+      flex: 1;
+      max-height: 52vh;
+    }
+    .grid-num-btn {
+      height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .grid-num-btn.answered {
+      background: var(--primary-light);
+      border-color: #F87171;
+      color: var(--primary);
+    }
+    .grid-num-btn.practice-correct {
+      background: var(--success-light) !important;
+      border-color: #86EFAC !important;
+      color: var(--success) !important;
+    }
+    .grid-num-btn.practice-wrong {
+      background: var(--danger-light) !important;
+      border-color: #FCA5A5 !important;
+      color: var(--danger) !important;
+    }
+    .grid-num-btn.current {
+      border: 2px solid var(--gold) !important;
+      font-weight: 800;
+    }
+
+    .sheet-footer {
+      margin-top: 14px;
+      padding-top: 10px;
+    }
+    .sheet-submit-btn {
+      width: 100%;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--red-gradient);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    /* ------------------------------
+       4. 成绩结果展示页 (Result View)
+       ------------------------------ */
+    .result-content {
+      padding: 20px 16px calc(24px + var(--safe-bottom));
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .score-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 26px 20px 22px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .score-badge {
+      display: inline-block;
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .score-badge.pass { background: #DCFCE7; color: var(--success); }
+    .score-badge.fail { background: #FEE2E2; color: var(--danger); }
+    .score-num {
+      font-size: 56px;
+      font-weight: 900;
+      color: var(--primary);
+      font-family: -apple-system, "DIN", sans-serif;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .score-total-tip {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .score-comment {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-sub);
+    }
+
+    .result-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--border);
+    }
+    .stat-box { text-align: center; }
+    .stat-box-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 2px;
+    }
+    .stat-box-val.green { color: var(--success); }
+    .stat-box-val.red { color: var(--danger); }
+    .stat-box-lbl { font-size: 12px; color: var(--text-muted); }
+
+    .result-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+    .btn-view-wrong {
+      background: var(--danger-light);
+      border: 1px solid #FECACA;
+      color: var(--danger);
+      padding: 14px;
+      border-radius: 25px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-view-all {
+      background: #fff;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 14px;
+      border-radius: 25px;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-restart {
+      background: var(--red-gradient);
+      color: #fff;
+      padding: 15px;
+      border-radius: 25px;
+      font-size: 16px;
+      font-weight: 700;
+      box-shadow: 0 4px 14px rgba(201, 33, 30, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-home {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    /* ------------------------------
+       5. 答题详情与错题筛选 (Detail View)
+       ------------------------------ */
+    .detail-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .detail-tabs-bar {
+      position: sticky;
+      top: 49px;
+      z-index: 19;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      gap: 10px;
+    }
+    .filter-tab {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 20px;
+      background: var(--bg);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-sub);
+      text-align: center;
+    }
+    .filter-tab.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .detail-list {
+      padding: 14px 16px calc(24px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .detail-item {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 16px 16px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+    .detail-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .detail-item-idx {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .detail-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .detail-badge.correct { background: var(--success-light); color: var(--success); }
+    .detail-badge.wrong { background: var(--danger-light); color: var(--danger); }
+    .detail-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+    .detail-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .detail-opt {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid transparent;
+    }
+    .detail-opt-letter {
+      font-weight: 700;
+      flex-shrink: 0;
+      width: 20px;
+    }
+    .detail-opt-text {
+      flex: 1;
+      word-break: break-word;
+    }
+    .detail-opt-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .detail-opt.is-correct-ans {
+      background: var(--success-light);
+      border-color: #86EFAC;
+      color: #065F46;
+      font-weight: 600;
+    }
+    .detail-opt.is-correct-ans .detail-opt-tag {
+      background: var(--success);
+      color: #fff;
+    }
+    .detail-opt.is-user-wrong {
+      background: var(--danger-light);
+      border-color: #FCA5A5;
+      color: #991B1B;
+      font-weight: 600;
+    }
+    .detail-opt.is-user-wrong .detail-opt-tag {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* 弹窗对话框 (Confirm Modal) */
+    .dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .dialog-overlay.open { display: flex; }
+    .dialog-box {
+      width: 100%;
+      max-width: 340px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px 20px 18px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+    }
+    .dialog-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .dialog-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      margin-bottom: 18px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    .dialog-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dialog-main-btns {
+      display: flex;
+      gap: 10px;
+    }
+    .dialog-btn {
+      flex: 1;
+      height: 42px;
+      border-radius: 21px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .dialog-btn.cancel {
+      background: var(--bg);
+      color: var(--text-sub);
+      border: 1px solid var(--border);
+    }
+    .dialog-btn.confirm {
+      background: var(--red-gradient);
+      color: #fff;
+    }
+    .dialog-btn.extra {
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      height: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-container">
+
+    <!-- 1. 首页视图 (Home View) -->
+    <div id="view-home" class="view-screen active">
+      <div class="home-header">
+        <div class="home-badge">
+          <span>★</span> 2026 党员发展培训专版
+        </div>
+        <h1 class="home-title">入党积极分子考试与练习</h1>
+        <p class="home-subtitle">300题全真题库 · 模拟考场 · 专项刷题</p>
+      </div>
+
+      <div class="home-body">
+        <!-- 模式选择区 -->
+        <div class="mode-cards-wrap">
+          <!-- 模式一：全真模拟考试 -->
+          <div class="mode-card primary-mode" onclick="handleExamCardClick()">
+            <div id="exam-draft-badge" class="badge-draft" style="display: none;">考试中途未完</div>
+            <div class="mode-card-left">
+              <div class="mode-icon-box">✍️</div>
+              <div>
+                <div class="mode-title">
+                  全真模拟考试
+                  <span class="mode-pill pill-red">100题</span>
+                </div>
+                <div class="mode-desc" id="exam-card-desc">随机抽100题 · 计分考场 · 记录成绩</div>
+              </div>
+            </div>
+            <div class="mode-arrow">›</div>
+          </div>
+
+          <!-- 模式二：专项练题模式 -->
+          <div class="mode-card practice-mode" onclick="handlePracticeCardClick()">
+            <div class="mode-card-left">
+              <div class="mode-icon-box">🎯</div>
+              <div>
+                <div class="mode-title">
+                  专项练题模式
+                  <span class="mode-pill pill-blue">300题乱序</span>
+                </div>
+                <div class="mode-desc" id="practice-card-desc">整库乱序 · 自由选定 · 确认即判正误</div>
+              </div>
+            </div>
+            <div class="mode-arrow">›</div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-title">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            模式规则与特点
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-item-label">模拟考试</div>
+              <div class="info-item-val">100题 · 交卷揭晓总分</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">专项练题</div>
+              <div class="info-item-val">选定可改 · 点确认看解析</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">临时退出</div>
+              <div class="info-item-val">随时退出，下次继续作答</div>
+            </div>
+            <div class="info-item">
+              <div class="info-item-label">历史记录</div>
+              <div class="info-item-val">模拟考滚动保留最近5次</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 最近 5 次模拟考试记录 -->
+        <div class="history-card">
+          <div class="history-header">
+            <div class="history-title">
+              <span>📋</span> 最近 5 次模拟考记录
+            </div>
+            <div class="history-header-right">
+              <span class="history-tag">滚动覆盖</span>
+              <button class="btn-clear-history" id="btn-clear-history" onclick="confirmClearHistory()" title="清空记录">清空</button>
+            </div>
+          </div>
+
+          <div id="home-history-list" class="history-list">
+            <!-- 动态生成历史记录 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 答题页面 (通用：模拟考试与练题模式复用) -->
+    <div id="view-exam" class="view-screen">
+      <div class="exam-nav">
+        <button class="nav-btn" onclick="handleExitCurrentMode()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <span id="nav-exit-text">退出</span>
+        </button>
+        <div class="exam-progress-text" id="exam-progress-text">1 / 100</div>
+        <div class="exam-timer" id="exam-timer-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span id="timer-display">00:00</span>
+        </div>
+      </div>
+
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-bar-fill"></div>
+      </div>
+
+      <div class="exam-content">
+        <div class="question-card">
+          <div class="question-type-tag" id="q-type-badge">单选题 · 第 1 题</div>
+          <div class="question-title" id="q-title">题目加载中...</div>
+        </div>
+
+        <div class="options-list" id="q-options-container">
+          <!-- 动态渲染选项 -->
+        </div>
+
+        <!-- 练题模式确认后即时反馈卡片 -->
+        <div class="practice-feedback-card" id="practice-feedback-card">
+          <div class="feedback-head" id="feedback-head">✓ 回答正确</div>
+          <div class="feedback-body" id="feedback-body">正确答案是：<span class="feedback-ans-tag" id="feedback-ans-letter">A</span></div>
+        </div>
+      </div>
+
+      <!-- 底部固定操作栏 -->
+      <div class="exam-bottom-bar">
+        <button class="btn-prev" id="btn-prev" onclick="prevQuestion()" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          上一题
+        </button>
+
+        <button class="btn-card-toggle" onclick="openCardSheet()" title="查看答题卡">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        </button>
+
+        <!-- 方案A：未确认时显示【确认答案】，确认后变为【下一题】 -->
+        <button class="btn-next" id="btn-next" onclick="handleNextOrConfirmClick()" disabled>
+          <span id="btn-next-text">下一题</span>
+          <svg id="btn-next-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 成绩结果展示页 (Result View) -->
+    <div id="view-result" class="view-screen">
+      <div class="home-header" style="padding-bottom: 20px;">
+        <h1 class="home-title" id="result-header-title" style="text-align: center;">考试成绩单</h1>
+        <p class="home-subtitle" style="text-align: center;">2026年入党积极分子考试模拟系统</p>
+      </div>
+
+      <div class="result-content">
+        <div class="score-card">
+          <div class="score-badge pass" id="result-badge">表现优秀</div>
+          <div class="score-num" id="result-score">92</div>
+          <div class="score-total-tip" id="result-total-tip">总分 100 分 · 每题 1 分</div>
+          <div class="score-comment" id="result-comment">理论基础扎实，继续保持！</div>
+
+          <div class="result-stats-grid">
+            <div class="stat-box">
+              <div class="stat-box-val green" id="stat-correct">92</div>
+              <div class="stat-box-lbl">答对题数</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-val red" id="stat-wrong">8</div>
+              <div class="stat-box-lbl">答错题数</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-val" id="stat-time">15:20</div>
+              <div class="stat-box-lbl">用时</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-actions">
+          <button class="btn-view-wrong" id="btn-show-wrongs" onclick="viewWrongsFromCurrentResult()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+            查看错题与正确答案 (<span id="wrong-count-btn-badge">0</span>)
+          </button>
+
+          <button class="btn-view-all" onclick="viewAllFromCurrentResult()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            查看全部作答详情
+          </button>
+
+          <button class="btn-restart" id="btn-restart-action" onclick="handleRestartFromScore()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span id="btn-restart-text">再测一次（重新随机100题）</span>
+          </button>
+
+          <button class="btn-home" onclick="goToHome()">
+            返回主页
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 作答详情与错题筛选视图 (Detail View) -->
+    <div id="view-detail" class="view-screen">
+      <div class="detail-nav">
+        <button class="nav-btn" onclick="backFromDetail()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          返回
+        </button>
+        <div class="exam-progress-text" id="detail-nav-title">作答详情</div>
+        <div style="width: 48px;"></div>
+      </div>
+
+      <div class="detail-tabs-bar">
+        <button class="filter-tab active" id="tab-all" onclick="switchDetailFilter('all')">全部题目 (100)</button>
+        <button class="filter-tab" id="tab-wrong" onclick="switchDetailFilter('wrong')">仅看错题 (0)</button>
+      </div>
+
+      <div class="detail-list" id="detail-list-container">
+        <!-- 动态生成题目详情卡片 -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 答题卡抽屉弹窗 -->
+  <div class="card-modal-overlay" id="card-modal-overlay" onclick="closeCardSheet(event)">
+    <div class="card-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-header">
+        <div class="sheet-title" id="sheet-title">答题卡</div>
+        <div class="sheet-legend" id="sheet-legend">
+          <!-- 动态渲染图例 -->
+        </div>
+      </div>
+
+      <div class="sheet-grid" id="sheet-grid-container">
+        <!-- 题号网格 -->
+      </div>
+
+      <div class="sheet-footer" id="sheet-footer">
+        <button class="sheet-submit-btn" id="sheet-submit-btn" onclick="trySubmitExam()">完成并交卷</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通用确认弹窗 (Confirm Modal) -->
+  <div class="dialog-overlay" id="dialog-overlay">
+    <div class="dialog-box">
+      <div class="dialog-title" id="dialog-title">提示</div>
+      <div class="dialog-desc" id="dialog-desc">提示内容</div>
+      <div class="dialog-btns">
+        <div class="dialog-main-btns">
+          <button class="dialog-btn cancel" id="dialog-btn-cancel" onclick="closeDialog()">取消</button>
+          <button class="dialog-btn confirm" id="dialog-btn-confirm">确定</button>
+        </div>
+        <button class="dialog-btn extra" id="dialog-btn-extra" style="display: none;">放弃并重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 全部 300 道题库内置数据（离线单文件运行）
+     */
+    const QUESTION_BANK = [{"id": 1, "title": "(     )从组织上确立了党对军队的绝对领导，为建立一支无产阶级领导下的新型人民军队奠定了基础。", "options": [{"letter": "A", "text": "井冈山会师", "raw": "A.井冈山会师"}, {"letter": "B", "text": "工农武装割据", "raw": "B.工农武装割据"}, {"letter": "C", "text": "三湾改编", "raw": "C.三湾改编"}, {"letter": "D", "text": "中共六大", "raw": "D.中共六大"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 2, "title": "我国国家制度和国家治理体系多方面显著优势之一：坚持(     ),发展人民民主，密切联系群众，紧紧依靠人民推动国家发展的显著优势。", "options": [{"letter": "A", "text": "民主专政", "raw": "A.民主专政"}, {"letter": "B", "text": "全面民主", "raw": "B.全面民主"}, {"letter": "C", "text": "人民当家作主", "raw": "C.人民当家作主"}, {"letter": "D", "text": "人民代表大会", "raw": "D.人民代表大会"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 3, "title": "（     ） 至20日，中华工农兵蘇维埃第一次全国代表大会（坚持“一蘇大会”）在瑞金召开。", "options": [{"letter": "A", "text": "1931年3月3日", "raw": "A.1931年3月3日"}, {"letter": "B", "text": "1933年6月7日", "raw": "B.1933年6月7日"}, {"letter": "C", "text": "1931年11月7日", "raw": "C.1931年11月7日"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 4, "title": "（    ）的主要任务是向党支部汇报入党积极分子的情况。", "options": [{"letter": "A", "text": "培养联系人", "raw": "A.培养联系人"}, {"letter": "B", "text": "入党介绍人", "raw": "B.入党介绍人"}, {"letter": "C", "text": "党支部书记", "raw": "C.党支部书记"}, {"letter": "D", "text": "党支部副书记", "raw": "D.党支部副书记"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 5, "title": "（    ）和（    ），是中国共产党人的精神支柱和政治灵魂，也是保持党的团结统一的思想基础。", "options": [{"letter": "A", "text": "共产主义远大理想；新时代中国特色社会主义共同理想", "raw": "A.共产主义远大理想；新时代中国特色社会主义共同理想"}, {"letter": "B", "text": "共产主义远大理想；中国特色社会主义共同理想", "raw": "B.共产主义远大理想；中国特色社会主义共同理想"}, {"letter": "C", "text": "共产主义崇高理想；新时代中国特色社会主义共同理想", "raw": "C.共产主义崇高理想；新时代中国特色社会主义共同理想"}, {"letter": "D", "text": "共产主义崇高理想；中国特色社会主义共同理想", "raw": "D.共产主义崇高理想；中国特色社会主义共同理想"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 6, "title": "（    ）是当代中国精神的集中体现，凝结着全体人民共同的价值追求。", "options": [{"letter": "A", "text": "八荣八耻", "raw": "A.八荣八耻"}, {"letter": "B", "text": "核心价值观", "raw": "B.核心价值观"}, {"letter": "C", "text": "社会主义价值观", "raw": "C.社会主义价值观"}, {"letter": "D", "text": "社会主义核心价值观", "raw": "D.社会主义核心价值观"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 7, "title": "（    ）是坚持党的领导、人民当家作主、依法治国有机统一的根本政治制度安排，必须长期坚持、不断完善。", "options": [{"letter": "A", "text": "政治协商制度", "raw": "A.政治协商制度"}, {"letter": "B", "text": "人民代表大会制度", "raw": "B.人民代表大会制度"}, {"letter": "C", "text": "基层群众自治制度", "raw": "C.基层群众自治制度"}, {"letter": "D", "text": "民族区域自治制度", "raw": "D.民族区域自治制度"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 8, "title": "（    ）是近代以来中华民族最伟大的梦想。", "options": [{"letter": "A", "text": "中国梦", "raw": "A.中国梦"}, {"letter": "B", "text": "强起来", "raw": "B.强起来"}, {"letter": "C", "text": "富起来", "raw": "C.富起来"}, {"letter": "D", "text": "实现中华民族伟大复兴", "raw": "D.实现中华民族伟大复兴"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 9, "title": "（    ）是马克思列宁主义在中国的运用和发展，是被实践证明了的关于中国革命和建设的正确的理论原则和经验总结，是中国共产党集体智慧的结晶。", "options": [{"letter": "A", "text": "毛泽东思想", "raw": "A.毛泽东思想"}, {"letter": "B", "text": "邓小平理论", "raw": "B.邓小平理论"}, {"letter": "C", "text": "三个代表思想", "raw": "C.三个代表思想"}, {"letter": "D", "text": "科学发展观", "raw": "D.科学发展观"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 10, "title": "（    ）是人民当家作主和依法治国的根本保证，人民当家作主是社会主义民主政治的本质特征，依法治国是党领导人民治理国家的基本方式，三者统一于我国社会主义民主政治伟大实践。", "options": [{"letter": "A", "text": "人民民主专政", "raw": "A.人民民主专政"}, {"letter": "B", "text": "协商民主", "raw": "B.协商民主"}, {"letter": "C", "text": "基层群众自治制度", "raw": "C.基层群众自治制度"}, {"letter": "D", "text": "党的领导", "raw": "D.党的领导"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 11, "title": "（    ）是在党领导下管理国家的制度体系，包括经济、政治、文化、社会、生态文明和党的建设等各领域体制机制、法律法规安排，也就 是一整套紧密相连、相互协调的国家制度。", "options": [{"letter": "A", "text": "国家治理体系", "raw": "A.国家治理体系"}, {"letter": "B", "text": "国家治理能力", "raw": "B.国家治理能力"}, {"letter": "C", "text": "社会主义法制体系", "raw": "C.社会主义法制体系"}, {"letter": "D", "text": "社会治理体系", "raw": "D.社会治理体系"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 12, "title": "（    ）是中国共产党的组织原则。", "options": [{"letter": "A", "text": "少数服从多数", "raw": "A.少数服从多数"}, {"letter": "B", "text": "下级服从上级", "raw": "B.下级服从上级"}, {"letter": "C", "text": "个人服从组织", "raw": "C.个人服从组织"}, {"letter": "D", "text": "民主集中制", "raw": "D.民主集中制"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 13, "title": "（    ）是中国共产党在中央苏区创办的第一所正规的中央高级党校。", "options": [{"letter": "A", "text": "中央马克思共产主义学校", "raw": "A.中央马克思共产主义学校"}, {"letter": "B", "text": "中共苏区中央局党校", "raw": "B.中共苏区中央局党校"}, {"letter": "C", "text": "中共中央党校", "raw": "C.中共中央党校"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 14, "title": "（    ）我们党面临的最大威胁。", "options": [{"letter": "A", "text": "理想信念动摇", "raw": "A.理想信念动摇"}, {"letter": "B", "text": "政治立场不坚定", "raw": "B.政治立场不坚定"}, {"letter": "C", "text": "腐败", "raw": "C.腐败"}, {"letter": "D", "text": "脱离群众", "raw": "D.脱离群众"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 15, "title": "（ ）是党的各级党组织和全体党员必须遵守的行为规则。", "options": [{"letter": "A", "text": "党的纪律", "raw": "A、党的纪律"}, {"letter": "B", "text": "党的章程", "raw": "B、党的章程"}, {"letter": "C", "text": "中国共产党纪律处分条例", "raw": "C、中国共产党纪律处分条例"}, {"letter": "D", "text": "党的初心使命", "raw": "D、党的初心使命"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 16, "title": "（ ）是马克思列宁主义在中国的运用和发展，是被实践证明了的关于中国革命和建设的正确的理论原则和经验总结，是中国共产党集体智慧的结晶。", "options": [{"letter": "A", "text": "毛泽东思想", "raw": "A、毛泽东思想"}, {"letter": "B", "text": "邓小平理论", "raw": "B、邓小平理论"}, {"letter": "C", "text": "“三个代表”重要思想", "raw": "C、“三个代表”重要思想"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 17, "title": "（      ）是马克思主义的本质属性", "options": [{"letter": "A", "text": "历史性", "raw": "A、历史性"}, {"letter": "B", "text": "创新性", "raw": "B、创新性"}, {"letter": "C", "text": "人民性", "raw": "C、人民性"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 18, "title": "“二苏大”旧址位于（     ）。", "options": [{"letter": "A", "text": "瑞金沙洲坝", "raw": "A.瑞金沙洲坝"}, {"letter": "B", "text": "瑞金叶坪", "raw": "B.瑞金叶坪"}, {"letter": "C", "text": "上海兴业路76号", "raw": "C.上海兴业路76号"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 19, "title": "“千古奇冤，江南一叶;同室操戈，相煎何急?”是周恩来在    后对国民党蒋介石的控诉和回击。(     )", "options": [{"letter": "A", "text": "七七事变", "raw": "A.七七事变"}, {"letter": "B", "text": "八一三事变", "raw": "B.八一三事变"}, {"letter": "C", "text": "皖南事变", "raw": "C.皖南事变"}, {"letter": "D", "text": "五二血案", "raw": "D.五二血案"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 20, "title": "“三会一课”制度的内容是          。（     ）", "options": [{"letter": "A", "text": "民主生活会，党支部委员会，党小组会，党课", "raw": "A、民主生活会，党支部委员会，党小组会，党课"}, {"letter": "B", "text": "支部党员大会，全体人员会，领导班子会，党课", "raw": "B、支部党员大会，全体人员会，领导班子会，党课"}, {"letter": "C", "text": "支部党员大会，党支部委员会，组织生活会，党课", "raw": "C、支部党员大会，党支部委员会，组织生活会，党课"}, {"letter": "D", "text": "支部党员大会，党支部委员会，党小组会，党课", "raw": "D、支部党员大会，党支部委员会，党小组会，党课"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 21, "title": "“一切为了群众，一切依靠群众，从群众中来，到群众中去，把党的正确主张变为群众的自觉行动。”这是党章对党的（    ）的表述。", "options": [{"letter": "A", "text": "思想路线", "raw": "A.思想路线"}, {"letter": "B", "text": "政治路线", "raw": "B.政治路线"}, {"letter": "C", "text": "群众路线", "raw": "C.群众路线"}, {"letter": "D", "text": "组织路线", "raw": "D.组织路线"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 22, "title": "“一苏大”旧址位于（    ）。", "options": [{"letter": "A", "text": "瑞金沙洲坝", "raw": "A.瑞金沙洲坝"}, {"letter": "B", "text": "瑞金叶坪", "raw": "B.瑞金叶坪"}, {"letter": "C", "text": "上海兴业路76号", "raw": "C.上海兴业路76号"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 23, "title": "《党章》规定，入党介绍人要认真了解申请人的思想、品质、经历和工作表现，向他解释（    ），说明党员的条件、义务和权利，并向党组织作出负责的报告。", "options": [{"letter": "A", "text": "党的纲领和党的章程", "raw": "A.党的纲领和党的章程"}, {"letter": "B", "text": "党的路线和党的方针", "raw": "B.党的路线和党的方针"}, {"letter": "C", "text": "党的政策和党的决议", "raw": "C.党的政策和党的决议"}, {"letter": "D", "text": "党的决定和党的纪律", "raw": "D.党的决定和党的纪律"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 24, "title": "《党章》规定，党的基层委员会、总支部委员会、支部委员会每届任期         。（     ）", "options": [{"letter": "A", "text": "1年", "raw": "A、1年"}, {"letter": "B", "text": "2年", "raw": "B、2年"}, {"letter": "C", "text": "3年", "raw": "C、3年"}, {"letter": "D", "text": "5年", "raw": "D、5年"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 25, "title": "《党章》规定，党的基层组织要组织党员认真学习马克思列宁主义、毛泽东思想、邓小平理论、“三个代表”重要思想、科学发展观、习近平新时代中国特色社会主义思想，推进“两学一做”学习教育、         常态化制度化。（    ）", "options": [{"letter": "A", "text": "科学发展观学习教育", "raw": "A、科学发展观学习教育"}, {"letter": "B", "text": "“不忘初心牢记使命”主题教育", "raw": "B、“不忘初心牢记使命”主题教育"}, {"letter": "C", "text": "“三严三实”专题教育", "raw": "C、“三严三实”专题教育"}, {"letter": "D", "text": "党史学习教育", "raw": "D、党史学习教育"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 26, "title": "《党章》规定，党员如果没有正当理由，连续       不参加党的组织生活，或不交纳党费，或不做党所分配的工作，就被认为是自行脱党。（     ）", "options": [{"letter": "A", "text": "3个月", "raw": "A、3个月"}, {"letter": "B", "text": "6个月", "raw": "B、6个月"}, {"letter": "C", "text": "12个月", "raw": "C、12个月"}, {"letter": "D", "text": "24个月", "raw": "D、24个月"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 27, "title": "《党章》规定，党组发挥（    ）作用。", "options": [{"letter": "A", "text": "领导核心", "raw": "A.领导核心"}, {"letter": "B", "text": "政治核心", "raw": "B.政治核心"}, {"letter": "C", "text": "组织核心", "raw": "C.组织核心"}, {"letter": "D", "text": "指挥中心", "raw": "D.指挥中心"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 28, "title": "《党章》总纲指出，马克思列宁主义揭示了人类社会历史发展的规律，它的（ ）是正确的，具有强大生命力。", "options": [{"letter": "A", "text": "基本立场", "raw": "A、基本立场"}, {"letter": "B", "text": "基本原理", "raw": "B、基本原理"}, {"letter": "C", "text": "基本结论", "raw": "C、基本结论"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 29, "title": "《党章》总纲指出，始终（ ），是我们党的立党之本、执政之基、力量之源。", "options": [{"letter": "A", "text": "做到“三个代表”", "raw": "A、做到“三个代表”"}, {"letter": "B", "text": "坚持邓小平理论", "raw": "B、坚持邓小平理论"}, {"letter": "C", "text": "坚持毛泽东思想", "raw": "C、坚持毛泽东思想"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 30, "title": "《党章》总纲指出，我们国家的立国之本是（ ）。", "options": [{"letter": "A", "text": "坚持社会主义制度", "raw": "A、坚持社会主义制度"}, {"letter": "B", "text": "始终做到“三个代表", "raw": "B、始终做到“三个代表"}, {"letter": "C", "text": "坚持四项基本原则", "raw": "C、坚持四项基本原则"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 31, "title": "《党章》总纲指出，要促进国民经济更高质量、更有效率、更加公平、更可持续、更为（ ）发展。", "options": [{"letter": "A", "text": "创新", "raw": "A、创新"}, {"letter": "B", "text": "安全", "raw": "B、安全"}, {"letter": "C", "text": "科学", "raw": "C、科学"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 32, "title": "《中共中央关于坚持和完善中国特色社会主义制度、推进国家治理体系和治理能力现代化若干重大问题的决定》中指出，我国国家制度和国家治理体系具有（   ）个方面的显著优势。", "options": [{"letter": "A", "text": "10个", "raw": "A.10个"}, {"letter": "B", "text": "11", "raw": "B.11"}, {"letter": "C", "text": "13", "raw": "C.13"}, {"letter": "D", "text": "14", "raw": "D.14"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 33, "title": "1921年7月23日至8月初，中国共产党第一次全国代表大会先后在    召开。(       )", "options": [{"letter": "A", "text": "上海.嘉兴", "raw": "A.上海.嘉兴"}, {"letter": "B", "text": "上海.天津", "raw": "B.上海.天津"}, {"letter": "C", "text": "北京.上海", "raw": "C.北京.上海"}, {"letter": "D", "text": "北京.广州", "raw": "D.北京.广州"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 34, "title": "1931年11月27日，中华苏维埃共和国中央执行委员会召开第一次会议，选举毛泽东为中央执行委员会主席，即苏维埃中央政府主席。（    ） 称呼由此叫响。", "options": [{"letter": "A", "text": "“毛书记”", "raw": "A.“毛书记”"}, {"letter": "B", "text": "“毛委员”", "raw": "B.“毛委员”"}, {"letter": "C", "text": "“毛主席”", "raw": "C.“毛主席”"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 35, "title": "1932年7月底，周恩来以苏区中央局书记的身份抵前线随红一方面军总部行动，指挥战争。留守瑞金的后方中央局以（    ）为代理书记。", "options": [{"letter": "A", "text": "项英", "raw": "A.项英"}, {"letter": "B", "text": "任弼时", "raw": "B.任弼时"}, {"letter": "C", "text": "邓发", "raw": "C.邓发"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 36, "title": "1933年1月，共青团中央机关迁入瑞金后，与少共苏区中央局合并，改称少共中央局（也称共青团中央局），（    ） 任秘书长。", "options": [{"letter": "A", "text": "何克全", "raw": "A.何克全"}, {"letter": "B", "text": "胡耀邦", "raw": "B.胡耀邦"}, {"letter": "C", "text": "刘英", "raw": "C.刘英"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 37, "title": "1933年5月，为表扬武阳区、石水乡的春耕生产模范，毛泽东率工作团于5月19日到武阳主持召开（    ）   ，号召苏区军民学习武阳石水经验，开展春耕生产竞赛，得到苏区军民的热烈响应。", "options": [{"letter": "A", "text": "春耕生产赠旗大会", "raw": "A.春耕生产赠旗大会"}, {"letter": "B", "text": "征粮工作赠旗大会", "raw": "B.征粮工作赠旗大会"}, {"letter": "C", "text": "抗日誓师赠旗大会", "raw": "C.抗日誓师赠旗大会"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 38, "title": "《党章》规定，党的支部委员会对申请入党的人，要注意征求（    ）的意见，进行严格的审查，认为合格后再提交支部大会讨论。上级党组织在批准申请人入党以前，要派人同他谈话，作进一步的了解，并帮助他提高对党的认识。", "options": [{"letter": "A", "text": "广大党员", "raw": "A.广大党员"}, {"letter": "B", "text": "广大群众", "raw": "B.广大群众"}, {"letter": "C", "text": "上级党组织", "raw": "C.上级党组织"}, {"letter": "D", "text": "党内外有关群众", "raw": "D.党内外有关群众"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 39, "title": "1945年，党的    确立了毛泽东思想为全党的指导思想。(        )", "options": [{"letter": "A", "text": "六大", "raw": "A.六大"}, {"letter": "B", "text": "六届六中全会", "raw": "B.六届六中全会"}, {"letter": "C", "text": "七大", "raw": "C.七大"}, {"letter": "D", "text": "八大", "raw": "D.八大"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 40, "title": "1946年8月，毛泽东在同美国记者安娜·路易斯·斯特朗的谈话中提出了(     )", "options": [{"letter": "A", "text": "“没有调查就没有发言权”", "raw": "A.“没有调查就没有发言权”"}, {"letter": "B", "text": "“将革命进行到底”", "raw": "B.“将革命进行到底”"}, {"letter": "C", "text": "“星星之火，可以燎原”", "raw": "C.“星星之火，可以燎原”"}, {"letter": "D", "text": "“帝国主义和一切反动派都是纸老虎”", "raw": "D.“帝国主义和一切反动派都是纸老虎”"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 41, "title": "1950年10月19日，中国人民志愿军．在司令员兼政治委员     同志率领下，跨过鸭绿江，开赴朝鲜 战场。10月25日，志愿军打响了入朝后的第一仗，拉开了抗美援朝战争的序幕（       ）", "options": [{"letter": "A", "text": "林彪", "raw": "A.林彪"}, {"letter": "B", "text": "彭德怀", "raw": "B.彭德怀"}, {"letter": "C", "text": "罗荣桓", "raw": "C.罗荣桓"}, {"letter": "D", "text": "陈赓", "raw": "D.陈赓"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 42, "title": "1956年4月，毛泽东发表    ，初步提出了中国社会主义建设的基本方针，就是要把国内外一切积极因素调动起来，为社会主义事业服务。(       )", "options": [{"letter": "A", "text": "《关于正确处理人民内部矛盾的问题》", "raw": "A.《关于正确处理人民内部矛盾的问题》"}, {"letter": "B", "text": "《论十大关系》", "raw": "B.《论十大关系》"}, {"letter": "C", "text": "《目前形势和我们的任务》", "raw": "C.《目前形势和我们的任务》"}, {"letter": "D", "text": "《论人民民主专政》", "raw": "D.《论人民民主专政》"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 43, "title": "2021年4月1日出版的《求是》杂志发表了习近平的重要文章《在党史学习教育动员大会上的讲话》。文章指出，    是最好的营养剂，重温这部伟大历史能够受到党的初心使命、性质宗旨、理想信念的生动教育，必须铭记光辉历史、传承红色基因。（     ）", "options": [{"letter": "A", "text": "中国革命历史", "raw": "A.中国革命历史"}, {"letter": "B", "text": "中国改革历史", "raw": "B.中国改革历史"}, {"letter": "C", "text": "中华民族复兴史", "raw": "C.中华民族复兴史"}, {"letter": "D", "text": "中华民族发展史", "raw": "D.中华民族发展史"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 44, "title": "2021年7月1日，习近平在庆祝中国共产党成立100周年大会上指出，经过全党全国各族人民持续奋斗，我们实现了第一个百年奋斗目标，在中华大地上全面建成了小康社会，历史性地解决了绝对贫困问题，正在意气风发向着 _______ 的第二个百年奋斗目标迈进。（      ）", "options": [{"letter": "A", "text": "基本实现社会主义现代化", "raw": "A.基本实现社会主义现代化"}, {"letter": "B", "text": "全面建成社会主义现代化强国", "raw": "B.全面建成社会主义现代化强国"}, {"letter": "C", "text": "实现中华民族伟大复兴", "raw": "C.实现中华民族伟大复兴"}, {"letter": "D", "text": "发展中国特色社会主义", "raw": "D.发展中国特色社会主义"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 45, "title": "2021年7月1日，习近平在庆祝中国共产党成立100周年大会上指出，十月革命一声炮响，给中国送来了马克思列宁主义。在中国人民和中华民族的伟大觉醒中，在马克思列宁主义同中国 _______ 的紧密结合中，中国共产党应运而生。（       ）", "options": [{"letter": "A", "text": "工人运动", "raw": "A.工人运动"}, {"letter": "B", "text": "新文化运动", "raw": "B.新文化运动"}, {"letter": "C", "text": "五四运动", "raw": "C.五四运动"}, {"letter": "D", "text": "农民运动", "raw": "D.农民运动"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 46, "title": "2021年7月1日，习近平在庆祝中国共产党成立100周年大会上指出，我们实现了人民生活从温饱不足到 ________ 、奔向 _______ 的历史性跨越，为实现中华民族伟大复兴提供了充满新的活力的体制保证和快速发展的物质条件。（        ）", "options": [{"letter": "A", "text": "总体小康、全面小康", "raw": "A.总体小康、全面小康"}, {"letter": "B", "text": "消除绝对贫困、全面小康", "raw": "B.消除绝对贫困、全面小康"}, {"letter": "C", "text": "全面小康、总体小康", "raw": "C.全面小康、总体小康"}, {"letter": "D", "text": "温饱解决、全面小康", "raw": "D.温饱解决、全面小康"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 47, "title": "2021年7月1日，习近平在庆祝中国共产党成立100周年大会上指出，新民主主义革命的胜利，为实现中华民族伟大复兴创造了 _______ 社会条件。（       ）", "options": [{"letter": "A", "text": "根本", "raw": "A.根本"}, {"letter": "B", "text": "必要", "raw": "B.必要"}, {"letter": "C", "text": "充分", "raw": "C.充分"}, {"letter": "D", "text": "关键", "raw": "D.关键"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 48, "title": "八一南昌起义部队于1927年8月25日到达瑞金后，（    ）  等三人在绵江中学（今瑞金一中）光荣加入中国共产党。", "options": [{"letter": "A", "text": "贺龙、周逸群、郭沫若", "raw": "A.贺龙、周逸群、郭沫若"}, {"letter": "B", "text": "贺龙、郭沫若、彭泽民", "raw": "B.贺龙、郭沫若、彭泽民"}, {"letter": "C", "text": "贺龙、周恩来、郭沫若", "raw": "C.贺龙、周恩来、郭沫若"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 49, "title": "被称为“共和国第一军嫂”的是（    ）。", "options": [{"letter": "A", "text": "陈发姑", "raw": "A.陈发姑"}, {"letter": "B", "text": "刘发姑", "raw": "B.刘发姑"}, {"letter": "C", "text": "杨发姑", "raw": "C.杨发姑"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 50, "title": "必须健全幼有所育、学有所教、劳有所得、病有所医、老有所养、住有所层、明有所扶等方面国家基本公共服务制度体系,尽力而为,量力而行,注量加强（      ）民生建设,保障群众基本生活。", "options": [{"letter": "A", "text": "普惠性、基础性、兜底性", "raw": "A.普惠性、基础性、兜底性"}, {"letter": "B", "text": "普惠性、基础性", "raw": "B.普惠性、基础性"}, {"letter": "C", "text": "基础性、兜底性", "raw": "C.基础性、兜底性"}, {"letter": "D", "text": "普惠性、兜底性", "raw": "D.普惠性、兜底性"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 51, "title": "标志红军二万五千里长征胜利结束的是(       )", "options": [{"letter": "A", "text": "红军穿越大草地进入甘肃. 陕西", "raw": "A. 红军穿越大草地进入甘肃. 陕西"}, {"letter": "B", "text": "中央红军同陕北红军会师", "raw": "B. 中央红军同陕北红军会师"}, {"letter": "C", "text": "红军三大主力在会宁会师", "raw": "C. 红军三大主力在会宁会师"}, {"letter": "D", "text": "遵义会议召开", "raw": "D. 遵义会议召开"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 52, "title": "标志着中国共产党开始独立领导革命战争和创建人民军队的事件是(       )", "options": [{"letter": "A", "text": "秋收起义", "raw": "A.秋收起义"}, {"letter": "B", "text": "广州起义", "raw": "B.广州起义"}, {"letter": "C", "text": "南昌起义", "raw": "C.南昌起义"}, {"letter": "D", "text": "百色起义", "raw": "D.百色起义"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 53, "title": "标志着中国新民主主义革命开端的历史事件是（      ）", "options": [{"letter": "A", "text": "新文化运动", "raw": "A.新文化运动"}, {"letter": "B", "text": "五四运动", "raw": "B.五四运动"}, {"letter": "C", "text": "中国共产党成立", "raw": "C.中国共产党成立"}, {"letter": "D", "text": "五卅运动", "raw": "D.五卅运动"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 54, "title": "不按月取得收入的个体经营者等人员中的党员 （    ）。", "options": [{"letter": "A", "text": "不交纳党费。", "raw": "A.不交纳党费。"}, {"letter": "B", "text": "每月以个人上季度月平均纯收入为计算基数。", "raw": "B.每月以个人上季度月平均纯收入为计算基数。"}, {"letter": "C", "text": "每年以个人上一年的年平均收入为计算基数。", "raw": "C.每年以个人上一年的年平均收入为计算基数。"}, {"letter": "D", "text": "每月交纳党费10元。", "raw": "D.每月交纳党费10元。"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 55, "title": "出台中央八项规定，严厉整治形式主义、官僚主义、享乐主义和奢靡之风，坚决反对（    ）。", "options": [{"letter": "A", "text": "特权", "raw": "A.特权"}, {"letter": "B", "text": "拜金", "raw": "B.拜金"}, {"letter": "C", "text": "个人主义", "raw": "C.个人主义"}, {"letter": "D", "text": "特权主义", "raw": "D.特权主义"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 56, "title": "处理违犯党纪的党组织和党员，应当实行（ ）相结合，做到宽严相济。", "options": [{"letter": "A", "text": "严查与宽容", "raw": "A、严查与宽容"}, {"letter": "B", "text": "惩戒与教育", "raw": "B、惩戒与教育"}, {"letter": "C", "text": "教育与处罚", "raw": "C、教育与处罚"}, {"letter": "D", "text": "惩戒与宣传", "raw": "D、惩戒与宣传"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 57, "title": "从（    ）到（    ），是“两个一百年”奋斗目标的历史交汇期。", "options": [{"letter": "A", "text": "二〇二〇年　二〇三五年", "raw": "A.二〇二〇年　二〇三五年"}, {"letter": "B", "text": "十九大　二十大", "raw": "B.十九大　二十大"}, {"letter": "C", "text": "二十大　二十一大", "raw": "C.二十大　二十一大"}, {"letter": "D", "text": "二〇三五年　本世纪中叶", "raw": "D.二〇三五年　本世纪中叶"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 58, "title": "从事普通农牧渔业生产的农民党员，每月缴纳的党费标准为：35周岁及以下的，每月交纳（   ）元；36周岁至55周岁的，每月交纳（   ）元；56周岁及以上的，每月交纳（   ）元。", "options": [{"letter": "A", "text": "0.5、1、1.5", "raw": "A.0.5、1、1.5"}, {"letter": "B", "text": "1、0.5、0.2", "raw": "B.1、0.5、0.2"}, {"letter": "C", "text": "1.5、1、0.5", "raw": "C.1.5、1、0.5"}, {"letter": "D", "text": "0.5、1、1.5", "raw": "D.0.5、1、1.5"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 59, "title": "村、社区重要事项以及与群众利益密切相关的事项，必须经过党支部（   ）讨论。", "options": [{"letter": "A", "text": "党小组会", "raw": "A.党小组会"}, {"letter": "B", "text": "支部委员会", "raw": "B.支部委员会"}, {"letter": "C", "text": "党员大会", "raw": "C.党员大会"}, {"letter": "D", "text": "群众代表大会", "raw": "D.群众代表大会"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 60, "title": "村党支部，（   ）隶属本村的各类组织和各项工作，围绕实施乡村振兴战略开展工作，组织带领农民群众发展集体经济，走共同富裕道路，领导村级治理，建设和谐美丽乡村。贫困村党支部应当动员和带领群众，全力打赢（   ）。", "options": [{"letter": "A", "text": "全面组织、脱贫攻坚", "raw": "A.全面组织、脱贫攻坚"}, {"letter": "B", "text": "全面领导、脱贫攻坚", "raw": "B.全面领导、脱贫攻坚"}, {"letter": "C", "text": "全面组织、三大攻坚战", "raw": "C.全面组织、三大攻坚战"}, {"letter": "D", "text": "全面领导、三大攻坚战", "raw": "D.全面领导、三大攻坚战"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 61, "title": "党必须加强对工会、共产主义青年团、妇女联合会等（    ）的领导，使它们保持和增强政治性、先进性、群众性，充分发挥作用。", "options": [{"letter": "A", "text": "群众组织", "raw": "A.群众组织"}, {"letter": "B", "text": "社会组织", "raw": "B.社会组织"}, {"letter": "C", "text": "群团组织", "raw": "C.群团组织"}, {"letter": "D", "text": "人民团体", "raw": "D.人民团体"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 62, "title": "党必须适应形势的发展和情况的变化，完善领导体制，改进领导方式，增强执政能力。共产党员必须同（    ）群众亲密合作，共同为建设中国特色社会主义而奋斗。", "options": [{"letter": "A", "text": "广大", "raw": "A.广大"}, {"letter": "B", "text": "党外", "raw": "B.党外"}, {"letter": "C", "text": "人民", "raw": "C.人民"}, {"letter": "D", "text": "基层", "raw": "D.基层"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 63, "title": "党的第一次代表大会是什么时候召开的？（    ）", "options": [{"letter": "A", "text": "1920.7.23", "raw": "A.1920.7.23"}, {"letter": "B", "text": "1921.7.1", "raw": "B.1921.7.1"}, {"letter": "C", "text": "1921.7.23", "raw": "C.1921.7.23"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 64, "title": "党的第一次代表大会是在哪里召开的？（    ）", "options": [{"letter": "A", "text": "上海", "raw": "A.上海"}, {"letter": "B", "text": "瑞金", "raw": "B.瑞金"}, {"letter": "C", "text": "平湖", "raw": "C.平湖"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 65, "title": "党的二十大报告指出，治国有常，利民为本。          是立党为公、执政为民的本质要求。（     ）", "options": [{"letter": "A", "text": "以人为本", "raw": "A、以人为本"}, {"letter": "B", "text": "为民造福", "raw": "B、为民造福"}, {"letter": "C", "text": "共同富裕", "raw": "C、共同富裕"}, {"letter": "D", "text": "保障人民健康", "raw": "D、保障人民健康"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 66, "title": "党的二十大的主题是：，高举中国特色社会主义伟大旗帜，全面贯彻新时代中国特色社会主义思想，弘扬伟大建党精神，自信自强、守正创新，踔厉奋发、勇毅前行，为全面建设（    ）、全面推进中华民族伟大复兴而团结奋斗。", "options": [{"letter": "A", "text": "社会主义现代化国家", "raw": "A.社会主义现代化国家"}, {"letter": "B", "text": "小康社会", "raw": "B.小康社会"}, {"letter": "C", "text": "社会主义现代化强国", "raw": "C.社会主义现代化强国"}, {"letter": "D", "text": "社会主义现代化军事强国", "raw": "D.社会主义现代化军事强国"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 67, "title": "党的二十届三中全会是在全面建设社会主义现代化国家新征程开局起步的关键时期召开的一次十分重要的会议，全会审议通过了哪一项重要决定？（    ）", "options": [{"letter": "A", "text": "《中共中央关于推进法治国家建设的决定》", "raw": "A、《中共中央关于推进法治国家建设的决定》"}, {"letter": "B", "text": "《中共中央关于进一步全面深化改革、推进中国式现代化的决定》", "raw": "B、《中共中央关于进一步全面深化改革、推进中国式现代化的决定》"}, {"letter": "C", "text": "《中共中央关于深化党和国家机构改革的决定》", "raw": "C、《中共中央关于深化党和国家机构改革的决定》"}, {"letter": "D", "text": "《中共中央关于全面加强党的建设的决定》", "raw": "D、《中共中央关于全面加强党的建设的决定》"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 68, "title": "党的基层代表大会或党员大会进行选举时，参加选举的人数超过应到会人数的（    ） ，方能进行选举。", "options": [{"letter": "A", "text": "一半", "raw": "A.一半"}, {"letter": "B", "text": "2/3", "raw": "B.2/3"}, {"letter": "C", "text": "4/5", "raw": "C.4/5"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 69, "title": "党的基层组织要对要求入党的积极分子进行教育和培养，做好经常性的发展党员工作，重视在       中发展党员。（     ）", "options": [{"letter": "A", "text": "生产、工作第一线和青年", "raw": "A、生产、工作第一线和青年"}, {"letter": "B", "text": "急难险重任务一线和大学生", "raw": "B、急难险重任务一线和大学生"}, {"letter": "C", "text": "少数民族和优秀女性", "raw": "C、少数民族和优秀女性"}, {"letter": "D", "text": "工人、农民和科学家", "raw": "D、工人、农民和科学家"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 70, "title": "党的基层组织应当把吸收具有马克思主义信仰、共产主义觉悟和中国特色社会主义信念，自觉践行（    ）的先进分子入党，作为一项经常性重要工作。", "options": [{"letter": "A", "text": "社会主义核心价值观", "raw": "A.社会主义核心价值观"}, {"letter": "B", "text": "群众路线", "raw": "B.群众路线"}, {"letter": "C", "text": "三严三实", "raw": "C.三严三实"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 71, "title": "党的纪律处分工作遵循的原则中，不包括以下哪一项（ ）。", "options": [{"letter": "A", "text": "坚持党要管党、全面从严治党", "raw": "A、坚持党要管党、全面从严治党"}, {"letter": "B", "text": "党纪面前一律平等", "raw": "B、党纪面前一律平等"}, {"letter": "C", "text": "实事求是", "raw": "C、实事求是"}, {"letter": "D", "text": "个人主义", "raw": "D、个人主义"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 72, "title": "党的纪律处分有警告、严重警告、撤销党内职务、留党察看、开除党籍五种。留党察看最长不超过（    ）年。", "options": [{"letter": "A", "text": "1年", "raw": "A.1年"}, {"letter": "B", "text": "6个月", "raw": "B.6个月"}, {"letter": "C", "text": "2年", "raw": "C.2年"}, {"letter": "D", "text": "8个月", "raw": "D.8个月"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 73, "title": "党的纪律是（    ）必须遵守的行为规则，是维护党的团结统一、完成党的任务的保证。党组织必须严格执行和维护党的纪律，共产党员必须自觉接受党的纪律的约束。", "options": [{"letter": "A", "text": "各级干部和全体党员", "raw": "A.各级干部和全体党员"}, {"letter": "B", "text": "全体党员", "raw": "B.全体党员"}, {"letter": "C", "text": "党的各级组织和全体党员", "raw": "C.党的各级组织和全体党员"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 74, "title": "党的纪律主要包括（    ）。", "options": [{"letter": "A", "text": "思想纪律、队伍纪律、廉政纪律、群众纪律、工作纪律、学习纪律", "raw": "A.思想纪律、队伍纪律、廉政纪律、群众纪律、工作纪律、学习纪律"}, {"letter": "B", "text": "政治纪律、队伍纪律、廉政纪律、群众纪律、作风纪律、学习纪律", "raw": "B.政治纪律、队伍纪律、廉政纪律、群众纪律、作风纪律、学习纪律"}, {"letter": "C", "text": "思想纪律、组织纪律、廉洁纪律、群众纪律、作风纪律、生活纪律", "raw": "C.思想纪律、组织纪律、廉洁纪律、群众纪律、作风纪律、生活纪律"}, {"letter": "D", "text": "政治纪律、组织纪律、廉洁纪律、群众纪律、工作纪律、生活纪律", "raw": "D.政治纪律、组织纪律、廉洁纪律、群众纪律、工作纪律、生活纪律"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 75, "title": "党的建制度改革深入推进，党内法规制度体系不断完善，把（    ）挺在前面，着力解决人民群众反映最强烈、对党的执政基础威胁最大的突出问题。", "options": [{"letter": "A", "text": "道德", "raw": "A.道德"}, {"letter": "B", "text": "法律", "raw": "B.法律"}, {"letter": "C", "text": "纪律", "raw": "C.纪律"}, {"letter": "D", "text": "责任", "raw": "D.责任"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 76, "title": "党的民主集中制的基本原则之一是“四个服从”，即党员个人服从党的组织,（    ）下级组织服从上级组织，全党各个组织和全体党员服从党的全国代表大会和中央委员会。", "options": [{"letter": "A", "text": "党委委员服从党委书记", "raw": "A.党委委员服从党委书记"}, {"letter": "B", "text": "少数服从多数", "raw": "B.少数服从多数"}, {"letter": "C", "text": "普通党员服从党委书记", "raw": "C.普通党员服从党委书记"}, {"letter": "D", "text": "支部服从党委", "raw": "D.支部服从党委"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 77, "title": "党的中央和省、自治区、直辖市委员会实行        制度；党的市（地、州、盟）和县（市、区、旗）委员会建立        制度。（     ）", "options": [{"letter": "A", "text": "巡察；巡视", "raw": "A、巡察；巡视"}, {"letter": "B", "text": "巡视；巡察", "raw": "B、巡视；巡察"}, {"letter": "C", "text": "视察；监察", "raw": "C、视察；监察"}, {"letter": "D", "text": "巡查；调研", "raw": "D、巡查；调研"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 78, "title": "党的中央委会认为有必要，或者有（    ）以上的省一级组织提出要求，全国代表大会可以提前举行；如无非常情况，不得延期举行。", "options": [{"letter": "A", "text": "四分之一", "raw": "A.四分之一"}, {"letter": "B", "text": "三分之一", "raw": "B.三分之一"}, {"letter": "C", "text": "二分之一", "raw": "C.二分之一"}, {"letter": "D", "text": "三分之二", "raw": "D.三分之二"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 79, "title": "推进以人为核心的新型城镇化，加快农业转移人口 （    ）。", "options": [{"letter": "A", "text": "市民化", "raw": "A.市民化"}, {"letter": "B", "text": "一体化", "raw": "B.一体化"}, {"letter": "C", "text": "城市化", "raw": "C.城市化"}, {"letter": "D", "text": "城镇化", "raw": "D.城镇化"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 80, "title": "党的最高理想和最终目标是（ ）。", "options": [{"letter": "A", "text": "全面建成小康社会", "raw": "A、全面建成小康社会"}, {"letter": "B", "text": "实现中华民族伟大复兴", "raw": "B、实现中华民族伟大复兴"}, {"letter": "C", "text": "实现共产主义", "raw": "C、实现共产主义"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 81, "title": "党对军队的绝对领导，这一根本原则和制度定型于(     )", "options": [{"letter": "A", "text": "八七会议", "raw": "A. 八七会议"}, {"letter": "B", "text": "古田会议", "raw": "B. 古田会议"}, {"letter": "C", "text": "文家市决策", "raw": "C. 文家市决策"}, {"letter": "D", "text": "三湾改编", "raw": "D. 三湾改编"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 82, "title": "党纪处分决定作出后，应当在（ ）内向受处分党员所在党的基层组织中的全体党员及其本人宣布。", "options": [{"letter": "A", "text": "10天", "raw": "A、10天"}, {"letter": "B", "text": "半个月", "raw": "B、半个月"}, {"letter": "C", "text": "1个月", "raw": "C、1个月"}, {"letter": "D", "text": "2个月", "raw": "D、2个月"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 83, "title": "党纪处分决定作出后，应当在（ ）向受处分党员所在党的基层组织中的全体党员及其本人宣布。", "options": [{"letter": "A", "text": "一个月内", "raw": "A、一个月内"}, {"letter": "B", "text": "二个月内", "raw": "B、二个月内"}, {"letter": "C", "text": "三个月内", "raw": "C、三个月内"}, {"letter": "D", "text": "六个月内", "raw": "D、六个月内"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 84, "title": "党内监督的重点对象是（    ）。", "options": [{"letter": "A", "text": "所有党员干部", "raw": "A.所有党员干部"}, {"letter": "B", "text": "党的高级干部", "raw": "B.党的高级干部"}, {"letter": "C", "text": "党的各级基层干部", "raw": "C.党的各级基层干部"}, {"letter": "D", "text": "党的领导机关和领导干部特别是主要领导干部", "raw": "D.党的领导机关和领导干部特别是主要领导干部"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 85, "title": "党委审批前，应当指派（    ）同发展对象谈话，作进一步了解，并帮助发展对象提高对党的认识。", "options": [{"letter": "A", "text": "党委委员或组织员", "raw": "A.党委委员或组织员"}, {"letter": "B", "text": "党支部书记", "raw": "B.党支部书记"}, {"letter": "C", "text": "培养联系人", "raw": "C.培养联系人"}, {"letter": "D", "text": "入党介绍人", "raw": "D.入党介绍人"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 86, "title": "党员必须履行的义务，（    ），向群众宣传党的主张，遇事同群众商量，及时向党反映群众的意见和要求，维护群众的正当利益。", "options": [{"letter": "A", "text": "一切为了群众", "raw": "A.一切为了群众"}, {"letter": "B", "text": "一切依靠群众", "raw": "B.一切依靠群众"}, {"letter": "C", "text": "密切联系群众", "raw": "C.密切联系群众"}, {"letter": "D", "text": "以群众利益为出发点", "raw": "D.以群众利益为出发点"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 87, "title": "党员必须履行的义务，发扬社会主义新风尚，带头实践社会主义荣辱观，提倡共产主义道德，为了保护国家和人民的利益，在一切困难和危险的时刻挺身而出，（    ）。", "options": [{"letter": "A", "text": "英勇斗争，不怕牺牲", "raw": "A.英勇斗争，不怕牺牲"}, {"letter": "B", "text": "英勇斗争，敢于牺牲。", "raw": "B.英勇斗争，敢于牺牲。"}, {"letter": "C", "text": "舍己为人，敢于牺牲。", "raw": "C.舍己为人，敢于牺牲。"}, {"letter": "D", "text": "无私奉献，不怕牺牲。", "raw": "D.无私奉献，不怕牺牲。"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 88, "title": "党员必须履行的义务，贯彻执行党的基本路线和各项方针、政策，带头参加改革开放和社会主义现代化建设，带动群众为经济发展和社会进步艰苦奋斗，在生产、工作、学习和社会生活中起（    ）作用。", "options": [{"letter": "A", "text": "桥梁和纽带", "raw": "A.桥梁和纽带"}, {"letter": "B", "text": "战斗堡垒", "raw": "B.战斗堡垒"}, {"letter": "C", "text": "先锋模范", "raw": "C.先锋模范"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 89, "title": "党员必须履行的义务，坚持党和人民的利益高于一切，个人利益服从党和人民的利益，吃苦在前，享受在后，克己奉公，（    ）。", "options": [{"letter": "A", "text": "无私奉献", "raw": "A.无私奉献"}, {"letter": "B", "text": "多做贡献", "raw": "B.多做贡献"}, {"letter": "C", "text": "助人为乐", "raw": "C.助人为乐"}, {"letter": "D", "text": "舍己为人", "raw": "D.舍己为人"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 90, "title": "党员必须履行的义务，切实开展（    ），勇于揭露和纠正工作中的缺点、错误，坚决同消极腐败现象作斗争。", "options": [{"letter": "A", "text": "自我革命", "raw": "A.自我革命"}, {"letter": "B", "text": "批评和自我批评", "raw": "B.批评和自我批评"}, {"letter": "C", "text": "自我批评", "raw": "C.自我批评"}, {"letter": "D", "text": "相互批评", "raw": "D.相互批评"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 91, "title": "党员必须履行的义务，认真学习马克思列宁主义、毛泽东思想、邓小平理论、“三个代表”重要思想、科学发展观、（  ）,学习党的路线、方针、政策和决议,学习党的基本知识,学习科学、文化、法律和业务知识,努力提高为人民服务的本领。", "options": [{"letter": "A", "text": "习近平新时代中国特色社会主义思想", "raw": "A.习近平新时代中国特色社会主义思想"}, {"letter": "B", "text": "新时代中国特色社会主义思想", "raw": "B.新时代中国特色社会主义思想"}, {"letter": "C", "text": "中国特色社会主义思想", "raw": "C.中国特色社会主义思想"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 92, "title": "党员必须履行的义务，自觉遵守（    ），首先是党的政治纪律和政治规矩，模范遵守国家的法律法规，严格保守党和国家的秘密，执行党的决定，服从组织分配，积极完成党的任务。", "options": [{"letter": "A", "text": "党的纪律", "raw": "A.党的纪律"}, {"letter": "B", "text": "党的规矩", "raw": "B.党的规矩"}, {"letter": "C", "text": "党的方针", "raw": "C.党的方针"}, {"letter": "D", "text": "党的政策", "raw": "D.党的政策"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 93, "title": "党员的党籍，从（    ）之日算起。", "options": [{"letter": "A", "text": "递交入党申请书", "raw": "A.递交入党申请书"}, {"letter": "B", "text": "递交入党志愿书", "raw": "B.递交入党志愿书"}, {"letter": "C", "text": "支部大会通过其为预备党员", "raw": "C.支部大会通过其为预备党员"}, {"letter": "D", "text": "预备期满转为正式党员", "raw": "D.预备期满转为正式党员"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 94, "title": "党员的党龄，从（    ）之日算起。", "options": [{"letter": "A", "text": "递交入党申请书", "raw": "A.递交入党申请书"}, {"letter": "B", "text": "递交入党志愿书", "raw": "B.递交入党志愿书"}, {"letter": "C", "text": "支部大会通过其为预备党员", "raw": "C.支部大会通过其为预备党员"}, {"letter": "D", "text": "预备期满转为正式党员", "raw": "D.预备期满转为正式党员"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 95, "title": "党员的预备期为（    ）。预备党员的预备期，从支部大会通过他为预备党员之日算起。党员的党龄，从预备期满转为正式党员之日算起。", "options": [{"letter": "A", "text": "3个月", "raw": "A.3个月"}, {"letter": "B", "text": "6个月", "raw": "B.6个月"}, {"letter": "C", "text": "1年", "raw": "C.1年"}, {"letter": "D", "text": "2年", "raw": "D.2年"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 96, "title": "党员个人代表党组织发表重要主张，如果超出党组织已有决定的范围，（    ）。", "options": [{"letter": "A", "text": "必须提交所在的党组织讨论决定，或向上级党组织请示", "raw": "A.必须提交所在的党组织讨论决定，或向上级党组织请示"}, {"letter": "B", "text": "发言者临场灵活处理", "raw": "B.发言者临场灵活处理"}, {"letter": "C", "text": "发言者可以全权解释", "raw": "C.发言者可以全权解释"}, {"letter": "D", "text": "必须征得群众同意", "raw": "D.必须征得群众同意"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 97, "title": "党员受到开除党籍处分，（ ）内不得重新入党，也不得推荐担任与其原任职务相当或者高于其原任职务的党外职务。", "options": [{"letter": "A", "text": "一年", "raw": "A、一年"}, {"letter": "B", "text": "两年", "raw": "B、两年"}, {"letter": "C", "text": "三年", "raw": "C、三年"}, {"letter": "D", "text": "五年", "raw": "D、五年"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 98, "title": "党员享有的权利，参加党的有关会议，阅读党的有关文件，接受党的（    ）。", "options": [{"letter": "A", "text": "教育和领导", "raw": "A.教育和领导"}, {"letter": "B", "text": "教育和培训", "raw": "B.教育和培训"}, {"letter": "C", "text": "教导和培训", "raw": "C.教导和培训"}, {"letter": "D", "text": "教育和引领", "raw": "D.教育和引领"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 99, "title": "党员享有的权利，对党的（    ）如有不同意见，在坚决执行的前提下，可以声明保留，并且可以把自己的意见向党的上级组织直至中央提出。", "options": [{"letter": "A", "text": "方针和决议", "raw": "A.方针和决议"}, {"letter": "B", "text": "方针和路线", "raw": "B.方针和路线"}, {"letter": "C", "text": "路线和政策", "raw": "C.路线和政策"}, {"letter": "D", "text": "决议和政策", "raw": "D.决议和政策"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 100, "title": "党员享有的权利，对党的工作提出建议和（    ）。", "options": [{"letter": "A", "text": "意见", "raw": "A.意见"}, {"letter": "B", "text": "倡议", "raw": "B.倡议"}, {"letter": "C", "text": "提议", "raw": "C.提议"}, {"letter": "D", "text": "主张", "raw": "D.主张"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 101, "title": "党员享有的权利，向党的上级组织直至中央提出（    ），并要求有关组织给以负责的答复。", "options": [{"letter": "A", "text": "请求、申诉和控告", "raw": "A.请求、申诉和控告"}, {"letter": "B", "text": "申诉、控告和检举", "raw": "B.申诉、控告和检举"}, {"letter": "C", "text": "批评、建议、和检举", "raw": "C.批评、建议、和检举"}, {"letter": "D", "text": "请求、申述和检举", "raw": "D.请求、申述和检举"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 102, "title": "党员享有的权利，行使（    ）、选举权，有被选举权。", "options": [{"letter": "A", "text": "表决权", "raw": "A.表决权"}, {"letter": "B", "text": "批评权", "raw": "B.批评权"}, {"letter": "C", "text": "揭发权", "raw": "C.揭发权"}, {"letter": "D", "text": "检举权", "raw": "D.检举权"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 103, "title": "党员享有的权利，在党的会议上和党报党刊上，参加关于党的的（    ）讨论。", "options": [{"letter": "A", "text": "路线问题", "raw": "A.路线问题"}, {"letter": "B", "text": "方针问题", "raw": "B.方针问题"}, {"letter": "C", "text": "政策问题", "raw": "C.政策问题"}, {"letter": "D", "text": "决议问题", "raw": "D.决议问题"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 104, "title": "党员享有的权利，在党的会议上有根据地批评党的任何组织和任何党员，向党负责地揭发、检举党的任何组织和任何党员违法乱纪的事实，要求处分违法乱纪的党员，要求（    ）不称职的干部。", "options": [{"letter": "A", "text": "处分", "raw": "A.处分"}, {"letter": "B", "text": "警告", "raw": "B.警告"}, {"letter": "C", "text": "严重警告", "raw": "C.严重警告"}, {"letter": "D", "text": "罢免和撤换不称职", "raw": "D.罢免和撤换不称职"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 105, "title": "党员享有的权利，在党组织讨论决定对党员的党纪处分或作出鉴定时，（    ）。", "options": [{"letter": "A", "text": "本人无权参加和进行申辩", "raw": "A.本人无权参加和进行申辩"}, {"letter": "B", "text": "其他党员不可以为他作证和辩护", "raw": "B.其他党员不可以为他作证和辩护"}, {"letter": "C", "text": "本人有权参加和进行申辩，其他党员可以为他作证和辩护", "raw": "C.本人有权参加和进行申辩，其他党员可以为他作证和辩护"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 106, "title": "党员应当增加党员意识，主动按（   ）缴纳党费。", "options": [{"letter": "A", "text": "年", "raw": "A.年"}, {"letter": "B", "text": "季度", "raw": "B.季度"}, {"letter": "C", "text": "月", "raw": "C.月"}, {"letter": "D", "text": "日", "raw": "D.日"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 107, "title": "党员永远是劳动人民的普通一员。除了（    ）以外，所有共产党员都不得谋求任何私利和特权。", "options": [{"letter": "A", "text": "法律和政策规定范围内的个人利益和工作职权", "raw": "A.法律和政策规定范围内的个人利益和工作职权"}, {"letter": "B", "text": "工资、津贴和奖金", "raw": "B.工资、津贴和奖金"}, {"letter": "C", "text": "办公经费开支和工作招待", "raw": "C.办公经费开支和工作招待"}, {"letter": "D", "text": "正常的配备公车", "raw": "D.正常的配备公车"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 108, "title": "党在自己的政治生活中正确地开展       ，在原则问题上进行思想斗争，坚持真理，修正错误。（     ）", "options": [{"letter": "A", "text": "自我剖析", "raw": "A、自我剖析"}, {"letter": "B", "text": "批评和自我批评", "raw": "B、批评和自我批评"}, {"letter": "C", "text": "学习教育", "raw": "C、学习教育"}, {"letter": "D", "text": "自我检视自我剖析", "raw": "D、自我检视自我剖析"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 109, "title": "党章（修正案）经中国共产党第二十次全国代表大会部分修改后于         通过。（     ）", "options": [{"letter": "A", "text": "2022年11月22日", "raw": "A、2022年11月22日"}, {"letter": "B", "text": "2022年10月22日", "raw": "B、2022年10月22日"}, {"letter": "C", "text": "2022年10月24日", "raw": "C、2022年10月24日"}, {"letter": "D", "text": "2022年10月16日", "raw": "D、2022年10月16日"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 110, "title": "1945年(     )，日本代表在投降书上签字，日军128万人向中国投降。至此，中国抗日战争胜利结束，世界反法西斯战争也胜利结束。", "options": [{"letter": "A", "text": "9月2日", "raw": "A.9月2日"}, {"letter": "B", "text": "9月3日", "raw": "B.9月3日"}, {"letter": "C", "text": "8月15日", "raw": "C.8月15日"}, {"letter": "D", "text": "8月16日", "raw": "D.8月16日"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 111, "title": "党章规定，党的各级领导干部必须信念坚定、为民服务、勤政务实、         、清正廉洁。（     ）", "options": [{"letter": "A", "text": "忠诚担当", "raw": "A、忠诚担当"}, {"letter": "B", "text": "创新实干", "raw": "B、创新实干"}, {"letter": "C", "text": "敢于担当", "raw": "C、敢于担当"}, {"letter": "D", "text": "以人为本", "raw": "D、以人为本"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 112, "title": "党章规定，非公有制经济组织中党的基层组织的主要职责不包括        。（    ）", "options": [{"letter": "A", "text": "指导生产、运输、销售等全链条工作", "raw": "A、指导生产、运输、销售等全链条工作"}, {"letter": "B", "text": "领导工会、共青团等群团组织", "raw": "B、领导工会、共青团等群团组织"}, {"letter": "C", "text": "团结凝聚职工群众", "raw": "C、团结凝聚职工群众"}, {"letter": "D", "text": "促进企业健康发展", "raw": "D、促进企业健康发展"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 113, "title": "党章指出，要加强党的长期执政能力建设、先进性和纯洁性建设，以改革创新精神全面推进党的建设新的伟大工程，以党的政治建设为统领，全面推进党的政治建设、思想建设、组织建设、作风建设、纪律建设，深入推进反腐败斗争，全面提高党的建设科学化水平，以       引领伟大社会革命。（     ）", "options": [{"letter": "A", "text": "伟大自我革命", "raw": "A、伟大自我革命"}, {"letter": "B", "text": "伟大牺牲精神", "raw": "B、伟大牺牲精神"}, {"letter": "C", "text": "自我革命精神", "raw": "C、自我革命精神"}, {"letter": "D", "text": "全面从严治党", "raw": "D、全面从严治党"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 114, "title": "党支部党员大会是党支部的议事决策机构，由全体党员参加，一般每季度召开（    ）次。", "options": [{"letter": "A", "text": "1", "raw": "A.1"}, {"letter": "B", "text": "2", "raw": "B.2"}, {"letter": "C", "text": "3", "raw": "C.3"}, {"letter": "D", "text": "4", "raw": "D.4"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 115, "title": "党支部书记应当具备良好（   ），热爱党的工作，具有一定的政策理论水平、组织协调能力和群众工作本领，敢于担当、乐于奉献，带头发挥先锋模范作用，在党员、群众中有较高威信，一般应当具有（    ）以上党龄。", "options": [{"letter": "A", "text": "政治素质、1年", "raw": "A.政治素质、1年"}, {"letter": "B", "text": "政治纪律、半年", "raw": "B.政治纪律、半年"}, {"letter": "C", "text": "政治意识、1年", "raw": "C.政治意识、1年"}, {"letter": "D", "text": "政治担当、半年", "raw": "D.政治担当、半年"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 116, "title": "党支部委员会会议一般（  ）召开1次，根据需要可以随时召开，对党支部重要工作进行讨论、作出决定等。党支部委员会会议须有（   ）委员到会方可进行。重要事项提交（   ）决定前，一般应当经党支部委员会会议讨论。", "options": [{"letter": "A", "text": "每月、半数以上、群众代表大会", "raw": "A.每月、半数以上、群众代表大会"}, {"letter": "B", "text": "每季度、半数以上、党员大会", "raw": "B.每季度、半数以上、党员大会"}, {"letter": "C", "text": "每月、三分之二以上、党员大会", "raw": "C.每月、三分之二以上、党员大会"}, {"letter": "D", "text": "每月、半数以上、党员大会", "raw": "D.每月、半数以上、党员大会"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 117, "title": "党支部一般每年开展（    ）次民主评议党员，组织党员对照合格党员标准、对照入党誓词，联系个人实际进行党性分析。", "options": [{"letter": "A", "text": "1", "raw": "A.1"}, {"letter": "B", "text": "2", "raw": "B.2"}, {"letter": "C", "text": "3", "raw": "C.3"}, {"letter": "D", "text": "4", "raw": "D.4"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 118, "title": "党支部应按照规定，向（    ）通报党的工作情况，公开党内有关事务。", "options": [{"letter": "A", "text": "党员", "raw": "A. 党员"}, {"letter": "B", "text": "群众", "raw": "B.群众"}, {"letter": "C", "text": "干部", "raw": "C.干部"}, {"letter": "D", "text": "党员和群众", "raw": "D.党员和群众"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 119, "title": "党支部应当经常开展谈心谈话。党支部委员之间、（   ）、党员和党员之间，（   ）谈心谈话一般不少于1次。谈心谈话应当坦诚相见、交流思想、交换意见、帮助提高。", "options": [{"letter": "A", "text": "党支部委员和党员之间、每月", "raw": "A.党支部委员和党员之间、每月"}, {"letter": "B", "text": "党支部委员和党员之间、每半年", "raw": "B.党支部委员和党员之间、每半年"}, {"letter": "C", "text": "党支部委员和党员之间、每季度", "raw": "C.党支部委员和党员之间、每季度"}, {"letter": "D", "text": "党支部委员和党员之间、每年", "raw": "D.党支部委员和党员之间、每年"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 120, "title": "党组织领导机构集体作出（ ）的决定或者实施其他（ ）的行为，对具有共同故意的成员，按（ ）处理；对_（ ）的成员，按照各自在集体违纪中所起的作用和应负的责任分别给予处分。", "options": [{"letter": "A", "text": "违反党纪；违反党纪；共同行为；过失违纪", "raw": "A、违反党纪；违反党纪；共同行为；过失违纪"}, {"letter": "B", "text": "违犯党纪；违犯党纪；共同违纪；过失违纪", "raw": "B、违犯党纪；违犯党纪；共同违纪；过失违纪"}, {"letter": "C", "text": "违犯党纪；违犯党纪；共同行为；过失违纪", "raw": "C、违犯党纪；违犯党纪；共同行为；过失违纪"}, {"letter": "D", "text": "违反党纪；违反党纪；共同违纪；过失违纪", "raw": "D、违反党纪；违反党纪；共同违纪；过失违纪"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 121, "title": "党组织讨论决定问题，如对重要问题发生争论，双方人数接近，除了在紧急情况下必须按多数意见执行外，应当       ，进一步调查研究，交换意见，下次再表决。（     ）", "options": [{"letter": "A", "text": "暂缓作出决定", "raw": "A、暂缓作出决定"}, {"letter": "B", "text": "不予考虑", "raw": "B、不予考虑"}, {"letter": "C", "text": "认真考虑", "raw": "C、认真考虑"}, {"letter": "D", "text": "给与批评", "raw": "D、给与批评"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 122, "title": "党组织应当指定（    ）作为入党积极分子的培养联系人。", "options": [{"letter": "A", "text": "一至二名正式党员", "raw": "A.一至二名正式党员"}, {"letter": "B", "text": "二至三名正式党员", "raw": "B.二至三名正式党员"}, {"letter": "C", "text": "一至二名预备党员", "raw": "C.一至二名预备党员"}, {"letter": "D", "text": "二至三名预备党员", "raw": "D.二至三名预备党员"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 123, "title": "到二〇三五年，我国发展的总体目标是：经济实力、科技实力、综合国力大幅跃升，人均国内生产总值迈上新的大台阶，达到（   ）", "options": [{"letter": "A", "text": "中等发达国家水平", "raw": "A、  中等发达国家水平"}, {"letter": "B", "text": "发达国家水平", "raw": "B、 发达国家水平"}, {"letter": "C", "text": "上等发达国家水平", "raw": "C、上等发达国家水平"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 124, "title": "邓小平就任瑞金县委书记后，于1931年10月创办了第一份中共瑞金县委机关报（    ）。", "options": [{"letter": "A", "text": "《瑞金红旗》", "raw": "A.《瑞金红旗》"}, {"letter": "B", "text": "《瑞金斗争》", "raw": "B.《瑞金斗争》"}, {"letter": "C", "text": "《瑞金辑要》", "raw": "C.《瑞金辑要》"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 125, "title": "第一个共产党组织是（    ）。", "options": [{"letter": "A", "text": "绵江中学支部", "raw": "A.绵江中学支部"}, {"letter": "B", "text": "上海共产主义小组", "raw": "B.上海共产主义小组"}, {"letter": "C", "text": "瑞金苏维埃", "raw": "C.瑞金苏维埃"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 126, "title": "对不适宜担任党支部书记、副书记和委员职务的，上级党组织应当及时作出（   ）。", "options": [{"letter": "A", "text": "撤职", "raw": "A. 撤职"}, {"letter": "B", "text": "免职", "raw": "B.免职"}, {"letter": "C", "text": "开除", "raw": "C.开除"}, {"letter": "D", "text": "调整", "raw": "D.调整"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 127, "title": "对出国（境）学习研究党员，由原就读高校或者工作单位党组织保留其组织关系，       至少与其联系1次。（     ）", "options": [{"letter": "A", "text": "每月", "raw": "A、每月"}, {"letter": "B", "text": "每季度", "raw": "B、每季度"}, {"letter": "C", "text": "每半年", "raw": "C、每半年"}, {"letter": "D", "text": "每年", "raw": "D、每年"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 128, "title": "对流动人员中的发展对象进行政治审查时，还应当征求（    ）的意见。", "options": [{"letter": "A", "text": "户籍所在地", "raw": "A.户籍所在地"}, {"letter": "B", "text": "居住地基层党组织", "raw": "B.居住地基层党组织"}, {"letter": "C", "text": "户籍所在地和居住地基层党组织", "raw": "C.户籍所在地和居住地基层党组织"}, {"letter": "D", "text": "户籍所在地或居住地基层党组织", "raw": "D.户籍所在地或居住地基层党组织"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 129, "title": "二人以上共同故意违纪的，对（ ），从重处分，本条例另有规定的除外；对其他成员，按照其在共同违纪中所起的作用和应负的责任，分别给予处分。对于经济方面共同违纪的，按照（ ）参与数额及其所起作用，分别给予处分。对共同违纪的为首者，情节严重的，按照共同违纪的总数额处分。教唆他人违纪的，应当按照其在共同违纪中所起的作用追究党纪责任。", "options": [{"letter": "A", "text": "为首者；个人", "raw": "A、为首者；个人"}, {"letter": "B", "text": "实际违纪较重者；为首者", "raw": "B、实际违纪较重者；为首者"}, {"letter": "C", "text": "所有参与者；个人", "raw": "C、所有参与者；个人"}, {"letter": "D", "text": "教唆者；他人", "raw": "D、教唆者；他人"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 130, "title": "二十大党章中 “四个全面”战略布局是指（ ）。", "options": [{"letter": "A", "text": "全面建设社会主义现代化国家、全面深化改革、全面依法治国、全面从严治党", "raw": "A、全面建设社会主义现代化国家、全面深化改革、全面依法治国、全面从严治党"}, {"letter": "B", "text": "全面建成小康社会、全面深化改革、全面依法治国、全面从严治党", "raw": "B、全面建成小康社会、全面深化改革、全面依法治国、全面从严治党"}, {"letter": "C", "text": "全面实现共同富裕、全面深化改革、全面依法治国、全面从严治党", "raw": "C、全面实现共同富裕、全面深化改革、全面依法治国、全面从严治党"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 131, "title": "二十大党章中提出的新时代新征程，经济和社会发展的战略目标是（ ）。", "options": [{"letter": "A", "text": "到二〇三五年基本实现社会主义现代化，到本世纪中叶把我国建成社会主义现代化强国", "raw": "A、到二〇三五年基本实现社会主义现代化，到本世纪中叶把我国建成社会主义现代化强国"}, {"letter": "B", "text": "到二〇三五年全面实现社会主义现代化，到本世纪中叶把我国建成社会主义强国", "raw": "B、到二〇三五年全面实现社会主义现代化，到本世纪中叶把我国建成社会主义强国"}, {"letter": "C", "text": "到二〇三五年把我国建成社会主义现代化强国，到本世纪中叶实现社会主义现代化", "raw": "C、 到二〇三五年把我国建成社会主义现代化强国，到本世纪中叶实现社会主义现代化"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 132, "title": "发挥社会主义协商民主重要作用。（    ）是具有中国特色的制度安排，是社会主义协商民主的重要渠道和专门协商机构。", "options": [{"letter": "A", "text": "政党协商", "raw": "A.政党协商"}, {"letter": "B", "text": "人大协商", "raw": "B.人大协商"}, {"letter": "C", "text": "基层协商", "raw": "C.基层协商"}, {"letter": "D", "text": "人民政协", "raw": "D.人民政协"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 133, "title": "发展党员，必须经过党的支部，坚持（    ）的原则。", "options": [{"letter": "A", "text": "分批吸收", "raw": "A.分批吸收"}, {"letter": "B", "text": "个别吸收", "raw": "B.个别吸收"}, {"letter": "C", "text": "个别吸收和分批吸收相结合", "raw": "C.个别吸收和分批吸收相结合"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 134, "title": "发展党员工作应到贯彻党的基本理论、基本路线、基本纲领、基本经验、基本要求，按照的（    ）总要求，坚持党章规定的党员标准。", "options": [{"letter": "A", "text": "控制总量、优化结构", "raw": "A.控制总量、优化结构"}, {"letter": "B", "text": "提高质量、发挥作用", "raw": "B.提高质量、发挥作用"}, {"letter": "C", "text": "控制总量、优化结构提高质量、发挥作用", "raw": "C.控制总量、优化结构提高质量、发挥作用"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 135, "title": "发展对象未来（    ）内将离开工作、学习单位的，一般不办理接收预备党员的手续。", "options": [{"letter": "A", "text": "一个月", "raw": "A.一个月"}, {"letter": "B", "text": "二个月", "raw": "B.二个月"}, {"letter": "C", "text": "三个月", "raw": "C.三个月"}, {"letter": "D", "text": "四个月", "raw": "D.四个月"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 136, "title": "发展对象应当有两名正式党员作为入党介绍人。入党介绍人一般由（    ）担任，也可由党组织指定。", "options": [{"letter": "A", "text": "培养联系人", "raw": "A.培养联系人"}, {"letter": "B", "text": "党支部书记", "raw": "B.党支部书记"}, {"letter": "C", "text": "党支部副书记", "raw": "C.党支部副书记"}, {"letter": "D", "text": "支委委员", "raw": "D.支委委员"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 137, "title": "发展是解决我国一切问题的基础和关键，发展必须是科学发展，必须坚定不移贯彻（    ）的发展理念。", "options": [{"letter": "A", "text": "创新、协调、绿色、开放、共享", "raw": "A.创新、协调、绿色、开放、共享"}, {"letter": "B", "text": "创造、协调、生态、开放、共享", "raw": "B.创造、协调、生态、开放、共享"}, {"letter": "C", "text": "创新、统筹、绿色、开放、共享", "raw": "C.创新、统筹、绿色、开放、共享"}, {"letter": "D", "text": "创造、统筹、生态、开放、共享", "raw": "D.创造、统筹、生态、开放、共享"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 138, "title": "凡属重大问题都要按照集体领导、民主集中、       的原则，由党的委员会集体讨论，作出决定。（  D  ）", "options": [{"letter": "A", "text": "会议讨论；集体决策", "raw": "A、会议讨论；集体决策"}, {"letter": "B", "text": "全员协商；一致表决", "raw": "B、全员协商；一致表决"}, {"letter": "C", "text": "重点研究；个别同意", "raw": "C、重点研究；个别同意"}, {"letter": "D", "text": "个别酝酿；会议决定", "raw": "D、个别酝酿；会议决定"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 139, "title": "非公有制经济组织中的党支部，（   ）企业严格遵守国家法律法规，团结凝聚职工群众，依法维护各方（   ），建设企业先进文化，促进企业健康发展。", "options": [{"letter": "A", "text": "引导和监督、合法权益", "raw": "A. 引导和监督、合法权益"}, {"letter": "B", "text": "引导、合法权益", "raw": "B.引导、合法权益"}, {"letter": "C", "text": "监督、合法权益", "raw": "C.监督、合法权益"}, {"letter": "D", "text": "引导和监督、合法利益", "raw": "D.引导和监督、合法利益"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 140, "title": "改革开放以来我们取得一切成绩和进步的根本原因，归结起来就是：开辟了中国特色社会主义道路，形成了中国特色社会主义理论体系，确立了中国特色社会主义制度，发展了（    ）。", "options": [{"letter": "A", "text": "中国特色社会主义方案", "raw": "A.中国特色社会主义方案"}, {"letter": "B", "text": "中国特色社会主义模式", "raw": "B.中国特色社会主义模式"}, {"letter": "C", "text": "中国特色社会主义文明", "raw": "C.中国特色社会主义文明"}, {"letter": "D", "text": "中国特色社会主义文化", "raw": "D.中国特色社会主义文化"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 141, "title": "各级领导干部要增强（   ），发扬民主作风，接受人民监督，当好人民公仆。", "options": [{"letter": "A", "text": "大局意识", "raw": "A.大局意识"}, {"letter": "B", "text": "忧患意识", "raw": "B.忧患意识"}, {"letter": "C", "text": "党的意识", "raw": "C.党的意识"}, {"letter": "D", "text": "民主意识", "raw": "D.民主意识"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 142, "title": "根据党章的最新修订，党的基层组织应当教育党员和群众自觉抵制不良倾向，坚决同各种（    ）行为作斗争。", "options": [{"letter": "A", "text": "违纪违法", "raw": "A.违纪违法"}, {"letter": "B", "text": "违法犯罪", "raw": "B.违法犯罪"}, {"letter": "C", "text": "违纪违规", "raw": "C.违纪违规"}, {"letter": "D", "text": "违规违法", "raw": "D.违规违法"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 143, "title": "根据新修订《中国共产党纪律处分条例》规定，党员干部相互利用职权或者职务上的影响为对方及其配偶、子女及其配偶等亲属、身边工作人员和其他特定关系人谋取利益搞权权交易的，给予（ ）处分。", "options": [{"letter": "A", "text": "警告或者严重警告", "raw": "A、警告或者严重警告"}, {"letter": "B", "text": "撤销党内职务", "raw": "B、撤销党内职务"}, {"letter": "C", "text": "留党察看", "raw": "C、留党察看"}, {"letter": "D", "text": "开除党籍", "raw": "D、开除党籍"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 144, "title": "巩固和发展最广泛的爱国统一战线，以（   ）为主线，坚定不移走中国特色解决民族问题的正确道路。", "options": [{"letter": "A", "text": "人类命运共同体", "raw": "A、  人类命运共同体"}, {"letter": "B", "text": "铸牢中华民族共同体意识", "raw": "B、 铸牢中华民族共同体意识"}, {"letter": "C", "text": "发展核心利益", "raw": "C、发展核心利益"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 145, "title": "共产党的宗旨是（    ）。", "options": [{"letter": "A", "text": "无私奉献", "raw": "A.无私奉献"}, {"letter": "B", "text": "为民服务", "raw": "B.为民服务"}, {"letter": "C", "text": "全心全意为人民服务", "raw": "C.全心全意为人民服务"}, {"letter": "D", "text": "先人后己", "raw": "D.先人后己"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 146, "title": "构建市场导向的（    ），发展绿色金融，壮大节能环保产业、清洁生产产业、清洁能源产业。", "options": [{"letter": "A", "text": "绿色发展创新体系", "raw": "A.绿色发展创新体系"}, {"letter": "B", "text": "绿色产业创新体系", "raw": "B.绿色产业创新体系"}, {"letter": "C", "text": "绿色科技创新体系", "raw": "C.绿色科技创新体系"}, {"letter": "D", "text": "绿色技术创新体系", "raw": "D.绿色技术创新体系"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 147, "title": "关于党费交纳的规定是（    ）。", "options": [{"letter": "A", "text": "所有党员都必须按规定缴纳党费", "raw": "A.所有党员都必须按规定缴纳党费"}, {"letter": "B", "text": "生活有困难的党员可自己决定不交纳党费", "raw": "B.生活有困难的党员可自己决定不交纳党费"}, {"letter": "C", "text": "党费既不能多交，也不能少交", "raw": "C.党费既不能多交，也不能少交"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 148, "title": "规模较大、跨区域的农民专业合作组织，专业市场、商业街区、商务楼宇等，符合条件的，应当成立（    ）。", "options": [{"letter": "A", "text": "党委", "raw": "A.党委"}, {"letter": "B", "text": "党组", "raw": "B.党组"}, {"letter": "C", "text": "党总支", "raw": "C.党总支"}, {"letter": "D", "text": "党支部", "raw": "D.党支部"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 149, "title": "国家（    ）改革试点取得实效，行政体制改革、司法体制改革、权力运行制约和监督体系建设有效实施。", "options": [{"letter": "A", "text": "政府职能", "raw": "A.政府职能"}, {"letter": "B", "text": "监察体制", "raw": "B.监察体制"}, {"letter": "C", "text": "政府体制", "raw": "C.政府体制"}, {"letter": "D", "text": "金融体制", "raw": "D.金融体制"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 150, "title": "红都瑞金打响我党反腐败历史上第一枪枪毙贪官是（    ）。", "options": [{"letter": "A", "text": "谢步升", "raw": "A.谢步升"}, {"letter": "B", "text": "左祥云", "raw": "B.左祥云"}, {"letter": "C", "text": "黄克功", "raw": "C.黄克功"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 151, "title": "红军于（     ）从瑞金出发开始长征。", "options": [{"letter": "A", "text": "1934.10", "raw": "A.1934.10"}, {"letter": "B", "text": "1934.11", "raw": "B.1934.11"}, {"letter": "C", "text": "1934.12", "raw": "C.1934.12"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 152, "title": "基层党委对发展对象的条件、培养教育情况等进行审查，根据需要听取（    ）等相关部门的意见。", "options": [{"letter": "A", "text": "计生", "raw": "A.计生"}, {"letter": "B", "text": "公安", "raw": "B.公安"}, {"letter": "C", "text": "纪委", "raw": "C.纪委"}, {"letter": "D", "text": "执法执纪", "raw": "D.执法执纪"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 153, "title": "基层党委和县级党委组织部门应当对发展对象进行不少于（    ）的短期培训。", "options": [{"letter": "A", "text": "二天、16个学时", "raw": "A.二天、16个学时"}, {"letter": "B", "text": "三天、24个学时", "raw": "B.三天、24个学时"}, {"letter": "C", "text": "四天、32个学时", "raw": "C.四天、32个学时"}, {"letter": "D", "text": "五天、40个学时", "raw": "D.五天、40个学时"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 154, "title": "加强（     ），必须紧紧围绕保持党同人民群众的血肉联系，增强群众观念和群众感情，不断厚植党执政的群众基础。", "options": [{"letter": "A", "text": "政治建设", "raw": "A.政治建设"}, {"letter": "B", "text": "思想建设", "raw": "B.思想建设"}, {"letter": "C", "text": "作风建设", "raw": "C.作风建设"}, {"letter": "D", "text": "纪律建设", "raw": "D.纪律建设"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 155, "title": "加强党对意识形态工作的领导，党的理论创新全面推进，马克思主义在意识形态领域的指导地位更加鲜明，中国特色社会主义和（    ）深入人心。", "options": [{"letter": "A", "text": "发展理念", "raw": "A.发展理念"}, {"letter": "B", "text": "中国梦", "raw": "B.中国梦"}, {"letter": "C", "text": "四个全面", "raw": "C.四个全面"}, {"letter": "D", "text": "四个自信", "raw": "D.四个自信"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 156, "title": "加强和规范党内政治生活，必须以（    ）为根本遵循。", "options": [{"letter": "A", "text": "党章", "raw": "A.党章"}, {"letter": "B", "text": "法律", "raw": "B.法律"}, {"letter": "C", "text": "党内监督条例", "raw": "C.党内监督条例"}, {"letter": "D", "text": "宪法", "raw": "D.宪法"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 157, "title": "加强社会主义核心价值体系建设，坚持马克思主义指导思想，树立中国特色社会主义共同理想，弘扬以（ ）为核心的民族精神和以（）为核心的时代精神，培育和践行社会主义核心价值观。", "options": [{"letter": "A", "text": "爱国主义改革创新", "raw": "A、爱国主义改革创新"}, {"letter": "B", "text": "自强不息与时俱进", "raw": "B、自强不息与时俱进"}, {"letter": "C", "text": "诚信友善解放思想", "raw": "C、诚信友善解放思想"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 158, "title": "坚持党的领导、人民当家作主、依法治国有机统一。（    ）是社会主义民主政治的本质特征。", "options": [{"letter": "A", "text": "党的领导", "raw": "A.党的领导"}, {"letter": "B", "text": "人民当家作主", "raw": "B.人民当家作主"}, {"letter": "C", "text": "依法治国", "raw": "C.依法治国"}, {"letter": "D", "text": "政治体制改革", "raw": "D.政治体制改革"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 159, "title": "坚持党要管党、全面从严治党，加强党的（    ）、先进性和纯洁性建设。", "options": [{"letter": "A", "text": "自身建设", "raw": "A.自身建设"}, {"letter": "B", "text": "领导能力建设", "raw": "B.领导能力建设"}, {"letter": "C", "text": "执政能力建设", "raw": "C.执政能力建设"}, {"letter": "D", "text": "长期执政能力建设", "raw": "D.长期执政能力建设"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 160, "title": "坚持和完善素荣发展社会主义先进文化的制度,巩固（   ）基础。", "options": [{"letter": "A", "text": "人民群众团结奋斗的共同思想", "raw": "A.人民群众团结奋斗的共同思想"}, {"letter": "B", "text": "全体人民团结奋斗的思想", "raw": "B.全体人民团结奋斗的思想"}, {"letter": "C", "text": "全体人民团结奋斗的共同理想", "raw": "C.全体人民团结奋斗的共同理想"}, {"letter": "D", "text": "全体人民团结奋斗的共同思想", "raw": "D.全体人民团结奋斗的共同思想"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 161, "title": "坚持全面依法治国，推进法治中国建设要完善以（    ） 为核心的中国特色社会主义法律体系。", "options": [{"letter": "A", "text": "宪法", "raw": "A、   宪法"}, {"letter": "B", "text": "刑法", "raw": "B、  刑法"}, {"letter": "C", "text": "民典法", "raw": "C、民典法"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 162, "title": "坚决维护党中央权威和（   ），把党的领导落实到党和国家事业各领域各方面各环节", "options": [{"letter": "A", "text": "全面领导", "raw": "A、 全面领导"}, {"letter": "B", "text": "集中统一领导", "raw": "B、 集中统一领导"}, {"letter": "C", "text": "有力领导", "raw": "C、有力领导"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 163, "title": "坚守中华文化立场，提炼展示中华文明的精神标识和文化精髓，加快构建中国话语和中国叙事体系，讲好中国故事、传播好（   ），展现可信、可爱、可敬的中国形象。", "options": [{"letter": "A", "text": "中国声音", "raw": "A、中国声音"}, {"letter": "B", "text": "中国符号", "raw": "B、 中国符号"}, {"letter": "C", "text": "中国精神", "raw": "C、中国精神"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 164, "title": "建设知识型、技能型、创新型劳动者大军，弘扬劳模精神和（    ）精神，营造劳动光荣的社会风尚和精益求精的敬业风气。", "options": [{"letter": "A", "text": "拼搏", "raw": "A.拼搏"}, {"letter": "B", "text": "钉子", "raw": "B.钉子"}, {"letter": "C", "text": "工匠", "raw": "C.工匠"}, {"letter": "D", "text": "铁人", "raw": "D.铁人"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 165, "title": "接收预备党员需要报具有审批权的（    ）预审。", "options": [{"letter": "A", "text": "党支部", "raw": "A.党支部"}, {"letter": "B", "text": "党总支", "raw": "B.党总支"}, {"letter": "C", "text": "基层党委", "raw": "C.基层党委"}, {"letter": "D", "text": "县委组织部", "raw": "D.县委组织部"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 166, "title": "解决台湾问题、实现祖国完全统一，是全体中华儿女（   ），是中华民族（   ）所在。", "options": [{"letter": "A", "text": "一致愿望、根本利益", "raw": "A.一致愿望、根本利益"}, {"letter": "B", "text": "共同愿望、本质利益", "raw": "B.共同愿望、本质利益"}, {"letter": "C", "text": "一致愿望、本质利益", "raw": "C.一致愿望、本质利益"}, {"letter": "D", "text": "共同愿望、根本利益", "raw": "D.共同愿望、根本利益"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 167, "title": "经基层党委预审合格的发展对象，由（    ）提交支部大会讨论。", "options": [{"letter": "A", "text": "支部委员会", "raw": "A.支部委员会"}, {"letter": "B", "text": "党小组会", "raw": "B.党小组会"}, {"letter": "C", "text": "党支部书记", "raw": "C.党支部书记"}, {"letter": "D", "text": "入党介绍人", "raw": "D.入党介绍人"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 168, "title": "抗日战争时期，毛泽东在《〈共产党人〉发刊词》中首次指出中国共产党在中国革命中战胜敌人的三大法宝是(       )", "options": [{"letter": "A", "text": "实事求是，理论联系实际, 批评与自我批评", "raw": "A.实事求是，理论联系实际, 批评与自我批评"}, {"letter": "B", "text": "统一战线，武装斗争，党的建设", "raw": "B.统一战线，武装斗争，党的建设"}, {"letter": "C", "text": "自力更生，艰苦奋斗，全心全意为人民服务", "raw": "C.自力更生，艰苦奋斗，全心全意为人民服务"}, {"letter": "D", "text": "实事求是，群众路线，党的领导", "raw": "D.实事求是，群众路线，党的领导"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 169, "title": "扩大人民（   ）政治参与，保证人民依法实行民主选举、民主协商、民主决策、民主管理、民主监督。", "options": [{"letter": "A", "text": "合理", "raw": "A.合理"}, {"letter": "B", "text": "有序", "raw": "B.有序"}, {"letter": "C", "text": "积极", "raw": "C.积极"}, {"letter": "D", "text": "有效", "raw": "D.有效"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 170, "title": "留党察看期限最长不得超过（ ）。", "options": [{"letter": "A", "text": "一年", "raw": "A、一年"}, {"letter": "B", "text": "两年", "raw": "B、两年"}, {"letter": "C", "text": "三年", "raw": "C、三年"}, {"letter": "D", "text": "五年", "raw": "D、五年"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 171, "title": "落实机关党员对机关基层党组织事务的知情权、参与权、（    ）、监督权，保障党员主体地位和民主权利。", "options": [{"letter": "A", "text": "选举权", "raw": "A.选举权"}, {"letter": "B", "text": "被选举权", "raw": "B.被选举权"}, {"letter": "C", "text": "申述权", "raw": "C.申述权"}, {"letter": "D", "text": "举报权", "raw": "D.举报权"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 172, "title": "马克思主义是我们立党立国、兴党兴国的根本指导思想。实践告诉我们，中国共产党为什么能，中国特色社会主义为什么好，归根到底是马克思主义行，是（    ）的马克思主义行。", "options": [{"letter": "A", "text": "中国化", "raw": "A.中国化"}, {"letter": "B", "text": "时代化", "raw": "B.时代化"}, {"letter": "C", "text": "中国特色", "raw": "C.中国特色"}, {"letter": "D", "text": "中国化时代化", "raw": "D.中国化时代化"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 173, "title": "毛泽东的下列著作中，（    ）  等四篇是在瑞金沙州坝工作生活期间写下的。", "options": [{"letter": "A", "text": "《怎样分析农村阶级》、《必须注意经济工作》、《关心群众生活、注意工作方法》、《我们的经济政策》", "raw": "A.《怎样分析农村阶级》、《必须注意经济工作》、《关心群众生活、注意工作方法》、《我们的经济政策》"}, {"letter": "B", "text": "《关心群众生活、注意工作方法》、《怎样分析农村阶级》、《反对本本主义》、《必须注意经济工作》", "raw": "B.《关心群众生活、注意工作方法》、《怎样分析农村阶级》、《反对本本主义》、《必须注意经济工作》"}, {"letter": "C", "text": "《关心群众生活、注意工作方法》、《怎样分析农村阶级》、《我们的经济政策》、《调查工作》", "raw": "C.《关心群众生活、注意工作方法》、《怎样分析农村阶级》、《我们的经济政策》、《调查工作》"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 174, "title": "毛泽东写的诗句“红军不怕远征难，万水千山只等闲”所反映的是下列哪一历史事件（    ）。", "options": [{"letter": "A", "text": "红军反“围剿”", "raw": "A.红军反“围剿”"}, {"letter": "B", "text": "红军长征", "raw": "B.红军长征"}, {"letter": "C", "text": "抗日战争", "raw": "C.抗日战争"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 175, "title": "旗帜鲜明（   ）是我们党作为马克思主义政党的根本要求。", "options": [{"letter": "A", "text": "讲纪律", "raw": "A.讲纪律"}, {"letter": "B", "text": "讲学习", "raw": "B.讲学习"}, {"letter": "C", "text": "讲正气", "raw": "C.讲正气"}, {"letter": "D", "text": "讲政治", "raw": "D.讲政治"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 176, "title": "企业、农村、机关、学校、科研院所、街道社区、社会组织、人民解放军连队和其他基层单位，凡是有正式党员（    ）以上的，都应当成立党的基层组织。", "options": [{"letter": "A", "text": "三人", "raw": "A.三人"}, {"letter": "B", "text": "五人", "raw": "B.五人"}, {"letter": "C", "text": "七人", "raw": "C.七人"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 177, "title": "《党章》规定，每个党员，不论职务高低，都必须编入党的一个支部、小组或其他特定组织，参加党的组织生活，接受党内外群众的（    ）。", "options": [{"letter": "A", "text": "监督", "raw": "A.监督"}, {"letter": "B", "text": "教育", "raw": "B.教育"}, {"letter": "C", "text": "考察", "raw": "C.考察"}, {"letter": "D", "text": "评议", "raw": "D.评议"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 178, "title": "全党必须牢记，（    ）的问题，是检验一个政党、一个政权性质的试金石。", "options": [{"letter": "A", "text": "为什么人", "raw": "A.为什么人"}, {"letter": "B", "text": "执政宗旨", "raw": "B.执政宗旨"}, {"letter": "C", "text": "建党宗旨", "raw": "C.建党宗旨"}, {"letter": "D", "text": "权力来源", "raw": "D.权力来源"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 179, "title": "全党全国各族人民要紧密团结在党中央周围，高举中国特色社会主义伟大旗帜，锐意进取，埋头苦干，为实现（    ）三大历史任务继续奋斗。", "options": [{"letter": "A", "text": "全面建成小康社会、完成祖国统一、实现中华民族伟大复兴的中国梦", "raw": "A.全面建成小康社会、完成祖国统一、实现中华民族伟大复兴的中国梦"}, {"letter": "B", "text": "全面建成小康社会、完成祖国统一、实现人民对美好生活的向往", "raw": "B.全面建成小康社会、完成祖国统一、实现人民对美好生活的向往"}, {"letter": "C", "text": "推进现代化建设、完成祖国统一、维护世界和平与促进共同发展", "raw": "C.推进现代化建设、完成祖国统一、维护世界和平与促进共同发展"}, {"letter": "D", "text": "推进现代化建设、完成祖国统一、实现人民对美好生活的向往", "raw": "D.推进现代化建设、完成祖国统一、实现人民对美好生活的向往"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 180, "title": "全党同志务必不忘初心、牢记使命，务必（    ），务必敢于斗争、善于斗争，坚定历史自信，增强历史主动，谱写新时代中国特色社会主义更加绚丽的华章。", "options": [{"letter": "A", "text": "谦虚谨慎、艰苦奋斗", "raw": "A.谦虚谨慎、艰苦奋斗"}, {"letter": "B", "text": "谦虚谨慎、不骄不躁", "raw": "B.谦虚谨慎、不骄不躁"}, {"letter": "C", "text": "不骄不躁、艰苦奋斗", "raw": "C.不骄不躁、艰苦奋斗"}, {"letter": "D", "text": "解放思想、开拓创新", "raw": "D.解放思想、开拓创新"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 181, "title": "全党同志一定要永远与人民（    ），永远把人民对美好生活的向往作为奋斗目标，以永不懈怠的精神状态和一往无前的奋斗姿态，继续朝着实现中华民族伟大复兴的宏伟目标奋勇前进。", "options": [{"letter": "A", "text": "同呼吸、共命运、手牵手", "raw": "A.同呼吸、共命运、手牵手"}, {"letter": "B", "text": "同呼吸、共命运、心连心", "raw": "B.同呼吸、共命运、心连心"}, {"letter": "C", "text": "同呼吸、心连心、共命运", "raw": "C.同呼吸、心连心、共命运"}, {"letter": "D", "text": "手牵手、心连心、共命运", "raw": "D.手牵手、心连心、共命运"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 182, "title": "全党要更加自觉地坚定（    ）原则，勇于直面问题，敢于刮骨疗毒，消除一切损害党的先进性和纯洁性的因素，清除一切侵蚀党的健康肌体的病毒。", "options": [{"letter": "A", "text": "组织", "raw": "A.组织"}, {"letter": "B", "text": "法治", "raw": "B.法治"}, {"letter": "C", "text": "党性", "raw": "C.党性"}, {"letter": "D", "text": "德治", "raw": "D.德治"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 183, "title": "全党要牢牢坚持（    ）这个党和国家的生命线、人民的幸福线，领导和团结全国各族人民，以经济建设为中心，坚持四项基本原则，坚持改革开放，自力更生，艰苦创业，为把我国建设成为富强民主文明和谐美丽的社会主义现代化强国而奋斗。", "options": [{"letter": "A", "text": "党的基本路线", "raw": "A.党的基本路线"}, {"letter": "B", "text": "党的基本方针", "raw": "B.党的基本方针"}, {"letter": "C", "text": "党的基本政策", "raw": "C.党的基本政策"}, {"letter": "D", "text": "党的基本方略", "raw": "D.党的基本方略"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 184, "title": "全面建成社会主义现代化强国，总的战略安排是分两步走：从二〇二〇年到二〇三五年基本实现社会主义现代化；从（    ）年到本世纪中叶把我国建成富强民主文明和谐美丽的社会主义现代化强国。", "options": [{"letter": "A", "text": "二〇二五", "raw": "A.二〇二五"}, {"letter": "B", "text": "二〇三五", "raw": "B.二〇三五"}, {"letter": "C", "text": "二〇三〇", "raw": "C.二〇三〇"}, {"letter": "D", "text": "二〇四〇", "raw": "D.二〇四〇"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 185, "title": "全面推进依法治国总目标是（    ）。", "options": [{"letter": "A", "text": "建设中国特色社会主义法律体系、建设社会主义法制国家", "raw": "A.建设中国特色社会主义法律体系、建设社会主义法制国家"}, {"letter": "B", "text": "建设中国特色社会主义法治体系、建设社会主义法治国家", "raw": "B.建设中国特色社会主义法治体系、建设社会主义法治国家"}, {"letter": "C", "text": "建设中国特色社会主义法律体系、建设社会主义法治国家", "raw": "C.建设中国特色社会主义法律体系、建设社会主义法治国家"}, {"letter": "D", "text": "建设中国特色社会主义法制体系、建设社会主义法制国家", "raw": "D.建设中国特色社会主义法制体系、建设社会主义法制国家"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 186, "title": "全面准确贯彻“一国两制”方针，牢牢掌握（    ）赋予的中央对香港、澳门全面管治权，深化内地和港澳地区交流合作，保持香港、澳门繁荣稳定。", "options": [{"letter": "A", "text": "宪法", "raw": "A.宪法"}, {"letter": "B", "text": "基本法", "raw": "B.基本法"}, {"letter": "C", "text": "宪法和基本法", "raw": "C.宪法和基本法"}, {"letter": "D", "text": "宪法和自治法", "raw": "D.宪法和自治法"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 187, "title": "确保到（    ）我国现行标准下农村贫困人口实现脱贫，贫困县全部摘帽，解决区域性整体贫困，做到脱真贫、真脱贫。", "options": [{"letter": "A", "text": "二〇三〇年", "raw": "A.二〇三〇年"}, {"letter": "B", "text": "二〇二〇年", "raw": "B.二〇二〇年"}, {"letter": "C", "text": "二〇二五年", "raw": "C.二〇二五年"}, {"letter": "D", "text": "二〇三五年", "raw": "D.二〇三五年"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 188, "title": "入党积极分子需要经过（    ）培训教育和考察，才可列为发展对象。", "options": [{"letter": "A", "text": "半年以上", "raw": "A.半年以上"}, {"letter": "B", "text": "一年以上", "raw": "B.一年以上"}, {"letter": "C", "text": "一年半以上", "raw": "C.一年半以上"}, {"letter": "D", "text": "二年以上", "raw": "D.二年以上"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 189, "title": "瑞金的地方方言属于（    ）。", "options": [{"letter": "A", "text": "客家话", "raw": "A.客家话"}, {"letter": "B", "text": "西南官话", "raw": "B.西南官话"}, {"letter": "C", "text": "粤语", "raw": "C.粤语"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 190, "title": "瑞金第一任县委书记是（    ）。", "options": [{"letter": "A", "text": "邓希平", "raw": "A.邓希平"}, {"letter": "B", "text": "邓小毛", "raw": "B.邓小毛"}, {"letter": "C", "text": "毛泽东", "raw": "C.毛泽东"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 191, "title": "瑞金共有（    ）个乡镇。", "options": [{"letter": "A", "text": "15", "raw": "A.15"}, {"letter": "B", "text": "16", "raw": "B.16"}, {"letter": "C", "text": "17", "raw": "C.17"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 192, "title": "瑞金国土总面积（    ）平方千米。", "options": [{"letter": "A", "text": "1448", "raw": "A.1448"}, {"letter": "B", "text": "2448", "raw": "B.2448"}, {"letter": "C", "text": "3448", "raw": "C.3448"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 193, "title": "瑞金模范师最早于（    ） 组建，组建初约3000人，全部为瑞金籍战士。", "options": [{"letter": "A", "text": "1931年冬", "raw": "A.1931年冬"}, {"letter": "B", "text": "1932年冬", "raw": "B.1932年冬"}, {"letter": "C", "text": "1933年6月", "raw": "C.1933年6月"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 194, "title": "瑞金史上第一个党支部是（    ） 。", "options": [{"letter": "A", "text": "叶坪村党支部", "raw": "A.叶坪村党支部"}, {"letter": "B", "text": "绵江中学支部", "raw": "B.绵江中学支部"}, {"letter": "C", "text": "苏维埃第一党支部", "raw": "C.苏维埃第一党支部"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 195, "title": "上级党组织对违犯党纪的党组织和党员作出的处理决定，下级党组织（    ）。", "options": [{"letter": "A", "text": "必须执行", "raw": "A.必须执行"}, {"letter": "B", "text": "选择执行", "raw": "B.选择执行"}, {"letter": "C", "text": "可不执行", "raw": "C.可不执行"}, {"letter": "D", "text": "根据情况执行", "raw": "D.根据情况执行"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 196, "title": "上级纪律检查委员会有权检查下级纪律检查委员会的工作，并且有权批准和改变下级纪律检查委员会对于案件所作的决定。如果所要改变的该下级纪律检查委员会的决定，已经得到它的同级党的委员会的批准，这种改变必须经过它的（    ）党的委员会批准。", "options": [{"letter": "A", "text": "同级", "raw": "A.同级"}, {"letter": "B", "text": "下级", "raw": "B.下级"}, {"letter": "C", "text": "上一级", "raw": "C.上一级"}, {"letter": "D", "text": "上二级", "raw": "D.上二级"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 197, "title": "申请入党的人，要填写入党志愿书，要有     名正式党员作介绍人，要经过支部大会通过和上级党组织批准，并且经过预备期的考察，才能成为正式党员。（     ）", "options": [{"letter": "A", "text": "四", "raw": "A、四"}, {"letter": "B", "text": "三", "raw": "B、三"}, {"letter": "C", "text": "两", "raw": "C、两"}, {"letter": "D", "text": "一", "raw": "D、一"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 198, "title": "“政权是由枪杆子中取得的”这一论断是毛泽东在(     )提出的。", "options": [{"letter": "A", "text": "八七会议上", "raw": "A.八七会议上"}, {"letter": "B", "text": "古田会议上", "raw": "B.古田会议上"}, {"letter": "C", "text": "反“围剿”斗争中", "raw": "C.反“围剿”斗争中"}, {"letter": "D", "text": "井冈山斗争中", "raw": "D.井冈山斗争中"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 199, "title": "深刻认识党面临的（    ）的尖锐性和严峻性，坚持问题导向，保持战略定力，推动全面从严治党向纵深发展。", "options": [{"letter": "A", "text": "精神懈怠危险、能力不足危险、脱离群众危险、消极腐败危险", "raw": "A.精神懈怠危险、能力不足危险、脱离群众危险、消极腐败危险"}, {"letter": "B", "text": "精神懈怠危险、封闭僵化危险、脱离群众危险、消极腐败危险", "raw": "B.精神懈怠危险、封闭僵化危险、脱离群众危险、消极腐败危险"}, {"letter": "C", "text": "精神懈怠危险、能力不足危险、官僚主义危险、消极腐败危险", "raw": "C.精神懈怠危险、能力不足危险、官僚主义危险、消极腐败危险"}, {"letter": "D", "text": "精神懈怠危险、能力不足危险、脱离群众危险、腐化堕落危险", "raw": "D.精神懈怠危险、能力不足危险、脱离群众危险、腐化堕落危险"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 200, "title": "生活奢靡、铺张浪费、贪图享乐、追求低级趣味，情节严重的，给予（ ）处分。", "options": [{"letter": "A", "text": "警告", "raw": "A、警告"}, {"letter": "B", "text": "撤销党内职务", "raw": "B、撤销党内职务"}, {"letter": "C", "text": "警告或者严重警告", "raw": "C、警告或者严重警告"}, {"letter": "D", "text": "留党察看", "raw": "D、留党察看"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 201, "title": "十八大以来，以习近平同志为主要代表的中国共产党人，顺应时代发展，从理论和实践结合上系统回答了新时代（    ）这个重大时代课题，创立了习近平新时代中国特色社会主义思想。", "options": [{"letter": "A", "text": "什么是社会主义、怎样建设社会主义", "raw": "A.什么是社会主义、怎样建设社会主义"}, {"letter": "B", "text": "建设什么样的党、怎样建设党", "raw": "B.建设什么样的党、怎样建设党"}, {"letter": "C", "text": "实现什么样的发展、怎样发展的问题", "raw": "C.实现什么样的发展、怎样发展的问题"}, {"letter": "D", "text": "坚持和发展什么样的中国特色社会主义、怎样坚持和发展中国特色社会主义", "raw": "D.坚持和发展什么样的中国特色社会主义、怎样坚持和发展中国特色社会主义"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 202, "title": "实施（    ）。农业农村农民问题是关系国计民生的根本性问题，必须始终把解决好“三农”问题作为全党工作重中之重。", "options": [{"letter": "A", "text": "农村振兴战略", "raw": "A.农村振兴战略"}, {"letter": "B", "text": "乡村振兴战略", "raw": "B.乡村振兴战略"}, {"letter": "C", "text": "农业振兴战略", "raw": "C.农业振兴战略"}, {"letter": "D", "text": "农民增收战略", "raw": "D.农民增收战略"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 203, "title": "实现伟大梦想，必须建设伟大工程。这个伟大工程就是我们党正在深入推进的（    ）新的伟大工程。", "options": [{"letter": "A", "text": "党的执政", "raw": "A.党的执政"}, {"letter": "B", "text": "党的领导", "raw": "B.党的领导"}, {"letter": "C", "text": "党的建设", "raw": "C.党的建设"}, {"letter": "D", "text": "党的纪律", "raw": "D.党的纪律"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 204, "title": "苏区精神的主要内涵是（    ）。", "options": [{"letter": "A", "text": "反对本本，开拓进取；执政为民，争创第一；艰苦奋斗，廉洁奉公；无私奉献，不怕牺牲", "raw": "A.反对本本，开拓进取；执政为民，争创第一；艰苦奋斗，廉洁奉公；无私奉献，不怕牺牲"}, {"letter": "B", "text": "坚定信念、求真务实、一心为民、清正廉洁、艰苦奋斗、争创一流、无私奉献", "raw": "B.坚定信念、求真务实、一心为民、清正廉洁、艰苦奋斗、争创一流、无私奉献"}, {"letter": "C", "text": "星火燎原，信念坚定；反对本本，开拓进取；执政为民，争创第一；艰苦奋斗，廉洁奉公", "raw": "C.星火燎原，信念坚定；反对本本，开拓进取；执政为民，争创第一；艰苦奋斗，廉洁奉公"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 205, "title": "通过其为（   ）之日起交纳党费。", "options": [{"letter": "A", "text": "共青团员", "raw": "A、共青团员"}, {"letter": "B", "text": "预备党员", "raw": "B、预备党员"}, {"letter": "C", "text": "正式党员", "raw": "C、正式党员"}, {"letter": "D", "text": "积极分子", "raw": "D、积极分子"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 206, "title": "土地革命时期，中国共产党建立的第一个红色政权是(       )", "options": [{"letter": "A", "text": "井冈山根据地茶陵县工农兵政府", "raw": "A. 井冈山根据地茶陵县工农兵政府"}, {"letter": "B", "text": "右江工农民主政府", "raw": "B. 右江工农民主政府"}, {"letter": "C", "text": "闽西工农民主政府", "raw": "C. 闽西工农民主政府"}, {"letter": "D", "text": "瑞金中华苏维埃共和国", "raw": "D. 瑞金中华苏维埃共和国"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 207, "title": "团的县级和县级以下各级委员会书记，企业事业单位的团委员会书记，是党员的，可以列席（    ）的会议。", "options": [{"letter": "A", "text": "上级党的委员会", "raw": "A.上级党的委员会"}, {"letter": "B", "text": "同级党的委员会和常务委员会", "raw": "B.同级党的委员会和常务委员会"}, {"letter": "C", "text": "上级党的常务委员会", "raw": "C.上级党的常务委员会"}, {"letter": "D", "text": "下级党的委员会和常务委员会", "raw": "D.下级党的委员会和常务委员会"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 208, "title": "推进（   ），建设覆盖纪检监察系统的检举举报平台。强化不敢腐的震慑，扎牢不能腐的笼子，增强不想腐的自觉，通过不懈努力换来海晏河清、朗朗乾坤。", "options": [{"letter": "A", "text": "监察领域国家立法", "raw": "A.监察领域国家立法"}, {"letter": "B", "text": "预防腐败国家立法", "raw": "B.预防腐败国家立法"}, {"letter": "C", "text": "反腐败国家立法", "raw": "C.反腐败国家立法"}, {"letter": "D", "text": "廉政国家立法", "raw": "D.廉政国家立法"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 209, "title": "伟大斗争、伟大工程、伟大事业、伟大理想，紧密联系、相互贯通、相互作用，其中起决定作用的是党的建设新的（     ）。", "options": [{"letter": "A", "text": "伟大斗争", "raw": "A.伟大斗争"}, {"letter": "B", "text": "伟大工程", "raw": "B.伟大工程"}, {"letter": "C", "text": "伟大事业", "raw": "C.伟大事业"}, {"letter": "D", "text": "伟大梦想", "raw": "D.伟大梦想"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 210, "title": "为解决沙洲坝军民吃水难的问题，毛泽东带领苏区军民于（    ）在沙洲坝镇沙洲坝村元太屋开挖了红井，从此解决了群众吃水难问题。", "options": [{"letter": "A", "text": "1933.9", "raw": "A.1933.9"}, {"letter": "B", "text": "1933.4", "raw": "B.1933.4"}, {"letter": "C", "text": "1933.12", "raw": "C.1933.12"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 211, "title": "我国国家制度和国家治理体系多方面显著优势之一：坚持党的集中统一领导，坚持党的科学理论,保持政治稳定，确保国家始终沿着（     ）方向前进的显著优势。", "options": [{"letter": "A", "text": "全面小康", "raw": "A.全面小康"}, {"letter": "B", "text": "伟大复兴", "raw": "B.伟大复兴"}, {"letter": "C", "text": "共产主义", "raw": "C.共产主义"}, {"letter": "D", "text": "社会主义", "raw": "D.社会主义"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 212, "title": "我国国家制度和国家治理体系多方面显著优势之一：坚持各民族—律平等，铸牢（    ）意识，实现共同团结奋斗、共同繁荣发展的显著优势。", "options": [{"letter": "A", "text": "中华民族共同体", "raw": "A.中华民族共同体"}, {"letter": "C", "text": "少数民族共同体", "raw": "C.少数民族共同体"}, {"letter": "B", "text": "中华人民共同体", "raw": "B.中华人民共同体"}, {"letter": "D", "text": "全国人民共同体", "raw": "D.全国人民共同体"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 213, "title": "我国是工人阶级领导的、以工农联盟为基础的人民民主专政的社会主义国家，国家一切权力属于（    ）。", "options": [{"letter": "A", "text": "人民", "raw": "A.人民"}, {"letter": "B", "text": "公民", "raw": "B.公民"}, {"letter": "C", "text": "民众", "raw": "C.民众"}, {"letter": "D", "text": "群众", "raw": "D.群众"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 214, "title": "我国宪法规定：“中华人民共和国的一切权力属于人民。”人民行使国家权力的机关是？（   ）", "options": [{"letter": "A", "text": "全国人民代表大会和地方各级人民代表大会", "raw": "A.全国人民代表大会和地方各级人民代表大会"}, {"letter": "B", "text": "中国人民政治协商会议", "raw": "B.中国人民政治协商会议"}, {"letter": "C", "text": "中国共产党中央委员会", "raw": "C.中国共产党中央委员会"}, {"letter": "D", "text": "国务院", "raw": "D.国务院"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 215, "title": "我们坚持人民至上、生命至上，坚持动态清零不动摇，开展抗击疫情（    ）、总体战、阻击战，最大限度保护了人民生命安全和身体健康。", "options": [{"letter": "A", "text": "人民战争", "raw": "A.人民战争"}, {"letter": "B", "text": "保卫战", "raw": "B.保卫战"}, {"letter": "C", "text": "抗击战", "raw": "C.抗击战"}, {"letter": "D", "text": "全民战争", "raw": "D.全民战争"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 216, "title": "我们坚持走中国特色社会主义政治发展道路，全面发展全过程人民民主，社会主义民主政治（    ）全面推进，人民当家作主更为扎实，全面依法治国总体格局基本形成。", "options": [{"letter": "A", "text": "制度化、规范化、程序化", "raw": "A.制度化、规范化、程序化"}, {"letter": "B", "text": "制度化、规范化、标准化", "raw": "B.制度化、规范化、标准化"}, {"letter": "C", "text": "标准化、制度化、规范化", "raw": "C.标准化、制度化、规范化"}, {"letter": "D", "text": "标准化、规范化、程序化", "raw": "D.标准化、规范化、程序化"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 217, "title": "吴某因违犯党纪受到留党察看处分一年，其在留党察看期间仍未能深刻认识并改正，期满后仍不符合恢复党员权利条件，党组织应当延长（ ）留党察看期限。", "options": [{"letter": "A", "text": "一个月", "raw": "A、一个月"}, {"letter": "B", "text": "三个月", "raw": "B、三个月"}, {"letter": "C", "text": "一年", "raw": "C、一年"}, {"letter": "D", "text": "六个月", "raw": "D、六个月"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 218, "title": "五四运动孕育了五四精神，其核心内容是        。（     ）", "options": [{"letter": "A", "text": "爱国、进取、民主、科学", "raw": "A、爱国、进取、民主、科学"}, {"letter": "B", "text": "爱国、敬业、诚信、友善", "raw": "B、爱国、敬业、诚信、友善"}, {"letter": "C", "text": "爱国、进步、民主、科学", "raw": "C、爱国、进步、民主、科学"}, {"letter": "D", "text": "自由、平等、公正、法治", "raw": "D、自由、平等、公正、法治"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 219, "title": "习近平新时代中国特色社会义思想的核心要义是（       ）", "options": [{"letter": "A", "text": "实现中华民族伟大复兴", "raw": "A.实现中华民族伟大复兴"}, {"letter": "B", "text": "坚持和发展中国特色社会主义", "raw": "B.坚持和发展中国特色社会主义"}, {"letter": "C", "text": "促进人类和平进步发展", "raw": "C.促进人类和平进步发展"}, {"letter": "D", "text": "实现党的指导思想与时俱进", "raw": "D.实现党的指导思想与时俱进"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 220, "title": "习近平新时代中国特色社会主义思想，是（    ）最新成果，是党和人民实践经验和集体智慧的结晶，是中国特色社会主义理论体系的重要组成部分，是全党全国人民为实现中华民族伟大复兴而奋斗的行动指南，必须长期坚持并不断发展。", "options": [{"letter": "A", "text": "社会主义中国化", "raw": "A.社会主义中国化"}, {"letter": "B", "text": "马列主义中国化", "raw": "B.马列主义中国化"}, {"letter": "C", "text": "马克思主义中国化", "raw": "C.马克思主义中国化"}, {"letter": "D", "text": "科学社会主义中国化", "raw": "D.科学社会主义中国化"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 221, "title": "习近平新时代中国特色社会主义思想内容包括“十个明确”、“十四个坚持”、（    ）。", "options": [{"letter": "A", "text": "“十个方面成就”", "raw": "A、  “十个方面成就”"}, {"letter": "B", "text": "“ 十三个方面成就”", "raw": "B、“ 十三个方面成就”"}, {"letter": "C", "text": "“十六个方面成就”", "raw": "C、“十六个方面成就”"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 222, "title": "新时代党的建设要以党的（   ）为统领。", "options": [{"letter": "A", "text": "政治建设", "raw": "A.政治建设"}, {"letter": "B", "text": "思想建设", "raw": "B.思想建设"}, {"letter": "C", "text": "作风建设", "raw": "C.作风建设"}, {"letter": "D", "text": "纪律建设", "raw": "D.纪律建设"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 223, "title": "新时代党的建设总要求之一是全面推进党的（    ）。", "options": [{"letter": "A", "text": "思想建设、政治建设、组织建设、作风建设、反腐倡廉建设", "raw": "A.思想建设、政治建设、组织建设、作风建设、反腐倡廉建设"}, {"letter": "B", "text": "思想建设、政治建设、组织建设、作风建设、纪律建设", "raw": "B.思想建设、政治建设、组织建设、作风建设、纪律建设"}, {"letter": "C", "text": "政治建设、思想建设、组织建设、作风建设、纪律建设", "raw": "C.政治建设、思想建设、组织建设、作风建设、纪律建设"}, {"letter": "D", "text": "政治建设、思想建设、组织建设、作风建设、反腐倡廉建设", "raw": "D.政治建设、思想建设、组织建设、作风建设、反腐倡廉建设"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 224, "title": "新时代坚持和发展中国特色社会主义的基本方略指出，坚持全面从严治党，必须以（    ）为根本遵循，把党的政治建设摆在首位。", "options": [{"letter": "A", "text": "宪法", "raw": "A.宪法"}, {"letter": "B", "text": "党章", "raw": "B.党章"}, {"letter": "C", "text": "党的纪律", "raw": "C.党的纪律"}, {"letter": "D", "text": "党内法规体系", "raw": "D.党内法规体系"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 225, "title": "新时代中国特色社会主义思想，明确坚持和发展中国特色社会主义，总任务是实现社会主义现代化和中华民族伟大复兴，在全面建成小康社会的基础上，分（    ）在本世纪中叶建成富强民主文明和谐美丽的社会主义现代化强国。", "options": [{"letter": "A", "text": "两步走", "raw": "A.两步走"}, {"letter": "B", "text": "三步走", "raw": "B.三步走"}, {"letter": "C", "text": "四步走", "raw": "C.四步走"}, {"letter": "D", "text": "五步走", "raw": "D.五步走"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 226, "title": "新修订的《中国共产党纪律处分条例》，从（ ）这个总源头出发，坚持（ ），坚持 （ ）导向和（ ）导向相结合，与时俱进完善纪律规范，进一步严明政治纪律和政治规矩。下面那个是：①党的纪律②党章③严的基调④问题⑤效果⑥目标⑦全面从严⑧党的建设。", "options": [{"letter": "A", "text": "②③④⑥", "raw": "A、②③④⑥"}, {"letter": "B", "text": "①③④⑤", "raw": "B、①③④⑤"}, {"letter": "C", "text": "②⑦④⑤", "raw": "C、②⑦④⑤"}, {"letter": "D", "text": "⑧③④⑥", "raw": "D、⑧③④⑥"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 227, "title": "新修订的《中国共产党纪律处分条例》规定，利用职权或者职务上的影响，为配偶、子女及其配偶等亲属和其他特定关系人吸收存款、推销金融产品、（ ）等提供帮助谋取利益的，情节严重的，给予开除党籍处分。", "options": [{"letter": "A", "text": "买卖古玩字画", "raw": "A、买卖古玩字画"}, {"letter": "B", "text": "零售贵金属纪念币", "raw": "B、零售贵金属纪念币"}, {"letter": "C", "text": "售卖高档烟酒", "raw": "C、售卖高档烟酒"}, {"letter": "D", "text": "经营名贵特产类特殊资源", "raw": "D、经营名贵特产类特殊资源"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 228, "title": "新中国成立以后，顺利地进行了社会主义改造，完成了从新民主主义到社会主义的过渡，确立了社会主义基本制度，发展了社会主义的         。（     ）", "options": [{"letter": "A", "text": "思想、历史和文化", "raw": "A、思想、历史和文化"}, {"letter": "B", "text": "指导思想", "raw": "B、指导思想"}, {"letter": "C", "text": "经济、政治和文化", "raw": "C、经济、政治和文化"}, {"letter": "D", "text": "现代化理论", "raw": "D、现代化理论"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 229, "title": "要坚持（    ）发展，按照产业兴旺、生态宜居、乡风文明、治理有效、生活富裕的总要求，建立健全城乡融合发展体制机制和政策体系，加快推进农业农村现代化。", "options": [{"letter": "A", "text": "农业农民优先", "raw": "A.农业农民优先"}, {"letter": "B", "text": "农业农村优先", "raw": "B.农业农村优先"}, {"letter": "C", "text": "农村农民优先", "raw": "C.农村农民优先"}, {"letter": "D", "text": "农业农村农民优先", "raw": "D.农业农村农民优先"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 230, "title": "要坚持农业农村优先发展，按照产业兴旺、生态宜居、乡风文明、治理有效、生活富裕的总要求，建立健全城乡（    ）发展体制机制和政策体系，加快推进农业农村现代化。", "options": [{"letter": "A", "text": "同时", "raw": "A.同时"}, {"letter": "B", "text": "融合", "raw": "B.融合"}, {"letter": "C", "text": "共同", "raw": "C.共同"}, {"letter": "D", "text": "高度", "raw": "D.高度"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 231, "title": "要坚持无禁区、全覆盖、零容忍，坚持（    ），坚持受贿行贿一起查，坚决防止党内形成利益集团。", "options": [{"letter": "A", "text": "重预防、强高压、长震慑", "raw": "A.重预防、强高压、长震慑"}, {"letter": "B", "text": "重遏制、强高压、长震慑", "raw": "B.重遏制、强高压、长震慑"}, {"letter": "C", "text": "重遏制、不减压、长震慑", "raw": "C.重遏制、不减压、长震慑"}, {"letter": "D", "text": "重遏制、强高压、长威慑", "raw": "D.重遏制、强高压、长威慑"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 232, "title": "要深刻认识党面临的（    ）的长期性和复杂性。", "options": [{"letter": "A", "text": "执政考验、深化改革考验、开放经济考验、保护环境考验", "raw": "A.执政考验、深化改革考验、开放经济考验、保护环境考验"}, {"letter": "B", "text": "执政考验、改革开放考验、市场经济考验、外部环境考验", "raw": "B.执政考验、改革开放考验、市场经济考验、外部环境考验"}, {"letter": "C", "text": "领导考验、深化改革考验、开放经济考验、保护环境考验", "raw": "C.领导考验、深化改革考验、开放经济考验、保护环境考验"}, {"letter": "D", "text": "领导考验、改革开放考验、市场经济考验、外部环境考验", "raw": "D.领导考验、改革开放考验、市场经济考验、外部环境考验"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 233, "title": "要尊崇党章，严格执行新形势下党内政治生活若干准则，增强党内政治生活的（   ）。", "options": [{"letter": "A", "text": "政治性、时代性、原则性、战斗性", "raw": "A.政治性、时代性、原则性、战斗性"}, {"letter": "B", "text": "思想性、政治性、时代性、原则性", "raw": "B.思想性、政治性、时代性、原则性"}, {"letter": "C", "text": "政治性、思想性、时代性、严肃性", "raw": "C.政治性、思想性、时代性、严肃性"}, {"letter": "D", "text": "政治性、思想性、严肃性、战斗性", "raw": "D.政治性、思想性、严肃性、战斗性"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 234, "title": "一个政党，一个政权，其前途命运取决于（    ）。人民群众反对什么、痛恨什么，我们就要坚决防范和纠正什么。", "options": [{"letter": "A", "text": "人民满意度", "raw": "A.人民满意度"}, {"letter": "B", "text": "民众支持率", "raw": "B.民众支持率"}, {"letter": "C", "text": "得道多助", "raw": "C.得道多助"}, {"letter": "D", "text": "人心向背", "raw": "D.人心向背"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 235, "title": "依据《中国共产党纪律处分条例》规定，党员有嫖娼或者吸食、注射毒品等丧失党员条件，严重败坏党的形象行为的，应当给予       处分。（    ）", "options": [{"letter": "A", "text": "严重警告", "raw": "A、严重警告"}, {"letter": "B", "text": "撤销党内职务", "raw": "B、撤销党内职务"}, {"letter": "C", "text": "留党察看", "raw": "C、留党察看"}, {"letter": "D", "text": "开除党籍", "raw": "D、开除党籍"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 236, "title": "以下（    ） 不是瑞金现有的乡镇。", "options": [{"letter": "A", "text": "象湖", "raw": "A.象湖"}, {"letter": "B", "text": "合龙", "raw": "B.合龙"}, {"letter": "C", "text": "万田", "raw": "C.万田"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 237, "title": "用一次中央全会专门研究国家制度和国家治理问题并作出决定，这在我们党的历史上还是第（    ）次。", "options": [{"letter": "A", "text": "—", "raw": "A.—"}, {"letter": "B", "text": "二", "raw": "B.二"}, {"letter": "C", "text": "三", "raw": "C.三"}, {"letter": "D", "text": "四", "raw": "D.四"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 238, "title": "有固定工资收入的党员交纳党费的比例为：每月工资收入3000元以下（含3000元）者，交纳月工资收入的（    ）；3000元以上至5000元（含5000元）者，交纳（    ）；5000元以上至10000元（含10000元）者，交纳（    ）；10000元以上者，交纳（    ）", "options": [{"letter": "A", "text": "0.5%、1%、1.5%、2%", "raw": "A.0.5%、1%、1.5%、2%"}, {"letter": "B", "text": "1%、1%、1.5%、2%", "raw": "B.1%、1%、1.5%、2%"}, {"letter": "C", "text": "0.5%、0.5%、1.5%、2%", "raw": "C.0.5%、0.5%、1.5%、2%"}, {"letter": "D", "text": "0.5%、0.5%、1%、1.5%", "raw": "D.0.5%、0.5%、1%、1.5%"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 239, "title": "有正式党员（    ）人以上的党支部，应当设立党支部委员会", "options": [{"letter": "A", "text": "5", "raw": "A.5"}, {"letter": "B", "text": "6", "raw": "B.6"}, {"letter": "C", "text": "7", "raw": "C.7"}, {"letter": "D", "text": "8", "raw": "D.8"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 240, "title": "预备党员必须由（    ）审批。", "options": [{"letter": "A", "text": "党支部", "raw": "A.党支部"}, {"letter": "B", "text": "党总支", "raw": "B.党总支"}, {"letter": "C", "text": "党委（工委）", "raw": "C.党委（工委）"}, {"letter": "D", "text": "组织部门", "raw": "D.组织部门"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 241, "title": "预备党员的一年预备期从（    ）通过其为预备党员之日起计算。", "options": [{"letter": "A", "text": "党小组会", "raw": "A.党小组会"}, {"letter": "B", "text": "支委会", "raw": "B.支委会"}, {"letter": "C", "text": "支部大会", "raw": "C.支部大会"}, {"letter": "D", "text": "党委会", "raw": "D.党委会"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 242, "title": "预备党员预备期满后，党组织经过考察认为其不履行党员义务，不具备党员条件的，应当（    ）。", "options": [{"letter": "A", "text": "留党察看", "raw": "A.留党察看"}, {"letter": "B", "text": "延长预备期", "raw": "B.延长预备期"}, {"letter": "C", "text": "取消预备党员资格", "raw": "C.取消预备党员资格"}, {"letter": "D", "text": "给予警告", "raw": "D.给予警告"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 243, "title": "在接收预备党员的支部大会上，与会党员要对申请人能否入党进行充分的讨论，并采取（    ）的方式进行表决。", "options": [{"letter": "A", "text": "举手或无记名投票", "raw": "A.举手或无记名投票"}, {"letter": "B", "text": "举手表决", "raw": "B.举手表决"}, {"letter": "C", "text": "无记名投票", "raw": "C.无记名投票"}, {"letter": "D", "text": "口头投票", "raw": "D.口头投票"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 244, "title": "在毛泽东思想指引下，中国共产党领导全国各族人民，经过长期的反对帝国主义、封建主义、官僚资本主义的革命斗争，取得了（ ）的胜利，建立了人民民主专政的中华人民共和国。", "options": [{"letter": "A", "text": "新民主主义革命", "raw": "A、新民主主义革命"}, {"letter": "B", "text": "社会主义革命", "raw": "B、社会主义革命"}, {"letter": "C", "text": "社会主义改造", "raw": "C、社会主义改造"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 245, "title": "在入党申请人中确定入党积极分子，应当采取（    ）推荐、群团组织推优等方式产生人选。", "options": [{"letter": "A", "text": "党员", "raw": "A.党员"}, {"letter": "B", "text": "群众", "raw": "B.群众"}, {"letter": "C", "text": "干部", "raw": "C.干部"}, {"letter": "D", "text": "领导", "raw": "D.领导"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 246, "title": "增强党自我净化能力，根本靠强化（    ）和（    ）。", "options": [{"letter": "A", "text": "党的自我监督　舆论监督", "raw": "A.党的自我监督　舆论监督"}, {"letter": "B", "text": "党的自我监督　群众监督", "raw": "B.党的自我监督　群众监督"}, {"letter": "C", "text": "党的自我监督　司法监督", "raw": "C.党的自我监督　司法监督"}, {"letter": "D", "text": "党的自我监督　民主监督", "raw": "D.党的自我监督　民主监督"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 247, "title": "长征第一桥位于（    ）。", "options": [{"letter": "A", "text": "瑞金云石山", "raw": "A.瑞金云石山"}, {"letter": "B", "text": "瑞金沙洲坝", "raw": "B.瑞金沙洲坝"}, {"letter": "C", "text": "瑞金武阳", "raw": "C.瑞金武阳"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 248, "title": "长征第一山是（    ）。", "options": [{"letter": "A", "text": "云石山", "raw": "A.云石山"}, {"letter": "B", "text": "三百山", "raw": "B.三百山"}, {"letter": "C", "text": "莲花山", "raw": "C.莲花山"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 249, "title": "召开讨论接收预备党员的支部大会，有表决权到会人员必须超过应到会有表决权人数的(    )。", "options": [{"letter": "A", "text": "半数", "raw": "A.半数"}, {"letter": "B", "text": "三分之二", "raw": "B.三分之二"}, {"letter": "C", "text": "四分之三", "raw": "C.四分之三"}, {"letter": "D", "text": "五分之四", "raw": "D.五分之四"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 250, "title": "支部大会讨论接收预备党员时，赞成的人数超过应到会有表决权的正式党员的（    ），才能通过接收预备党员的决议。", "options": [{"letter": "A", "text": "半数", "raw": "A.半数"}, {"letter": "B", "text": "三分之二", "raw": "B.三分之二"}, {"letter": "C", "text": "四分之三", "raw": "C.四分之三"}, {"letter": "D", "text": "五分之四", "raw": "D.五分之四"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 251, "title": "中共党员、某镇民政所所长马某某，在发放救灾物资时，给其弟弟多发五袋大米和三桶油。请问马某某的行为属于违反群众纪律中的哪种情形（ ）。", "options": [{"letter": "A", "text": "弄虚作假，损害群众利益", "raw": "A、 、弄虚作假，损害群众利益"}, {"letter": "B", "text": "克扣群众财物", "raw": "B、克扣群众财物"}, {"letter": "C", "text": "优亲厚友", "raw": "C、优亲厚友"}, {"letter": "D", "text": "拖欠群众钱款", "raw": "D、拖欠群众钱款"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 252, "title": "中共瑞金县委成立于（    ）。", "options": [{"letter": "A", "text": "1929.6", "raw": "A.1929.6"}, {"letter": "B", "text": "1930.6", "raw": "B.1930.6"}, {"letter": "C", "text": "1931.6", "raw": "C.1931.6"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 253, "title": "中共瑞金县委第一份机关报的主编是（    ）。", "options": [{"letter": "A", "text": "张爱萍", "raw": "A.张爱萍"}, {"letter": "B", "text": "胡耀邦", "raw": "B.胡耀邦"}, {"letter": "C", "text": "邓小平", "raw": "C.邓小平"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 254, "title": "中共中央最新修订印发的《中国共产党纪律处分条例》规定，党员干部必须正确行使人民赋予的权力，清正廉洁，（ ），反对任何滥用职权、谋求私利的行为。", "options": [{"letter": "A", "text": "坚守初心使命", "raw": "A、坚守初心使命"}, {"letter": "B", "text": "牢固树立政治意识、大局意识", "raw": "B、牢固树立政治意识、大局意识"}, {"letter": "C", "text": "反对特权思想和特权现象", "raw": "C、反对特权思想和特权现象"}, {"letter": "D", "text": "保护人民权益、伸张正义", "raw": "D、保护人民权益、伸张正义"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 255, "title": "中国共产党成立于哪一年？（    ）", "options": [{"letter": "A", "text": "1918", "raw": "A.1918"}, {"letter": "B", "text": "1921", "raw": "B.1921"}, {"letter": "C", "text": "1949", "raw": "C.1949"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 256, "title": "中国共产党党旗为旗面缀有（    ）图案的红旗。", "options": [{"letter": "A", "text": "一颗金黄色五角星", "raw": "A.一颗金黄色五角星"}, {"letter": "B", "text": "五颗金黄色五角星", "raw": "B.五颗金黄色五角星"}, {"letter": "C", "text": "金黄色镰刀和斧头", "raw": "C.金黄色镰刀和斧头"}, {"letter": "D", "text": "金黄色镰刀和锤头", "raw": "D.金黄色镰刀和锤头"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 257, "title": "中国共产党党员的党龄，从        之日算起。（     ）", "options": [{"letter": "A", "text": "预备期满转为正式党员", "raw": "A、预备期满转为正式党员"}, {"letter": "B", "text": "成为预备党员", "raw": "B、成为预备党员"}, {"letter": "C", "text": "成为正式党员后一年", "raw": "C、成为正式党员后一年"}, {"letter": "D", "text": "递交申请书", "raw": "D、递交申请书"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 258, "title": "中国共产党的性质是（ ）。①中国工人阶级的先锋队②中国人民和中华民族的先锋队③中国特色社会主义事业的领导核心④代表中国先进生产力的发展要求，代表中国先进文化的前进方向，代表中国最广大人民的根本利益", "options": [{"letter": "A", "text": "①②③", "raw": "A、①②③"}, {"letter": "B", "text": "②③④", "raw": "B、②③④"}, {"letter": "C", "text": "①②③④", "raw": "C、①②③④"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 259, "title": "中国共产党和中国人民以英勇顽强的奋斗向世界庄严宣告，        是决定当代中国前途命运的关键一招。（     ）", "options": [{"letter": "A", "text": "党的领导", "raw": "A、党的领导"}, {"letter": "B", "text": "改革开放", "raw": "B、改革开放"}, {"letter": "C", "text": "科技创新", "raw": "C、科技创新"}, {"letter": "D", "text": "科学发展", "raw": "D、科学发展"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 260, "title": "中国共产党开始在实践中探索本国建设社会主义道路的标志是(       )", "options": [{"letter": "A", "text": "过渡时期总路线的制定", "raw": "A.过渡时期总路线的制定"}, {"letter": "B", "text": "整风运动的开始", "raw": "B.整风运动的开始"}, {"letter": "C", "text": "《论十大关系》的提出", "raw": "C.《论十大关系》的提出"}, {"letter": "D", "text": "中共八大召开", "raw": "D.中共八大召开"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 261, "title": "中国共产党领导人民发展社会主义民主政治。坚持（ ）有机统一，走中国特色社会主义政治发展道路、中国特色社会主义法治道路。①党的领导②人民当家作主③依法治国", "options": [{"letter": "A", "text": "①②③", "raw": "A、①②③"}, {"letter": "B", "text": "①②", "raw": "B、①②"}, {"letter": "C", "text": "①③", "raw": "C、①③"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 262, "title": "中国共产党领导人民发展社会主义先进文化。建设社会主义精神文明，实行依法治国和以德治国相结合，提高全民族的思想道德素质和科学文化素质，为改革开放和社会主义现代化建设提供强大的（ ），建设社会主义文化强国。", "options": [{"letter": "A", "text": "思想保证、精神动力和力量源泉", "raw": "A、思想保证、精神动力和力量源泉"}, {"letter": "B", "text": "理论武装、精神动力和力量源泉", "raw": "B、理论武装、精神动力和力量源泉"}, {"letter": "C", "text": "思想保证、精神动力和智力支持", "raw": "C、思想保证、精神动力和智力支持"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 263, "title": "中国共产党领导人民建设社会主义生态文明。树立尊重自然、顺应自然、保护自然的生态文明理念，增强（     ）的意识。", "options": [{"letter": "A", "text": "金山银山不如绿水青山", "raw": "A.金山银山不如绿水青山"}, {"letter": "B", "text": "绿水青山就是金山银山", "raw": "B.绿水青山就是金山银山"}, {"letter": "C", "text": "金山银山就是绿水青山", "raw": "C.金山银山就是绿水青山"}, {"letter": "D", "text": "绿水青山胜过金山银山", "raw": "D.绿水青山胜过金山银山"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 264, "title": "中国共产党领导人民建设社会主义生态文明。着力建设资源节约型、环境友好型社会，实行最严格的（    ）。", "options": [{"letter": "A", "text": "耕地保护制度", "raw": "A.耕地保护制度"}, {"letter": "B", "text": "森林保护制度", "raw": "B.森林保护制度"}, {"letter": "C", "text": "环境保护制度", "raw": "C.环境保护制度"}, {"letter": "D", "text": "生态环境保护制度", "raw": "D.生态环境保护制度"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 265, "title": "《党章》规定，（    ）必须面向党旗进行入党宣誓。誓词如下：我志愿加入中国共产党，拥护党的纲领，遵守党的章程，履行党员义务，执行党的决定，严守党的纪律，保守党的秘密，对党忠诚，积极工作，为共产主义奋斗终身，随时准备为党和人民牺牲一切，永不叛党。", "options": [{"letter": "A", "text": "入党申请人", "raw": "A.入党申请人"}, {"letter": "B", "text": "入党积极分子", "raw": "B.入党积极分子"}, {"letter": "C", "text": "发展对象", "raw": "C.发展对象"}, {"letter": "D", "text": "预备党员", "raw": "D.预备党员"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 266, "title": "中国共产党人的初心和使命，就是为中国人民（    ），为中华民族（    ）。这个初心和使命是激励中国共产党人不断前进的根本动力。", "options": [{"letter": "A", "text": "谋幸福，谋未来", "raw": "A.谋幸福，谋未来"}, {"letter": "B", "text": "谋生活，谋复兴", "raw": "B.谋生活，谋复兴"}, {"letter": "C", "text": "谋幸福，谋复兴", "raw": "C.谋幸福，谋复兴"}, {"letter": "D", "text": "谋生活，谋未来", "raw": "D.谋生活，谋未来"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 267, "title": "中国共产党要领导全国各族人民实现第二个百年奋斗目标、实现中华民族伟大复兴的中国梦，必须紧密围绕党的基本路线，坚持和加强党的全面领导，弘扬坚持真理、坚守理想，践行初心、担当使命，不怕牺牲、英勇斗争，        的伟大建党精神。（     ）", "options": [{"letter": "A", "text": "砥砺奋进、争取胜利", "raw": "A、砥砺奋进、争取胜利"}, {"letter": "B", "text": "万众一心、众志成城", "raw": "B、万众一心、众志成城"}, {"letter": "C", "text": "对党忠诚、不负人民", "raw": "C、对党忠诚、不负人民"}, {"letter": "D", "text": "排除万难、争取胜利", "raw": "D、排除万难、争取胜利"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 268, "title": "中国共产党以（ ）作为自己的行动指南。①马克思列宁主义②毛泽东思想③邓小平理论④“三个代表”重要思想⑤科学发展观⑥习近平新时代中国特色社会主义思想", "options": [{"letter": "A", "text": "①②③④⑤⑥", "raw": "A、①②③④⑤⑥"}, {"letter": "B", "text": "①②③", "raw": "B、①②③"}, {"letter": "C", "text": "④⑤⑥", "raw": "C、④⑤⑥"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 269, "title": "中国共产党员发展党员工作主要分为五大步骤：申请入党、入党积极分子的确定和培养教育、（    ）、预备党员的接收、预备党员的教育考察和转正。", "options": [{"letter": "A", "text": "发展对象的确定和考察", "raw": "A.发展对象的确定和考察"}, {"letter": "B", "text": "预备党员的确定", "raw": "B.预备党员的确定"}, {"letter": "C", "text": "预备党员的考察", "raw": "C.预备党员的考察"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 270, "title": "中国将高举和平、发展、合作、共赢的旗帜，恪守维护世界和平、促进（    ）的外交政策宗旨。", "options": [{"letter": "A", "text": "共同繁荣", "raw": "A.共同繁荣"}, {"letter": "B", "text": "共同发展", "raw": "B.共同发展"}, {"letter": "C", "text": "和平崛起", "raw": "C.和平崛起"}, {"letter": "D", "text": "和平发展", "raw": "D.和平发展"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 271, "title": "中国梦的实质就是要实现（   ）。", "options": [{"letter": "A", "text": "科技发达、军事强大、经济发展", "raw": "A.科技发达、军事强大、经济发展"}, {"letter": "B", "text": "国家富强、民族振兴、人民幸福", "raw": "B.国家富强、民族振兴、人民幸福"}, {"letter": "C", "text": "文化繁荣、经济发展、社会和谐", "raw": "C.文化繁荣、经济发展、社会和谐"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 272, "title": "中国特色社会主义进入新时代，我国社会主要矛盾已经转化为人民日益增长的（    ）需要和（    ）的发展之间的矛盾。", "options": [{"letter": "A", "text": "美好生活、不充分不平衡", "raw": "A.美好生活、不充分不平衡"}, {"letter": "B", "text": "幸福生活、不平衡不充分", "raw": "B.幸福生活、不平衡不充分"}, {"letter": "C", "text": "幸福生活、不充分不平衡", "raw": "C.幸福生活、不充分不平衡"}, {"letter": "D", "text": "美好生活、不平衡不充分", "raw": "D.美好生活、不平衡不充分"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 273, "title": "中国特色社会主义进入新时代，意味着近代以来久经磨难的中华民族迎来了（    ）的伟大飞跃，迎来了实现中华民族伟大复兴的光明前景。", "options": [{"letter": "A", "text": "从站起来、富起来到强起来", "raw": "A.从站起来、富起来到强起来"}, {"letter": "B", "text": "从站起来、好起来到富起来", "raw": "B.从站起来、好起来到富起来"}, {"letter": "C", "text": "从站起来、强起来到富起来", "raw": "C.从站起来、强起来到富起来"}, {"letter": "D", "text": "从好起来、富起来到强起来", "raw": "D.从好起来、富起来到强起来"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 274, "title": "中国特色社会主义进入新时代，意味着中国特色社会主义道路、理论、制度、文化不断发展，拓展了发展中国家走向现代化的途径，给世界上那些既希望加快发展又希望保持自身独立性的国家和民族提供了全新选择，为解决人类问题贡献了（  ）。", "options": [{"letter": "A", "text": "中国道路和中国模式", "raw": "A.中国道路和中国模式"}, {"letter": "B", "text": "中国智慧和中国模式", "raw": "B.中国智慧和中国模式"}, {"letter": "C", "text": "中国智慧和中国方案", "raw": "C.中国智慧和中国方案"}, {"letter": "D", "text": "中国模式和中国方案", "raw": "D.中国模式和中国方案"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 275, "title": "中央出版局于1931年底在（    ） 成立，负责苏区的新闻出版和发行工作。", "options": [{"letter": "A", "text": "瑞金叶坪", "raw": "A.瑞金叶坪"}, {"letter": "B", "text": "瑞金沙洲坝", "raw": "B.瑞金沙洲坝"}, {"letter": "C", "text": "瑞金城关", "raw": "C.瑞金城关"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 276, "title": "中央苏区的六大建筑是指（    ）六大建筑。", "options": [{"letter": "A", "text": "中央政府大礼堂、叶坪红军广场、红军检阅台、红军烈士纪念亭、公略亭、博生堡", "raw": "A.中央政府大礼堂、叶坪红军广场、红军检阅台、红军烈士纪念亭、公略亭、博生堡"}, {"letter": "B", "text": "中央政府大礼堂、红军烈士纪念塔、红军检阅台、红军烈士纪念亭、公略亭、红井", "raw": "B.中央政府大礼堂、红军烈士纪念塔、红军检阅台、红军烈士纪念亭、公略亭、红井"}, {"letter": "C", "text": "中央政府大礼堂、红军烈士纪念塔、红军检阅台、红军烈士纪念亭、公略亭、博生堡", "raw": "C.中央政府大礼堂、红军烈士纪念塔、红军检阅台、红军烈士纪念亭、公略亭、博生堡"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 277, "title": "中央苏区是由以（    ）为中心的赣南、闽西两块苏维埃区域组成", "options": [{"letter": "A", "text": "于都", "raw": "A.于都"}, {"letter": "B", "text": "宁都", "raw": "B.宁都"}, {"letter": "C", "text": "瑞金", "raw": "C.瑞金"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 278, "title": "中央蘇区的惊天伟业在赣南创建，彪炳史册的（    ） 在赣南成立。", "options": [{"letter": "A", "text": "中华蘇维埃共和国", "raw": "A.中华蘇维埃共和国"}, {"letter": "B", "text": "中华人民共和国", "raw": "B.中华人民共和国"}, {"letter": "C", "text": "中国蘇维埃共和国", "raw": "C.中国蘇维埃共和国"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 279, "title": "追认党员必须严格掌握，由所在单位党组织讨论决定后，经上级党委审查，报（    ）批准。", "options": [{"letter": "A", "text": "县一级党委", "raw": "A.县一级党委"}, {"letter": "B", "text": "市一级党委", "raw": "B.市一级党委"}, {"letter": "C", "text": "省一级党委", "raw": "C.省一级党委"}, {"letter": "D", "text": "中央", "raw": "D.中央"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 280, "title": "综合分析国际国内形势和我国发展条件，从二〇二〇年到本世纪中叶可以分两个阶段来安排。第一个阶段，从（    ）到（    ），在全面建成小康社会的基础上，再奋斗十五年，基本实现社会主义现代化。", "options": [{"letter": "A", "text": "二〇二〇年　二〇三五年", "raw": "A.二〇二〇年　二〇三五年"}, {"letter": "B", "text": "二〇二五年　二〇四〇年", "raw": "B.二〇二五年　二〇四〇年"}, {"letter": "C", "text": "二〇三〇年　二〇四五年", "raw": "C.二〇三〇年　二〇四五年"}, {"letter": "D", "text": "二〇三五年　本世纪中叶", "raw": "D.二〇三五年　本世纪中叶"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 281, "title": "组织、利用宗教活动反对党的理论、路线、方针、政策和决议，破坏民族团结的，对策划者、组织者和（ ），给予开除党籍处分。", "options": [{"letter": "A", "text": "骨干分子", "raw": "A、骨干分子"}, {"letter": "B", "text": "领导者", "raw": "B、领导者"}, {"letter": "C", "text": "直接领导人", "raw": "C、直接领导人"}, {"letter": "D", "text": "实践者", "raw": "D、实践者"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 282, "title": "最新修订的《中国共产党纪律处分条例》由中共中央于（）发布。", "options": [{"letter": "A", "text": "2003年12月31日", "raw": "A、2003年12月31日"}, {"letter": "B", "text": "2023年12月8日", "raw": "B、2023年12月8日"}, {"letter": "C", "text": "2023年12月19日", "raw": "C、2023年12月19日"}, {"letter": "D", "text": "2024年1月1日‍", "raw": "D、2024年1月1日‍"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 283, "title": "推进教育数字化，建设全民终身学习的（    ）。", "options": [{"letter": "A", "text": "学习型社会、学习型国家", "raw": "A.学习型社会、学习型国家"}, {"letter": "B", "text": "学习型社会、学习型大国", "raw": "B.学习型社会、学习型大国"}, {"letter": "C", "text": "学习型政党、学习型强国", "raw": "C.学习型政党、学习型强国"}, {"letter": "D", "text": "学习型政府、学习型强国", "raw": "D.学习型政府、学习型强国"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 284, "title": "要坚持(    )，不断健全党内法规体系，坚持把纪律挺在前面，加强组织性纪律性，在党的纪律面前人人平等。", "options": [{"letter": "A", "text": "全面从严治党", "raw": "A.全面从严治党"}, {"letter": "B", "text": "治国必先治党、治党务必从严", "raw": "B.治国必先治党、治党务必从严"}, {"letter": "C", "text": "依规治党、标本兼治", "raw": "C.依规治党、标本兼治"}, {"letter": "D", "text": "党风廉政建设", "raw": "D.党风廉政建设"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 285, "title": "坚持常抓不懈、紧抓不放，把握腐败阶段性特征和变化趋势，以（    ）理念治理腐败，不断探索“三不腐”协同联动的有效途径。", "options": [{"letter": "A", "text": "系统施治、标本兼治", "raw": "A.系统施治、标本兼治"}, {"letter": "B", "text": "有案必查、有腐必惩", "raw": "B.有案必查、有腐必惩"}, {"letter": "C", "text": "惩前毖后、治病救人", "raw": "C.惩前毖后、治病救人"}, {"letter": "D", "text": "贯通协同、一贯到底", "raw": "D.贯通协同、一贯到底"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 286, "title": "党章规定，对党员的纪律处分，必须经过支部大会讨论决定，报党的（    ）批准。", "options": [{"letter": "A", "text": "纪律检查机关", "raw": "A.纪律检查机关"}, {"letter": "B", "text": "组织部门", "raw": "B.组织部门"}, {"letter": "C", "text": "基层委员会", "raw": "C.基层委员会"}, {"letter": "D", "text": "纪律检查委员会", "raw": "D.纪律检查委员会"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 287, "title": "（    ）是党的优势所在，力量所在。", "options": [{"letter": "A", "text": "严明的纪律体系", "raw": "A.严明的纪律体系"}, {"letter": "B", "text": "庞大的组织体系", "raw": "B.庞大的组织体系"}, {"letter": "C", "text": "健全的制度体系", "raw": "C.健全的制度体系"}, {"letter": "D", "text": "严密的组织体系", "raw": "D.严密的组织体系"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 288, "title": "完善人才战略布局，坚持各方面人才一起抓，建设（    ）的人才队伍。", "options": [{"letter": "A", "text": "规模宏大、结构合理、素质优良", "raw": "A.规模宏大、结构合理、素质优良"}, {"letter": "B", "text": "规模庞大、结构合理、素质精良", "raw": "B.规模庞大、结构合理、素质精良"}, {"letter": "C", "text": "规模宏大、结构优化、素质优良", "raw": "C.规模宏大、结构优化、素质优良"}, {"letter": "D", "text": "适当数量、结构优化、素质精良", "raw": "D.适当数量、结构优化、素质精良"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 289, "title": "习近平新时代中国特色社会主义思想是对马克思列宁主义、毛泽东思想、邓小平理论、“三个代表”重要思想、科学发展观的继承和发展，是（    ）。", "options": [{"letter": "A", "text": "当代马克思主义；中国马克思主义", "raw": "A.当代马克思主义；中国马克思主义"}, {"letter": "B", "text": "当代中国马克思主义；二十一世纪马克思主义", "raw": "B.当代中国马克思主义；二十一世纪马克思主义"}, {"letter": "C", "text": "现代中国马克思主义；新时代马克思主义", "raw": "C.现代中国马克思主义；新时代马克思主义"}, {"letter": "D", "text": "中国化马克思主义；时代化马克思主义", "raw": "D.中国化马克思主义；时代化马克思主义"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 290, "title": "中国共产党自成立以来，始终把为中国人民谋幸福、为中华民族谋复兴作为自己的初心使命，历经百年奋斗，从根本上改变了中国人民的前途命运，开辟了实现中华民族伟大复兴的正确道路，展示了马克思主义的强大生命力，深刻影响了世界历史进程，锻造了（    ）的中国共产党。", "options": [{"letter": "A", "text": "伟大", "raw": "A.伟大"}, {"letter": "B", "text": "光荣", "raw": "B.光荣"}, {"letter": "C", "text": "走在时代前列", "raw": "C.走在时代前列"}, {"letter": "D", "text": "正确", "raw": "D.正确"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 291, "title": "健全党统一领导、全面覆盖、权威高效的监督体系，完善权力监督制约机制，以（    ）为主导，促进各类监督贯通协调。", "options": [{"letter": "A", "text": "党内监督", "raw": "A.党内监督"}, {"letter": "B", "text": "司法监督", "raw": "B.司法监督"}, {"letter": "C", "text": "社会监督", "raw": "C.社会监督"}, {"letter": "D", "text": "媒体监督", "raw": "D.媒体监督"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 292, "title": "我们真诚呼吁，世界各国弘扬(     )的全人类共同价值，促进各国人民相知相亲，共同应对各种全球性挑战。", "options": [{"letter": "A", "text": "和平、发展、公平、正义、民主、自由", "raw": "A.和平、发展、公平、正义、民主、自由"}, {"letter": "B", "text": "和平、发展、公正、平等、民主、共赢", "raw": "B.和平、发展、公正、平等、民主、共赢"}, {"letter": "C", "text": "和平、发展、公平、法治、民主、团结", "raw": "C.和平、发展、公平、法治、民主、团结"}, {"letter": "D", "text": "和平、发展、公正、平等、民主、自由", "raw": "D.和平、发展、公正、平等、民主、自由"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 293, "title": "全面推进中国特色大国外交，推动构建人类命运共同体，坚定维护国际公平正义，倡导践行真正的多边主义，旗帜鲜明反对一切霸权主义和强权政治，毫不动摇反对任何(    )。", "options": [{"letter": "A", "text": "单边主义、保护主义、霸凌行径", "raw": "A.单边主义、保护主义、霸凌行径"}, {"letter": "B", "text": "单边主义、保护主义、霸凌主义", "raw": "B.单边主义、保护主义、霸凌主义"}, {"letter": "C", "text": "单边主义、贸易保护主义、霸凌行径", "raw": "C.单边主义、贸易保护主义、霸凌行径"}, {"letter": "D", "text": "单边主义、贸易保护主义、霸凌行为", "raw": "D.单边主义、贸易保护主义、霸凌行为"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 294, "title": "中国式现代化为人类实现现代化提供了新的选择， 中国共产党和中国人民为解决人类面临的共同问题提供更多更好的中国智慧、中国方案、(     )。", "options": [{"letter": "A", "text": "中国经验", "raw": "A.中国经验"}, {"letter": "B", "text": "中国力量", "raw": "B.中国力量"}, {"letter": "C", "text": "中国实践", "raw": "C.中国实践"}, {"letter": "D", "text": "中国模式", "raw": "D.中国模式"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 295, "title": "马克思主义是我们立党立国、(    )的根本指导思想。", "options": [{"letter": "A", "text": "执政兴国", "raw": "A.执政兴国"}, {"letter": "B", "text": "执政为民", "raw": "B.执政为民"}, {"letter": "C", "text": "强党强国", "raw": "C.强党强国"}, {"letter": "D", "text": "兴党兴国", "raw": "D.兴党兴国"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 296, "title": "马克思主义的中国篇章是中国共产党人依靠自身力量实践出来的，贯穿其中的一个基本点就是中国的问题必须从(    )出发，由中国人自己来解答。", "options": [{"letter": "A", "text": "中国实际", "raw": "A.中国实际"}, {"letter": "B", "text": "中国国情", "raw": "B.中国国情"}, {"letter": "C", "text": "工作实际", "raw": "C.工作实际"}, {"letter": "D", "text": "中国基本国情", "raw": "D.中国基本国情"}], "answerIndex": 3, "answerLetter": "D"}, {"id": 297, "title": "十九届中央纪律检查委员会报告指出，旗帜鲜明把(    )作为政治巡视根本任务，紧扣党的领导职能责任，聚焦贯彻党的路线方针政策和党中央重大决策部署、落实全面从严治党战略部署、落实新时代党的组织路线等情况，加强监督检查，推动落实落地。", "options": [{"letter": "A", "text": "党中央集中统一领导", "raw": "A.党中央集中统一领导"}, {"letter": "B", "text": "党中央权威", "raw": "B.党中央权威"}, {"letter": "C", "text": "两个维护", "raw": "C.两个维护"}, {"letter": "D", "text": "两个确立", "raw": "D.两个确立"}], "answerIndex": 2, "answerLetter": "C"}, {"id": 298, "title": "深入推进改革创新，坚定不移扩大开放，着力破解深层次体制机制障碍，不断彰显中国特色社会主义制度优势，不断增强社会主义现代化建设的动力和活力，把我国制度优势更好转化为(    )。", "options": [{"letter": "A", "text": "国家治理效能", "raw": "A.国家治理效能"}, {"letter": "B", "text": "社会治理经验", "raw": "B.社会治理经验"}, {"letter": "C", "text": "国家治理能力", "raw": "C.国家治理能力"}, {"letter": "D", "text": "社会治理能力", "raw": "D.社会治理能力"}], "answerIndex": 0, "answerLetter": "A"}, {"id": 299, "title": "我们解决了党内许多突出问题，但党面临的(    )将长期存在，精神懈怠危险、能力不足危险、脱离群众危险、消极腐败危险将长期存在。", "options": [{"letter": "A", "text": "执政考验、改革开放考验、市场经济考验、境外势力考验", "raw": "A.执政考验、改革开放考验、市场经济考验、境外势力考验"}, {"letter": "B", "text": "执政考验、改革开放考验、市场经济考验、外部环境考验", "raw": "B.执政考验、改革开放考验、市场经济考验、外部环境考验"}, {"letter": "C", "text": "长期执政考验、改革开放考验、市场经济考验、外部环境考验", "raw": "C.长期执政考验、改革开放考验、市场经济考验、外部环境考验"}, {"letter": "D", "text": "长期执政考验、改革开放考验、市场经济考验、境外势力考验", "raw": "D.长期执政考验、改革开放考验、市场经济考验、境外势力考验"}], "answerIndex": 1, "answerLetter": "B"}, {"id": 300, "title": "党的最高理想和最终目标是（    ）。", "options": [{"letter": "A", "text": "实现中国梦", "raw": "A.实现中国梦"}, {"letter": "B", "text": "实现和谐社会", "raw": "B.实现和谐社会"}, {"letter": "C", "text": "实现各尽所能,按需分配", "raw": "C.实现各尽所能,按需分配"}, {"letter": "D", "text": "实现共产主义", "raw": "D.实现共产主义"}], "answerIndex": 3, "answerLetter": "D"}];
+
+    // 存储 Key 常量
+    const STORAGE_KEYS = {
+      HISTORY: 'PARTY_EXAM_RECENT_5_V1',
+      EXAM_DRAFT: 'PARTY_EXAM_DRAFT_V1',           // 模拟考试未完成草稿
+      PRACTICE_STATE: 'PARTY_PRACTICE_STATE_V2'     // 练题模式状态（升级支持方案A）
+    };
+
+    // 全局状态管理
+    const STATE = {
+      mode: 'exam',               // 'exam' (全真考试) | 'practice' (练题模式)
+      questions: [],              // 当前题集 (exam: 100题, practice: 300题乱序)
+      userAnswers: {},            // key: index, value: selected optIdx
+      practiceConfirmed: {},      // 方案A核心：key: index, value: true (练题模式中已点击确认锁定的题)
+      currentIndex: 0,            // 当前题目下标
+      timerInterval: null,        // 计时器句柄
+      secondsElapsed: 0,          // 秒数
+      currentDetailRecord: null,
+      detailFilter: 'all',
+      previousView: 'home'
+    };
+
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      renderHomePageUI();
+    });
+
+    /**
+     * 刷新首页显示（包括草稿角标、历史记录等）
+     */
+    function renderHomePageUI() {
+      // 检查模拟考试未完成草稿
+      const examDraft = getExamDraft();
+      const draftBadge = document.getElementById('exam-draft-badge');
+      const examDesc = document.getElementById('exam-card-desc');
+
+      if (examDraft && examDraft.questions && examDraft.questions.length > 0) {
+        const answeredCount = Object.keys(examDraft.userAnswers || {}).length;
+        if (draftBadge) draftBadge.style.display = 'block';
+        if (examDesc) examDesc.innerText = `未完成考试：已答 ${answeredCount}/100 题，点击继续`;
+      } else {
+        if (draftBadge) draftBadge.style.display = 'none';
+        if (examDesc) examDesc.innerText = '随机抽100题 · 计分考场 · 记录成绩';
+      }
+
+      // 检查练题模式进度
+      const practiceState = getPracticeState();
+      const practiceDesc = document.getElementById('practice-card-desc');
+      if (practiceState && practiceState.questions && practiceState.questions.length > 0) {
+        const confirmedCount = Object.keys(practiceState.practiceConfirmed || {}).length;
+        if (confirmedCount > 0) {
+          practiceDesc.innerText = `进行中：已练 ${confirmedCount}/300 题 · 选定可改`;
+        } else {
+          practiceDesc.innerText = '整库乱序 · 自由选定 · 确认即判正误';
+        }
+      } else {
+        if (practiceDesc) practiceDesc.innerText = '整库乱序 · 自由选定 · 确认即判正误';
+      }
+
+      renderHistoryList();
+    }
+
+    /**
+     * 视图切换
+     */
+    function switchView(viewName) {
+      document.querySelectorAll('.view-screen').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) {
+        target.classList.add('active');
+        window.scrollTo(0, 0);
+      }
+    }
+
+    /**
+     * Fisher-Yates 洗牌算法
+     */
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    // ==========================================
+    // 模式一：全真模拟考试（100题）
+    // ==========================================
+
+    /**
+     * 首页点击【全真模拟考试】
+     */
+    function handleExamCardClick() {
+      const draft = getExamDraft();
+      if (draft && draft.questions && draft.questions.length > 0) {
+        const answeredCount = Object.keys(draft.userAnswers || {}).length;
+        const total = draft.questions.length;
+        const m = Math.floor((draft.secondsElapsed || 0) / 60);
+        const s = (draft.secondsElapsed || 0) % 60;
+        const timeStr = `${m}分${s}秒`;
+
+        showDialog({
+          title: '未完成的考试',
+          desc: `检测到您有一场未完成的模拟考试！
+进度：已答 ${answeredCount} / ${total} 题，用时 ${timeStr}。
+
+点击【确定】继续上次的考试，
+点击【取消】关闭此提示。`,
+          confirmText: '确定（继续考试）',
+          cancelText: '取消',
+          onConfirm: () => {
+            closeDialog();
+            resumeExamFromDraft(draft);
+          },
+          onCancel: () => {
+            closeDialog();
+          },
+          extraText: '放弃并开始新考试',
+          onExtra: () => {
+            clearExamDraft();
+            closeDialog();
+            startNewSimulatedExam();
+          }
+        });
+      } else {
+        startNewSimulatedExam();
+      }
+    }
+
+    function startNewSimulatedExam() {
+      clearExamDraft();
+      STATE.mode = 'exam';
+      STATE.questions = shuffleArray(QUESTION_BANK).slice(0, 100);
+      STATE.userAnswers = {};
+      STATE.practiceConfirmed = {};
+      STATE.currentIndex = 0;
+      STATE.secondsElapsed = 0;
+
+      initExamTimer();
+      saveExamDraft();
+      renderCurrentQuestion();
+      switchView('exam');
+    }
+
+    function resumeExamFromDraft(draft) {
+      STATE.mode = 'exam';
+      STATE.questions = draft.questions;
+      STATE.userAnswers = draft.userAnswers || {};
+      STATE.practiceConfirmed = {};
+      STATE.currentIndex = draft.currentIndex || 0;
+      STATE.secondsElapsed = draft.secondsElapsed || 0;
+
+      initExamTimer();
+      renderCurrentQuestion();
+      switchView('exam');
+    }
+
+    function saveExamDraft() {
+      if (STATE.mode !== 'exam') return;
+      try {
+        const draft = {
+          questions: STATE.questions,
+          userAnswers: STATE.userAnswers,
+          currentIndex: STATE.currentIndex,
+          secondsElapsed: STATE.secondsElapsed,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEYS.EXAM_DRAFT, JSON.stringify(draft));
+      } catch (e) {
+        console.error('保存草稿失败:', e);
+      }
+    }
+
+    function getExamDraft() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEYS.EXAM_DRAFT);
+        return data ? JSON.parse(data) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function clearExamDraft() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.EXAM_DRAFT);
+      } catch (e) {}
+    }
+
+    // ==========================================
+    // 模式二：专项练题模式（300题乱序 · 方案A 选定可改+确认校验）
+    // ==========================================
+
+    function handlePracticeCardClick() {
+      const practiceState = getPracticeState();
+      if (practiceState && practiceState.questions && practiceState.questions.length > 0) {
+        const confirmedCount = Object.keys(practiceState.practiceConfirmed || {}).length;
+        if (confirmedCount > 0 && confirmedCount < practiceState.questions.length) {
+          showDialog({
+            title: '继续练题',
+            desc: `您上次已练习 ${confirmedCount} / 300 题，是否继续刷题？`,
+            confirmText: '继续刷题',
+            cancelText: '取消',
+            onConfirm: () => {
+              closeDialog();
+              resumePractice(practiceState);
+            },
+            onCancel: () => closeDialog(),
+            extraText: '重新乱序练题',
+            onExtra: () => {
+              closeDialog();
+              startNewPractice();
+            }
+          });
+          return;
+        }
+      }
+      startNewPractice();
+    }
+
+    function startNewPractice() {
+      STATE.mode = 'practice';
+      STATE.questions = shuffleArray(QUESTION_BANK); // 全部300题乱序
+      STATE.userAnswers = {};
+      STATE.practiceConfirmed = {}; // 清空确认记录
+      STATE.currentIndex = 0;
+      STATE.secondsElapsed = 0;
+
+      initExamTimer();
+      savePracticeState();
+      renderCurrentQuestion();
+      switchView('exam');
+    }
+
+    function resumePractice(saved) {
+      STATE.mode = 'practice';
+      STATE.questions = saved.questions;
+      STATE.userAnswers = saved.userAnswers || {};
+      STATE.practiceConfirmed = saved.practiceConfirmed || {};
+      STATE.currentIndex = saved.currentIndex || 0;
+      STATE.secondsElapsed = saved.secondsElapsed || 0;
+
+      initExamTimer();
+      renderCurrentQuestion();
+      switchView('exam');
+    }
+
+    function savePracticeState() {
+      if (STATE.mode !== 'practice') return;
+      try {
+        const state = {
+          questions: STATE.questions,
+          userAnswers: STATE.userAnswers,
+          practiceConfirmed: STATE.practiceConfirmed,
+          currentIndex: STATE.currentIndex,
+          secondsElapsed: STATE.secondsElapsed,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEYS.PRACTICE_STATE, JSON.stringify(state));
+      } catch (e) {}
+    }
+
+    function getPracticeState() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEYS.PRACTICE_STATE);
+        return data ? JSON.parse(data) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // ==========================================
+    // 答题流程与界面渲染（模式自适应 & 方案A）
+    // ==========================================
+
+    function initExamTimer() {
+      if (STATE.timerInterval) clearInterval(STATE.timerInterval);
+      updateTimerDisplay();
+      STATE.timerInterval = setInterval(() => {
+        STATE.secondsElapsed++;
+        updateTimerDisplay();
+        if (STATE.secondsElapsed % 5 === 0) {
+          if (STATE.mode === 'exam') saveExamDraft();
+          else if (STATE.mode === 'practice') savePracticeState();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(STATE.secondsElapsed / 60).toString().padStart(2, '0');
+      const s = (STATE.secondsElapsed % 60).toString().padStart(2, '0');
+      const display = document.getElementById('timer-display');
+      if (display) display.innerText = `${m}:${s}`;
+    }
+
+    /**
+     * 渲染当前题目
+     */
+    function renderCurrentQuestion() {
+      const q = STATE.questions[STATE.currentIndex];
+      if (!q) return;
+
+      const total = STATE.questions.length;
+      const currentNum = STATE.currentIndex + 1;
+      const isPractice = STATE.mode === 'practice';
+      const isConfirmed = isPractice && Boolean(STATE.practiceConfirmed[STATE.currentIndex]);
+      const currentSelected = STATE.userAnswers[STATE.currentIndex];
+      const hasChosen = currentSelected !== undefined && currentSelected !== null;
+
+      // 顶部导航更新
+      document.getElementById('exam-progress-text').innerText = `${currentNum} / ${total}`;
+      const fill = document.getElementById('progress-bar-fill');
+      fill.style.width = `${(currentNum / total) * 100}%`;
+      if (isPractice) fill.classList.add('blue');
+      else fill.classList.remove('blue');
+
+      const badge = document.getElementById('q-type-badge');
+      if (isPractice) {
+        badge.className = 'question-type-tag blue';
+        badge.innerText = `练题模式 · 第 ${currentNum} 题 / 共 ${total} 题`;
+      } else {
+        badge.className = 'question-type-tag';
+        badge.innerText = `单选题 · 第 ${currentNum} 题 / 共 ${total} 题`;
+      }
+
+      document.getElementById('q-title').innerText = q.title;
+
+      const container = document.getElementById('q-options-container');
+      container.innerHTML = '';
+
+      // 练题模式即时解析面板（仅在已确认锁定后展示）
+      const feedbackCard = document.getElementById('practice-feedback-card');
+      const feedbackHead = document.getElementById('feedback-head');
+      const feedbackAnsLetter = document.getElementById('feedback-ans-letter');
+
+      if (isPractice && isConfirmed) {
+        const isCorrect = currentSelected === q.answerIndex;
+        feedbackCard.className = `practice-feedback-card ${isCorrect ? 'correct' : 'wrong'}`;
+        feedbackHead.innerText = isCorrect ? '✓ 回答正确！' : '✕ 回答错误！';
+        feedbackAnsLetter.innerText = `${q.answerLetter}. ${q.options[q.answerIndex]?.text || ''}`;
+      } else {
+        feedbackCard.className = 'practice-feedback-card';
+      }
+
+      // 渲染选项列表
+      q.options.forEach((opt, optIdx) => {
+        const optEl = document.createElement('div');
+        let classes = ['option-item'];
+
+        if (isPractice) {
+          if (isConfirmed) {
+            // 已确认锁定状态：展示红绿正误对比
+            if (optIdx === q.answerIndex) {
+              classes.push('feedback-correct');
+            } else if (optIdx === currentSelected) {
+              classes.push('feedback-wrong');
+            }
+          } else {
+            // 方案A：作答阶段，仅高亮选中，允许随意修改
+            if (currentSelected === optIdx) {
+              classes.push('practice-chosen');
+            }
+          }
+        } else {
+          // 模拟考试模式：只展示选态，交卷前不剧透答案
+          if (currentSelected === optIdx) {
+            classes.push('selected');
+          }
+        }
+
+        optEl.className = classes.join(' ');
+        // 如果练题模式已确认锁定，则禁止再点击更改；否则允许点击选择/修改
+        if (!isConfirmed) {
+          optEl.onclick = () => selectOption(optIdx);
+        }
+
+        let markText = '✓';
+        if (isPractice && isConfirmed) {
+          if (optIdx === q.answerIndex) markText = '正确';
+          else if (optIdx === currentSelected) markText = '错误';
+        }
+
+        optEl.innerHTML = `
+          <div class="option-letter">${opt.letter}</div>
+          <div class="option-text">${opt.text}</div>
+          <div class="check-mark">${markText}</div>
+        `;
+        container.appendChild(optEl);
+      });
+
+      updateNavButtons();
+    }
+
+    /**
+     * 选择选项（方案A：支持随意修改，未确认前不锁死）
+     */
+    function selectOption(optIdx) {
+      const isPractice = STATE.mode === 'practice';
+      if (isPractice && STATE.practiceConfirmed[STATE.currentIndex]) {
+        return; // 已确认锁定的题目不可修改
+      }
+
+      // 记录用户选择（可随意覆盖切换选项）
+      STATE.userAnswers[STATE.currentIndex] = optIdx;
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate(10); } catch (e) {}
+      }
+
+      if (isPractice) savePracticeState();
+      else saveExamDraft();
+
+      renderCurrentQuestion();
+    }
+
+    /**
+     * 更新上一题、下一题/确认答案按钮状态
+     * 方案A核心：
+     * 1. 练题模式且当前题目尚未确认时：按钮为【确认答案】。未选时置灰，已选时激活；
+     * 2. 练题模式且当前题目已确认时：按钮为【下一题】；
+     * 3. 模拟考试模式：未选时【下一题】置灰，已选时激活；最后一题为【提交试卷】。
+     */
+    function updateNavButtons() {
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      const btnText = document.getElementById('btn-next-text');
+      const btnIcon = document.getElementById('btn-next-icon');
+      const isPractice = STATE.mode === 'practice';
+
+      btnPrev.disabled = STATE.currentIndex === 0;
+
+      const currentSelected = STATE.userAnswers[STATE.currentIndex];
+      const hasChosen = currentSelected !== undefined && currentSelected !== null;
+      const isConfirmed = isPractice && Boolean(STATE.practiceConfirmed[STATE.currentIndex]);
+      const isLast = STATE.currentIndex === STATE.questions.length - 1;
+
+      // 样式重置
+      btnNext.classList.remove('btn-confirm-stage', 'btn-blue', 'btn-submit-ready');
+
+      if (isPractice) {
+        if (!isConfirmed) {
+          // 方案A：作答阶段，显示【确认答案】
+          btnText.innerText = '确认答案';
+          btnIcon.style.display = 'none';
+          btnNext.classList.add('btn-confirm-stage');
+
+          if (!hasChosen) {
+            btnNext.disabled = true; // 还没选选项：禁用置灰
+          } else {
+            btnNext.disabled = false; // 已选选项：激活，允许随时修改或点击确认
+          }
+        } else {
+          // 方案A：已确认阶段，显示【下一题】或【完成练习】
+          btnIcon.style.display = 'inline-block';
+          btnNext.classList.add('btn-blue');
+          btnNext.disabled = false;
+
+          if (isLast) {
+            btnText.innerText = '完成练习';
+            btnNext.classList.add('btn-submit-ready');
+          } else {
+            btnText.innerText = '下一题';
+          }
+        }
+      } else {
+        // 模拟考试模式
+        btnIcon.style.display = 'inline-block';
+        if (!hasChosen) {
+          btnNext.disabled = true;
+          btnText.innerText = isLast ? '提交试卷' : '下一题';
+        } else {
+          btnNext.disabled = false;
+          if (isLast) {
+            btnNext.classList.add('btn-submit-ready');
+            btnText.innerText = '提交试卷';
+          } else {
+            btnText.innerText = '下一题';
+          }
+        }
+      }
+    }
+
+    /**
+     * 底部主操作按钮点击分发（方案A核心路由）
+     */
+    function handleNextOrConfirmClick() {
+      const isPractice = STATE.mode === 'practice';
+
+      if (isPractice) {
+        const isConfirmed = Boolean(STATE.practiceConfirmed[STATE.currentIndex]);
+        if (!isConfirmed) {
+          // 第一步：点击【确认答案】
+          confirmPracticeAnswer();
+        } else {
+          // 第二步：点击【下一题】
+          proceedNextQuestion();
+        }
+      } else {
+        // 模拟考模式：直接下一题或交卷
+        proceedNextQuestion();
+      }
+    }
+
+    /**
+     * 练题模式：确认当前答案并锁定（触发正误校验）
+     */
+    function confirmPracticeAnswer() {
+      const currentSelected = STATE.userAnswers[STATE.currentIndex];
+      if (currentSelected === undefined || currentSelected === null) return;
+
+      const q = STATE.questions[STATE.currentIndex];
+      const isCorrect = currentSelected === q.answerIndex;
+
+      // 标记当前题目已确认锁定
+      STATE.practiceConfirmed[STATE.currentIndex] = true;
+
+      // 触觉反馈强化记忆
+      if (navigator.vibrate) {
+        try {
+          if (isCorrect) navigator.vibrate(15);
+          else navigator.vibrate([25, 40, 25]);
+        } catch (e) {}
+      }
+
+      savePracticeState();
+      renderCurrentQuestion();
+    }
+
+    /**
+     * 前往下一题或完成
+     */
+    function proceedNextQuestion() {
+      if (STATE.currentIndex < STATE.questions.length - 1) {
+        STATE.currentIndex++;
+        if (STATE.mode === 'exam') saveExamDraft();
+        else savePracticeState();
+        renderCurrentQuestion();
+      } else {
+        trySubmitExam();
+      }
+    }
+
+    function prevQuestion() {
+      if (STATE.currentIndex > 0) {
+        STATE.currentIndex--;
+        if (STATE.mode === 'exam') saveExamDraft();
+        else savePracticeState();
+        renderCurrentQuestion();
+      }
+    }
+
+    /**
+     * 临时退出处理
+     */
+    function handleExitCurrentMode() {
+      const isPractice = STATE.mode === 'practice';
+      const modeName = isPractice ? '练题' : '模拟考试';
+
+      showDialog({
+        title: `临时退出${modeName}`,
+        desc: `当前进度已自动为您保存在本地。
+下次进入时可直接继续，是否确认退出？`,
+        confirmText: '确认退出',
+        cancelText: '继续作答',
+        onConfirm: () => {
+          if (STATE.timerInterval) {
+            clearInterval(STATE.timerInterval);
+            STATE.timerInterval = null;
+          }
+          if (isPractice) savePracticeState();
+          else saveExamDraft();
+
+          closeDialog();
+          renderHomePageUI();
+          switchView('home');
+        },
+        onCancel: () => closeDialog()
+      });
+    }
+
+    // ==========================================
+    // 答题卡抽屉
+    // ==========================================
+
+    function openCardSheet() {
+      const grid = document.getElementById('sheet-grid-container');
+      grid.innerHTML = '';
+      const isPractice = STATE.mode === 'practice';
+
+      document.getElementById('sheet-title').innerText = isPractice ? '练题卡 (300题)' : '答题卡 (100题)';
+
+      const legend = document.getElementById('sheet-legend');
+      if (isPractice) {
+        legend.innerHTML = `
+          <div class="legend-item"><div class="legend-dot correct"></div><span>正确</span></div>
+          <div class="legend-item"><div class="legend-dot wrong"></div><span>错误</span></div>
+          <div class="legend-item"><div class="legend-dot unanswered"></div><span>未练</span></div>
+        `;
+      } else {
+        legend.innerHTML = `
+          <div class="legend-item"><div class="legend-dot answered"></div><span>已答</span></div>
+          <div class="legend-item"><div class="legend-dot unanswered"></div><span>未答</span></div>
+        `;
+      }
+
+      document.getElementById('sheet-submit-btn').innerText = isPractice ? '结束练习并查看统计' : '完成并交卷';
+
+      STATE.questions.forEach((q, idx) => {
+        const userChoice = STATE.userAnswers[idx];
+        const isConfirmed = isPractice && Boolean(STATE.practiceConfirmed[idx]);
+        const isCurrent = idx === STATE.currentIndex;
+
+        const btn = document.createElement('button');
+        let classes = ['grid-num-btn'];
+
+        if (isCurrent) classes.push('current');
+
+        if (isPractice) {
+          if (isConfirmed) {
+            if (userChoice === q.answerIndex) classes.push('practice-correct');
+            else classes.push('practice-wrong');
+          }
+        } else if (userChoice !== undefined && userChoice !== null) {
+          classes.push('answered');
+        }
+
+        btn.className = classes.join(' ');
+        btn.innerText = idx + 1;
+        btn.onclick = () => {
+          STATE.currentIndex = idx;
+          closeCardSheet();
+          renderCurrentQuestion();
+        };
+        grid.appendChild(btn);
+      });
+
+      document.getElementById('card-modal-overlay').classList.add('open');
+    }
+
+    function closeCardSheet(e) {
+      if (!e || e.target.id === 'card-modal-overlay' || !e.target) {
+        document.getElementById('card-modal-overlay').classList.remove('open');
+      }
+    }
+
+    // ==========================================
+    // 交卷结算与成绩展示
+    // ==========================================
+
+    function trySubmitExam() {
+      closeCardSheet();
+      const total = STATE.questions.length;
+      const isPractice = STATE.mode === 'practice';
+
+      if (!isPractice) {
+        const answeredCount = Object.keys(STATE.userAnswers).length;
+        if (answeredCount < total) {
+          const remaining = total - answeredCount;
+          showDialog({
+            title: '尚有未答题目',
+            desc: `您还有 ${remaining} 道题未作答，请全部作答完毕后再提交试卷。`,
+            confirmText: '继续答题',
+            cancelText: '取消',
+            onConfirm: () => closeDialog()
+          });
+          return;
+        }
+      }
+
+      const confirmedTotal = isPractice ? Object.keys(STATE.practiceConfirmed).length : total;
+
+      showDialog({
+        title: isPractice ? '结束练习' : '确认交卷',
+        desc: isPractice ?
+          `您已练习并确认 ${confirmedTotal} / ${total} 道题目，确认现在结算练习结果吗？` :
+          `您已完成全部 ${total} 道题目，确认现在提交试卷并计算总分吗？`,
+        confirmText: '确认结算',
+        cancelText: '再练练',
+        onConfirm: () => {
+          closeDialog();
+          finishExamAndCalculate();
+        },
+        onCancel: () => closeDialog()
+      });
+    }
+
+    function finishExamAndCalculate() {
+      if (STATE.timerInterval) {
+        clearInterval(STATE.timerInterval);
+        STATE.timerInterval = null;
+      }
+
+      const isPractice = STATE.mode === 'practice';
+      let correctCount = 0;
+      const total = STATE.questions.length;
+      const questionsSnapshot = [];
+
+      STATE.questions.forEach((q, idx) => {
+        const userChoice = STATE.userAnswers[idx];
+        const isConfirmed = isPractice ? Boolean(STATE.practiceConfirmed[idx]) : true;
+        const isCorrect = isConfirmed && userChoice === q.answerIndex;
+        if (isCorrect) correctCount++;
+
+        questionsSnapshot.push({
+          id: q.id,
+          title: q.title,
+          options: q.options,
+          answerIndex: q.answerIndex,
+          answerLetter: q.answerLetter,
+          userChoice: userChoice,
+          userLetter: userChoice !== undefined && userChoice !== null ? q.options[userChoice]?.letter : '未答',
+          isCorrect: isCorrect,
+          isAnswered: isPractice ? isConfirmed : (userChoice !== undefined && userChoice !== null)
+        });
+      });
+
+      const answeredTotal = isPractice ? Object.keys(STATE.practiceConfirmed).length : total;
+      const wrongCount = answeredTotal - correctCount;
+      const score = correctCount;
+
+      const m = Math.floor(STATE.secondsElapsed / 60);
+      const s = STATE.secondsElapsed % 60;
+      const durationStr = `${m > 0 ? m + '分' : ''}${s}秒`;
+
+      const now = new Date();
+      const pad = n => n.toString().padStart(2, '0');
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+      const examRecord = {
+        id: Date.now(),
+        mode: STATE.mode,
+        dateStr: dateStr,
+        score: score,
+        total: total,
+        answeredTotal: answeredTotal,
+        correctCount: correctCount,
+        wrongCount: wrongCount,
+        durationStr: durationStr,
+        secondsElapsed: STATE.secondsElapsed,
+        questions: questionsSnapshot
+      };
+
+      if (!isPractice) {
+        clearExamDraft();
+        saveExamToHistory(examRecord);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.PRACTICE_STATE);
+      }
+
+      showResultScreen(examRecord);
+    }
+
+    function saveExamToHistory(newRecord) {
+      try {
+        let history = getExamHistory();
+        history.unshift(newRecord);
+        if (history.length > 5) {
+          history = history.slice(0, 5);
+        }
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+      } catch (err) {
+        console.error('保存历史记录失败:', err);
+      }
+      renderHomePageUI();
+    }
+
+    function getExamHistory() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        return data ? JSON.parse(data) : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function confirmClearHistory() {
+      showDialog({
+        title: '清空历史记录',
+        desc: '确定要清空手机本地保存的模拟考试记录吗？清空后无法恢复。',
+        confirmText: '确定清空',
+        cancelText: '取消',
+        onConfirm: () => {
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+          closeDialog();
+          renderHomePageUI();
+        },
+        onCancel: () => closeDialog()
+      });
+    }
+
+    function renderHistoryList() {
+      const container = document.getElementById('home-history-list');
+      const clearBtn = document.getElementById('btn-clear-history');
+      if (!container) return;
+
+      const history = getExamHistory();
+      if (!history || history.length === 0) {
+        if (clearBtn) clearBtn.style.display = 'none';
+        container.innerHTML = `
+          <div class="history-empty">
+            暂无历史答题记录，点击上方卡片开始测试吧！
+          </div>
+        `;
+        return;
+      }
+
+      if (clearBtn) clearBtn.style.display = 'block';
+      container.innerHTML = '';
+      history.forEach((rec, idx) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.onclick = () => openDetailView(rec, 'home');
+
+        item.innerHTML = `
+          <div class="history-item-left">
+            <div class="history-item-date">${rec.dateStr} · 考次 ${idx + 1}</div>
+            <div class="history-item-meta">
+              <span>对: ${rec.correctCount}</span>
+              <span>错: ${rec.wrongCount}</span>
+              <span>用时: ${rec.durationStr}</span>
+            </div>
+          </div>
+          <div class="history-item-right">
+            <div>
+              <span class="history-score">${rec.score}</span>
+              <span class="history-score-unit">分</span>
+            </div>
+            <span class="arrow-icon">›</span>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    /**
+     * 成绩单页面展示
+     */
+    function showResultScreen(record) {
+      STATE.currentDetailRecord = record;
+      const isPractice = record.mode === 'practice';
+
+      document.getElementById('result-header-title').innerText = isPractice ? '练题成果报告' : '考试成绩单';
+      document.getElementById('result-total-tip').innerText = isPractice ?
+        `练习 ${record.answeredTotal} 题 · 正确率 ${record.answeredTotal > 0 ? Math.round((record.correctCount / record.answeredTotal) * 100) : 0}%` :
+        `总分 100 分 · 每题 1 分`;
+
+      document.getElementById('result-score').innerText = isPractice ?
+        `${record.correctCount}` : `${record.score}`;
+
+      document.getElementById('stat-correct').innerText = record.correctCount;
+      document.getElementById('stat-wrong').innerText = record.wrongCount;
+      document.getElementById('stat-time').innerText = record.durationStr;
+      document.getElementById('wrong-count-btn-badge').innerText = record.wrongCount;
+
+      const badge = document.getElementById('result-badge');
+      const comment = document.getElementById('result-comment');
+      const restartText = document.getElementById('btn-restart-text');
+
+      restartText.innerText = isPractice ? '重新练题（300题乱序）' : '再测一次（重新随机100题）';
+
+      if (record.score === 100) {
+        badge.className = 'score-badge pass';
+        badge.innerText = '★ 满分答卷';
+        comment.innerText = '太棒了！理论功底极佳，全部答对！';
+      } else if (record.score >= 90) {
+        badge.className = 'score-badge pass';
+        badge.innerText = '★ 表现优异';
+        comment.innerText = '理论基础扎实，继续保持高水准！';
+      } else if (record.score >= 80) {
+        badge.className = 'score-badge pass';
+        badge.innerText = '● 表现良好';
+        comment.innerText = '成绩良好，针对错题巩固即可达优秀！';
+      } else if (record.score >= 60) {
+        badge.className = 'score-badge pass';
+        badge.innerText = '● 顺利及格';
+        comment.innerText = '顺利及格，建议多加回顾错题与重点。';
+      } else {
+        badge.className = 'score-badge fail';
+        badge.innerText = '▲ 仍需努力';
+        comment.innerText = '建议多做几轮乱序练题强化记忆。';
+      }
+
+      switchView('result');
+    }
+
+    function handleRestartFromScore() {
+      if (STATE.currentDetailRecord && STATE.currentDetailRecord.mode === 'practice') {
+        startNewPractice();
+      } else {
+        startNewSimulatedExam();
+      }
+    }
+
+    function viewWrongsFromCurrentResult() {
+      if (!STATE.currentDetailRecord) return;
+      STATE.detailFilter = 'wrong';
+      openDetailView(STATE.currentDetailRecord, 'result');
+    }
+
+    function viewAllFromCurrentResult() {
+      if (!STATE.currentDetailRecord) return;
+      STATE.detailFilter = 'all';
+      openDetailView(STATE.currentDetailRecord, 'result');
+    }
+
+    function openDetailView(record, fromView = 'home') {
+      STATE.currentDetailRecord = record;
+      STATE.previousView = fromView;
+
+      document.getElementById('detail-nav-title').innerText = `${record.dateStr} 详情`;
+      renderDetailList();
+      switchView('detail');
+    }
+
+    function backFromDetail() {
+      switchView(STATE.previousView || 'home');
+    }
+
+    function switchDetailFilter(filter) {
+      STATE.detailFilter = filter;
+      renderDetailList();
+    }
+
+    function renderDetailList() {
+      const record = STATE.currentDetailRecord;
+      if (!record) return;
+
+      const filter = STATE.detailFilter;
+      const tabAll = document.getElementById('tab-all');
+      const tabWrong = document.getElementById('tab-wrong');
+
+      tabAll.innerText = `全部题目 (${record.questions.length})`;
+      tabWrong.innerText = `仅看错题 (${record.wrongCount})`;
+
+      if (filter === 'all') {
+        tabAll.classList.add('active');
+        tabWrong.classList.remove('active');
+      } else {
+        tabAll.classList.remove('active');
+        tabWrong.classList.add('active');
+      }
+
+      const listContainer = document.getElementById('detail-list-container');
+      listContainer.innerHTML = '';
+
+      let listToShow = record.questions;
+      if (filter === 'wrong') {
+        listToShow = record.questions.filter(q => q.isAnswered && !q.isCorrect);
+      }
+
+      if (listToShow.length === 0) {
+        listContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🎉</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+              ${filter === 'wrong' ? '太棒了，没有错题！' : '暂无题目'}
+            </div>
+            <div style="font-size: 13px;">继续保持优异的成绩吧！</div>
+          </div>
+        `;
+        return;
+      }
+
+      listToShow.forEach((q, idx) => {
+        const originalIndex = record.questions.findIndex(item => item === q);
+        const qNum = originalIndex >= 0 ? originalIndex + 1 : idx + 1;
+
+        const card = document.createElement('div');
+        card.className = 'detail-item';
+
+        const isCorrect = q.isCorrect;
+
+        let optionsHtml = '';
+        q.options.forEach((opt, optIdx) => {
+          const isCorrectAns = optIdx === q.answerIndex;
+          const isUserPick = optIdx === q.userChoice;
+
+          let extraClass = '';
+          let tagHtml = '';
+
+          if (isCorrectAns) {
+            extraClass = 'is-correct-ans';
+            tagHtml = '<span class="detail-opt-tag">正确答案</span>';
+          } else if (isUserPick && !isCorrect) {
+            extraClass = 'is-user-wrong';
+            tagHtml = '<span class="detail-opt-tag">你的选择</span>';
+          }
+
+          optionsHtml += `
+            <div class="detail-opt ${extraClass}">
+              <div class="detail-opt-letter">${opt.letter}.</div>
+              <div class="detail-opt-text">${opt.text}</div>
+              ${tagHtml}
+            </div>
+          `;
+        });
+
+        card.innerHTML = `
+          <div class="detail-item-header">
+            <span class="detail-item-idx">第 ${qNum} 题</span>
+            <span class="detail-badge ${isCorrect ? 'correct' : 'wrong'}">
+              ${isCorrect ? '✓ 回答正确' : '✕ 回答错误'}
+            </span>
+          </div>
+          <div class="detail-title">${q.title}</div>
+          <div class="detail-options">
+            ${optionsHtml}
+          </div>
+        `;
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    function goToHome() {
+      renderHomePageUI();
+      switchView('home');
+    }
+
+    /**
+     * 通用弹窗组件
+     */
+    function showDialog(opts) {
+      document.getElementById('dialog-title').innerText = opts.title || '提示';
+      document.getElementById('dialog-desc').innerText = opts.desc || '';
+
+      const confirmBtn = document.getElementById('dialog-btn-confirm');
+      confirmBtn.innerText = opts.confirmText || '确定';
+      confirmBtn.onclick = opts.onConfirm || closeDialog;
+
+      const cancelBtn = document.getElementById('dialog-btn-cancel');
+      cancelBtn.innerText = opts.cancelText || '取消';
+      cancelBtn.onclick = opts.onCancel || closeDialog;
+
+      const extraBtn = document.getElementById('dialog-btn-extra');
+      if (opts.extraText && opts.onExtra) {
+        extraBtn.style.display = 'block';
+        extraBtn.innerText = opts.extraText;
+        extraBtn.onclick = opts.onExtra;
+      } else {
+        extraBtn.style.display = 'none';
+      }
+
+      document.getElementById('dialog-overlay').classList.add('open');
+    }
+
+    function closeDialog() {
+      document.getElementById('dialog-overlay').classList.remove('open');
+    }
+  </script>
+</body>
+</html>

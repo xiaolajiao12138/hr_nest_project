@@ -4,6 +4,8 @@ import router from '@/router';
 import { getToken } from '@/utils/auth';
 import { getLeavePendingCountApi } from '@/api/leave';
 import { getLatestNoticesApi } from '@/api/ops';
+import { useUserStore } from './user';
+import { usePermissionStore } from './permission';
 
 /**
  * 前端应用内通知消息结构接口
@@ -30,7 +32,12 @@ export interface AppMessage {
  */
 export interface SseMessageData {
   /** 推送事件类型代码 */
-  type: 'NOTICE_BROADCAST' | 'LEAVE_AUDIT_NOTIFY' | 'TODO_BADGE_UPDATE' | 'HEARTBEAT';
+  type:
+    | 'NOTICE_BROADCAST'
+    | 'LEAVE_AUDIT_NOTIFY'
+    | 'TODO_BADGE_UPDATE'
+    | 'HEARTBEAT'
+    | 'PERMISSION_UPDATE';
   /** 消息标题 */
   title?: string;
   /** 消息正文 */
@@ -311,6 +318,30 @@ export const useNotifyStore = defineStore('notify', {
         } else {
           this.fetchPendingCount();
         }
+        return;
+      }
+
+      // 业务场景 4: 权限与菜单配置变更实时热重载（无需退出重新登录）
+      if (payload.type === 'PERMISSION_UPDATE') {
+        const userStore = useUserStore();
+        const permissionStore = usePermissionStore();
+
+        // 1. 静默拉取当前用户最新权限标识与角色
+        userStore.getInfo().catch(() => {});
+
+        // 2. 热重载路由与侧边栏导航菜单
+        permissionStore.reloadRoutes(router).catch(() => {});
+
+        // 3. 右上角轻量提示
+        ElNotification({
+          title: '系统权限已同步',
+          message:
+            payload.message || '系统岗位权限与功能配置已更新，功能菜单已自动为您对齐。',
+          type: 'success',
+          position: 'top-right',
+          duration: 4000,
+        });
+        return;
       }
     },
 
