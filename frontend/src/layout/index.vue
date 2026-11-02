@@ -18,6 +18,9 @@
         </router-view>
       </div>
     </div>
+
+    <!-- 页面右下角常驻 HR 数字化智能体浮动助手（点击/悬浮唤出，支持数据增删改查与权限控制） -->
+    <AiAgentChat />
   </div>
 </template>
 
@@ -26,6 +29,12 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import Sidebar from './Sidebar/index.vue';
 import Header from './Header.vue';
 import TagsView from './TagsView.vue';
+/**
+ * 引入右下角悬浮 HR 智能体组件
+ * 支持自然语言对人事、组织、请假、考勤、薪酬等数据进行受控的增删改查
+ * 类似全局浮动组件参考：Watermark、NotifyDialog
+ */
+import AiAgentChat from '@/components/AiAgentChat/index.vue';
 import { useNotifyStore } from '@/stores/notify';
 import { useUserStore } from '@/stores/user';
 import { useWatermark } from '@/hooks/useWatermark';
