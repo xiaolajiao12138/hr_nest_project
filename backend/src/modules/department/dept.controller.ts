@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { OperLog } from '../../common/decorators/oper-log.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 /**
  * 组织架构与部门管理控制器
@@ -27,14 +28,14 @@ export class DeptController {
   constructor(private readonly deptService: DeptService) {}
 
   /**
-   * 获取多级层级嵌套的部门完整组织架构树
+   * 获取多级层级嵌套的部门完整组织架构树（支持管理员全量树与普通员工数据范围隔离）
    *
+   * @param user 当前登录用户载荷
    * @returns 返回符合前端 el-tree / el-cascader 规范的部门树状数组
    */
   @Get('tree')
-  @Permissions('hr:dept:list')
-  async getTree() {
-    return this.deptService.getDeptTree();
+  async getTree(@CurrentUser() user: CurrentUserPayload) {
+    return this.deptService.getDeptTreeForUser(user);
   }
 
   /**

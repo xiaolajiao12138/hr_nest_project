@@ -76,15 +76,25 @@ export class AttendanceController {
   @Permissions('hr:attendance:list')
   async getMonthSchedule(
     @Query('yearMonth') yearMonth: string,
-    @Query('deptId') deptId?: number,
+    @Query('deptId') deptId: number | undefined,
+    @Query('keyword') keyword: string | undefined,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.attendanceService.getMonthSchedule(yearMonth, deptId ? Number(deptId) : undefined);
+    return this.attendanceService.getMonthSchedule(
+      yearMonth,
+      deptId ? Number(deptId) : undefined,
+      user,
+      keyword,
+    );
   }
 
   @Post('schedule/batch-set')
   @Permissions('hr:attendance:schedule')
-  async batchSetSchedule(@Body() dto: BatchSetScheduleDto) {
-    return this.attendanceService.batchSetSchedule(dto);
+  async batchSetSchedule(
+    @Body() dto: BatchSetScheduleDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.attendanceService.batchSetSchedule(dto, user);
   }
 
   // ==================== 打卡业务 ====================
@@ -111,19 +121,28 @@ export class AttendanceController {
    */
   @Get('record/detail')
   @Permissions('hr:attendance:list')
-  async getRecordDetail(@Query('id', ParseIntPipe) id: number) {
-    return this.attendanceService.getRecordDetail(id);
+  async getRecordDetail(
+    @Query('id', ParseIntPipe) id: number,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.attendanceService.getRecordDetail(id, user);
   }
 
   @Get('record/list')
   @Permissions('hr:attendance:list')
-  async getRecordList(@Query() query: QueryAttendanceRecordDto) {
-    return this.attendanceService.getRecordList(query);
+  async getRecordList(
+    @Query() query: QueryAttendanceRecordDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.attendanceService.getRecordList(query, user);
   }
 
   @Post('record/repair')
   @Permissions('hr:attendance:repair')
-  async repairRecord(@Body() dto: RepairAttendanceDto) {
-    return this.attendanceService.repairRecord(dto);
+  async repairRecord(
+    @Body() dto: RepairAttendanceDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.attendanceService.repairRecord(dto, user);
   }
 }

@@ -5,6 +5,7 @@ import { Dept } from './entities/dept.entity';
 import { BaseService } from '../../common/base/base.service';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { CreateDeptDto, UpdateDeptDto } from './dto/dept.dto';
+import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 /**
  * 组织架构与部门管理业务服务类
@@ -41,6 +42,56 @@ export class DeptService extends BaseService<Dept> {
       order: { sort: 'ASC', id: 'ASC' },
     });
     return this.buildTree(list, 0);
+  }
+
+  /**
+   * 基于当前登录用户数据权限获取部门组织架构树
+   * 1. 超级管理员 (admin) 或具备 'hr:dept:list' / '*' 权限：返回全量部门组织架构树
+   * 2. 普通员工：仅返回自身所在部门以及其下属所有子部门构成的树状结构，实现部门数据范围隔离
+   *
+   * @param user 当前登录用户运行时载荷
+   * @returns 组织部门树节点数组
+   */
+  async getDeptTreeForUser(user: CurrentUserPayload): Promise<Dept[]> {
+    const hasFullAccess =
+      user.roles?.includes('admin') ||
+      user.roles?.includes('hr') ||
+      user.permissions?.includes('*') ||
+      user.permissions?.includes('hr:dept:list') ||
+      user.permissions?.includes('hr:employee:list') ||
+      user.permissions?.includes('hr:attendance:schedule') ||
+      user.permissions?.includes('hr:attendance:shift');
+
+    if (hasFullAccess) {
+      return this.getDeptTree();
+    }
+
+    // 普通员工数据权限过滤
+    let deptId = user.deptId;
+    if (!deptId) {
+      // 容错：从数据库精确拉取一次所属部门
+      const u = await this.dataSource.query('SELECT dept_id FROM sys_user WHERE id = $1', [user.userId]);
+      deptId = u?.[0]?.dept_id;
+    }
+
+    if (!deptId) {
+      return [];
+    }
+
+    const currentDept = await this.deptRepo.findOne({ where: { id: deptId } });
+    if (!currentDept) {
+      return [];
+    }
+
+    // 获取当前部门及其全部子孙部门 ID
+    const subDeptIds = await this.getAllSubDeptIds(deptId);
+    const deptList = await this.deptRepo.find({
+      where: { id: In(subDeptIds) },
+      order: { sort: 'ASC', id: 'ASC' },
+    });
+
+    // 以当前部门的父级 parentId 构建树，使当前部门作为根节点，下级部门作为其 children
+    return this.buildTree(deptList, Number(currentDept.parentId));
   }
 
   /**

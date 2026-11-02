@@ -109,7 +109,11 @@ export function deleteShiftApi(id: number) {
 }
 
 /** 查询月份排班日历矩阵 */
-export function getMonthScheduleApi(params: { yearMonth: string; deptId?: number }) {
+export function getMonthScheduleApi(params: {
+  yearMonth: string;
+  deptId?: number;
+  keyword?: string;
+}) {
   return request<{
     days: number;
     yearMonth: string;

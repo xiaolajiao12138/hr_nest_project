@@ -247,7 +247,7 @@
                 :icon="Edit"
                 @click="openRepairDialog(row)"
               >
-                补卡修正
+                {{ isAttendanceManager ? '补卡修正' : '申请补卡' }}
               </el-button>
             </template>
           </BaseTable>
@@ -275,8 +275,16 @@
                 style="width: 170px"
                 @change="fetchScheduleData"
               />
+              <el-input
+                v-model="scheduleKeyword"
+                placeholder="工号 / 员工姓名"
+                clearable
+                style="width: 170px"
+                @keyup.enter="fetchScheduleData"
+                @clear="fetchScheduleData"
+              />
               <el-button type="primary" plain :icon="Refresh" @click="fetchScheduleData">
-                刷新排班
+                查询 / 刷新
               </el-button>
             </div>
 
@@ -556,7 +564,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Refresh,
@@ -566,6 +574,7 @@ import {
   Delete,
 } from '@element-plus/icons-vue';
 import { useI18n } from '@/locales';
+import { useUserStore } from '@/stores/user';
 import BaseSearch from '@/components/BaseSearch.vue';
 import BaseTable, { type TableColumn } from '@/components/BaseTable.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
@@ -596,6 +605,29 @@ import {
 } from '@/utils/date';
 
 const { t } = useI18n();
+const userStore = useUserStore();
+
+/** 是否拥有跨员工/全量考勤管理权限（管理员、人事或考勤排班/班次管理者） */
+const isAttendanceManager = computed(() => {
+  const roles = userStore.roles || [];
+  const perms = userStore.permissions || [];
+  return (
+    roles.includes('admin') ||
+    roles.includes('hr') ||
+    perms.includes('*') ||
+    perms.includes('hr:employee:list') ||
+    perms.includes('hr:attendance:schedule') ||
+    perms.includes('hr:attendance:shift') ||
+    perms.includes('hr:attendance:manage')
+  );
+});
+
+/** 是否具备员工花名册接口访问权限（避免无 hr:employee:list 的排班角色预请求触发 403） */
+const canLoadEmployeeRoster = computed(() => {
+  const roles = userStore.roles || [];
+  const perms = userStore.permissions || [];
+  return roles.includes('admin') || perms.includes('*') || perms.includes('hr:employee:list');
+});
 
 /** 当前激活的 Tab 页签 */
 const activeTab = ref('records');
@@ -815,6 +847,7 @@ async function submitRepair() {
 const scheduleLoading = ref(false);
 const scheduleMonth = ref(getCurrentYearMonth());
 const scheduleDeptId = ref<number | undefined>(undefined);
+const scheduleKeyword = ref('');
 const scheduleDays = ref<number[]>([]);
 const scheduleList = ref<any[]>([]);
 
@@ -824,6 +857,7 @@ async function fetchScheduleData() {
     const res: any = await getMonthScheduleApi({
       yearMonth: scheduleMonth.value,
       deptId: scheduleDeptId.value,
+      keyword: scheduleKeyword.value.trim() || undefined,
     });
 
     const daysCount = res.days || 31;
@@ -847,6 +881,14 @@ const batchScheduleForm = reactive({
 });
 
 function openBatchScheduleDialog() {
+  if (!employeeOptions.value.length && scheduleList.value.length) {
+    employeeOptions.value = scheduleList.value.map((item: any) => ({
+      id: item.empId,
+      name: item.name,
+      empNo: item.empNo,
+      dept: { deptName: item.deptName },
+    }));
+  }
   batchScheduleForm.empIds = [];
   batchScheduleForm.shiftId = shiftList.value[0]?.id;
   batchScheduleForm.includeWeekends = false;
@@ -1012,11 +1054,18 @@ onMounted(async () => {
   try {
     const dRes: any = await getDeptTreeApi();
     deptTree.value = dRes || [];
-
-    const eRes: any = await getEmployeeListApi({ page: 1, pageSize: 100 });
-    employeeOptions.value = eRes.list || [];
   } catch (e) {
     // 忽略
+  }
+
+  // 仅具备员工花名册权限的管理员预加载排班员工候选列表（其余排班角色从排班矩阵兜底提取）
+  if (canLoadEmployeeRoster.value) {
+    try {
+      const eRes: any = await getEmployeeListApi({ page: 1, pageSize: 100 });
+      employeeOptions.value = eRes.list || [];
+    } catch (e) {
+      // 忽略
+    }
   }
 
   loadTodayStatus();
