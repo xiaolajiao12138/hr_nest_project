@@ -24,6 +24,12 @@ import { SseModule } from './modules/sse/sse.module';
 import { SalaryModule } from './modules/salary/salary.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PerformanceModule } from './modules/performance/performance.module';
+/**
+ * 智能体业务模块
+ * 提供右下角悬浮智能助手、自然语言驱动的数据增删改查以及RBAC权限双层校验
+ * 类似模块参考：EmployeeModule、SalaryModule
+ */
+import { AgentModule } from './modules/agent/agent.module';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -72,6 +78,8 @@ const env = process.env.NODE_ENV || 'development';
     SalaryModule,
     AttendanceModule,
     PerformanceModule,
+    // 挂载HR数字化智能体业务模块
+    AgentModule,
   ],
   providers: [
     {

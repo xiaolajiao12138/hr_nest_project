@@ -39,6 +39,7 @@
     "ioredis": "^5.4.2",
     "minio": "^8.0.4",
     "nest-winston": "^1.10.2",
+    "openai": "^7.47.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.13.1",
