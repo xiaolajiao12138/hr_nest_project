@@ -38,14 +38,14 @@ export class LeaveController {
 
   /**
    * 获取当前待审批请假任务总数
-   * 用于顶部 Header 铃铛待办徽标和工作台概览卡片的实时数据呈现
+   * 用于顶部 Header 铃铛待办徽标和工作台概览卡片的实时数据呈现（已登录用户通用待办状态统计）
    *
+   * @param user 当前登录用户运行时载荷
    * @returns 返回待审批单据总数 { count: number }
    */
   @Get('pending-count')
-  @Permissions('hr:leave:list')
-  async getPendingCount() {
-    return this.leaveService.getPendingCount();
+  async getPendingCount(@CurrentUser() user: CurrentUserPayload) {
+    return this.leaveService.getPendingCount(user);
   }
 
   /**

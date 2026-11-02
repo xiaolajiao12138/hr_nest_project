@@ -48,8 +48,26 @@ export interface SseMessageData {
   timestamp?: number;
 }
 
-/** 本地持久化存储 LocalStorage 的键名 */
-const STORAGE_KEY = 'hr_user_notifications';
+/** 本地持久化存储 LocalStorage 的键名前缀（按登录用户 ID 严格空间隔离） */
+const LEGACY_SHARED_STORAGE_KEY = 'hr_user_notifications';
+
+function getUserStorageKey(): string {
+  const userStore = useUserStore();
+  const uid =
+    userStore.userInfo?.id ||
+    userStore.userInfo?.userId ||
+    userStore.userInfo?.username;
+  return uid ? `hr_user_notifications_${uid}` : '';
+}
+
+function hasLeaveAuditPerm(): boolean {
+  const userStore = useUserStore();
+  return Boolean(
+    userStore.roles?.includes('admin') ||
+      userStore.permissions?.includes('*') ||
+      userStore.permissions?.includes('hr:leave:audit'),
+  );
+}
 
 /**
  * 格式化当前本地系统时间为标准展示格式 (YYYY-MM-DD HH:mm:ss)
@@ -92,25 +110,32 @@ export const useNotifyStore = defineStore('notify', {
 
   actions: {
     /**
-     * 从浏览器 LocalStorage 读取历史消息数据
+     * 从浏览器 LocalStorage 读取当前登录用户专属的历史消息数据
      */
     loadFromStorage() {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          this.messages = JSON.parse(stored);
+        // 自动清理旧版未隔离的全局共享缓存键，防止切换账号串号看到他人请假通知
+        localStorage.removeItem(LEGACY_SHARED_STORAGE_KEY);
+        const key = getUserStorageKey();
+        if (!key) {
+          this.messages = [];
+          return;
         }
+        const stored = localStorage.getItem(key);
+        this.messages = stored ? JSON.parse(stored) : [];
       } catch (e) {
         this.messages = [];
       }
     },
 
     /**
-     * 将当前消息列表同步持久化至浏览器 LocalStorage
+     * 将当前消息列表同步持久化至当前登录用户专属的 LocalStorage 空间
      */
     saveToStorage() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.messages));
+        const key = getUserStorageKey();
+        if (!key) return;
+        localStorage.setItem(key, JSON.stringify(this.messages));
       } catch (e) {
         console.warn('[Notify] 本地消息存储失败', e);
       }
@@ -225,8 +250,12 @@ export const useNotifyStore = defineStore('notify', {
           }
         };
 
-        // 初始拉取一次真实待审批数量与最新公告
-        this.fetchPendingCount();
+        // 仅当当前用户具备请假审批权限时才拉取待审批数量；全员同步最新已发布公告
+        if (hasLeaveAuditPerm()) {
+          this.fetchPendingCount();
+        } else {
+          this.pendingLeaveCount = 0;
+        }
         this.fetchRecentNotices();
       } catch (e) {
         console.error('[SSE] 启动异常:', e);
@@ -294,8 +323,10 @@ export const useNotifyStore = defineStore('notify', {
           actionUrl: '/hr/leave',
         });
 
-        // 刷新最新的待办审批数量
-        this.fetchPendingCount();
+        // 仅审批人需要刷新最新的待办审批数量
+        if (hasLeaveAuditPerm()) {
+          this.fetchPendingCount();
+        }
 
         // 顶部弹窗提醒，支持点击跳转
         ElNotification({
@@ -311,8 +342,12 @@ export const useNotifyStore = defineStore('notify', {
         return;
       }
 
-      // 业务场景 3: 审批代办任务徽标数字变动，实现全员主管视图实时增减
+      // 业务场景 3: 审批待办任务徽标数字变动，仅对具备审批权限的主管视图生效
       if (payload.type === 'TODO_BADGE_UPDATE') {
+        if (!hasLeaveAuditPerm()) {
+          this.pendingLeaveCount = 0;
+          return;
+        }
         if (payload.data && typeof payload.data.pendingCount === 'number') {
           this.pendingLeaveCount = payload.data.pendingCount;
         } else {
@@ -321,26 +356,23 @@ export const useNotifyStore = defineStore('notify', {
         return;
       }
 
-      // 业务场景 4: 权限与菜单配置变更实时热重载（无需退出重新登录）
+      // 业务场景 4: 权限与菜单配置变更后台静默热重载（不弹出干扰通知）
       if (payload.type === 'PERMISSION_UPDATE') {
         const userStore = useUserStore();
         const permissionStore = usePermissionStore();
 
-        // 1. 静默拉取当前用户最新权限标识与角色
-        userStore.getInfo().catch(() => {});
+        userStore
+          .getInfo()
+          .then(() => {
+            if (hasLeaveAuditPerm()) {
+              this.fetchPendingCount();
+            } else {
+              this.pendingLeaveCount = 0;
+            }
+          })
+          .catch(() => {});
 
-        // 2. 热重载路由与侧边栏导航菜单
         permissionStore.reloadRoutes(router).catch(() => {});
-
-        // 3. 右上角轻量提示
-        ElNotification({
-          title: '系统权限已同步',
-          message:
-            payload.message || '系统岗位权限与功能配置已更新，功能菜单已自动为您对齐。',
-          type: 'success',
-          position: 'top-right',
-          duration: 4000,
-        });
         return;
       }
     },

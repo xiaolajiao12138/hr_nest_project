@@ -119,9 +119,9 @@ export class UserService extends BaseService<User> {
 
     const saved = await this.userRepo.save(user);
 
-    // 实时清除权限缓存并通知前端热重载
+    // 实时清除权限缓存，并仅向被修改的该用户本人定向发送权限重载信号
     await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.broadcastPermissionUpdate('用户角色分配与状态已更新');
+    this.sseService.sendPermissionUpdateToUser(id, '您的角色分配与状态已更新');
 
     return saved;
   }
@@ -150,9 +150,9 @@ export class UserService extends BaseService<User> {
     }
     await this.userRepo.update(id, { status: Number(status) });
 
-    // 状态修改立即清除缓存，若停用则下一次请求立即被熔断拦截
+    // 状态修改立即清除缓存，仅定向通知目标用户
     await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.broadcastPermissionUpdate('用户账号启停状态已更新');
+    this.sseService.sendPermissionUpdateToUser(id, '您的账号启停状态已更新');
 
     return true;
   }
@@ -163,7 +163,7 @@ export class UserService extends BaseService<User> {
   async deleteById(id: number): Promise<boolean> {
     const res = await super.deleteById(id);
     await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.broadcastPermissionUpdate('用户已被移除');
+    this.sseService.sendPermissionUpdateToUser(id, '账号已被移除');
     return res;
   }
 

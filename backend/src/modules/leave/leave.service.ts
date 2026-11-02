@@ -16,6 +16,7 @@ import {
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { PageResultDto } from '../../common/dto/page-result.dto';
 import { SseService } from '../sse/sse.service';
+import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 /**
  * 请假审批与年假账户核心业务服务类
@@ -53,12 +54,29 @@ export class LeaveService extends BaseService<Leave> {
 
   /**
    * 获取当前系统处于待审批状态 (PENDING) 的请假任务总数
+   * 支持权限自适应：
+   * 1. 超级管理员 (admin) 或人事审批专员：返回全公司待审批请假总数；
+   * 2. 普通员工：返回 0，安全静默放行，杜绝无权限报错
    * 
+   * @param user 当前登录用户载荷
    * @returns 包含待办数量的对象 { count: number }
    */
-  async getPendingCount(): Promise<{ count: number }> {
-    const count = await this.leaveRepo.count({ where: { status: 'PENDING' } });
-    return { count };
+  async getPendingCount(user?: CurrentUserPayload): Promise<{ count: number }> {
+    const isAuditor =
+      !user ||
+      user.roles?.includes('admin') ||
+      user.roles?.includes('hr') ||
+      user.permissions?.includes('*') ||
+      user.permissions?.includes('hr:leave:audit') ||
+      user.permissions?.includes('hr:leave:list');
+
+    if (isAuditor) {
+      const count = await this.leaveRepo.count({ where: { status: 'PENDING' } });
+      return { count };
+    }
+
+    // 普通员工无审批权限，待其审批的单据数恒为 0
+    return { count: 0 };
   }
 
   /**
@@ -211,23 +229,27 @@ export class LeaveService extends BaseService<Leave> {
       return manager.save(leave);
     });
 
-    // 触发 SSE 实时推送：更新全员待办审批徽标数字
-    this.leaveRepo.count({ where: { status: 'PENDING' } }).then((pendingCount) => {
-      this.sseService.sendPendingBadgeUpdate(pendingCount);
-    }).catch(() => {});
-
-    // 触发 SSE 实时推送：新请假待办提交通知
-    this.sseService.broadcast({
-      type: 'LEAVE_AUDIT_NOTIFY',
-      title: '新请假审批待办',
-      message: `员工【${savedLeave.empName}】提交了请假申请(${savedLeave.leaveNo})，天数: ${savedLeave.days}天，等待审批`,
-      data: {
-        leaveId: savedLeave.id,
-        empName: savedLeave.empName,
-        days: savedLeave.days,
-        status: 'PENDING',
-      },
-    });
+    // 触发 SSE 定向推送：仅向具备请假审批权限的管理员/主管推送新待办提醒与待办角标更新（不打扰普通员工）
+    try {
+      const [pendingCount, auditorIds] = await Promise.all([
+        this.leaveRepo.count({ where: { status: 'PENDING' } }),
+        this.resolveLeaveAuditorUserIds(),
+      ]);
+      this.sseService.sendPendingBadgeUpdate(pendingCount, auditorIds);
+      this.sseService.sendToUsers(auditorIds, {
+        type: 'LEAVE_AUDIT_NOTIFY',
+        title: '新请假审批待办',
+        message: `员工【${savedLeave.empName}】提交了请假申请(${savedLeave.leaveNo})，天数: ${savedLeave.days}天，等待审批`,
+        data: {
+          leaveId: savedLeave.id,
+          empName: savedLeave.empName,
+          days: savedLeave.days,
+          status: 'PENDING',
+        },
+      });
+    } catch {
+      // 通知异常不阻断主流程
+    }
 
     return savedLeave;
   }
@@ -293,25 +315,31 @@ export class LeaveService extends BaseService<Leave> {
       return manager.save(leave);
     });
 
-    // 触发 SSE 实时推送：更新全员待办审批徽标数字
-    this.leaveRepo.count({ where: { status: 'PENDING' } }).then((pendingCount) => {
-      this.sseService.sendPendingBadgeUpdate(pendingCount);
-    }).catch(() => {});
+    // 触发 SSE 定向推送：审批结果仅通知请假申请员工本人，待办角标仅同步给审批人
+    try {
+      const actionText = auditDto.action === 'APPROVED' ? '已通过' : '已驳回';
+      const [pendingCount, auditorIds, applicantIds] = await Promise.all([
+        this.leaveRepo.count({ where: { status: 'PENDING' } }),
+        this.resolveLeaveAuditorUserIds(),
+        this.resolveApplicantUserIds(savedLeave.empId),
+      ]);
 
-    // 触发 SSE 实时推送：审批结果提醒通知
-    const actionText = auditDto.action === 'APPROVED' ? '已通过' : '已驳回';
-    this.sseService.broadcast({
-      type: 'LEAVE_AUDIT_NOTIFY',
-      title: '请假审批提醒',
-      message: `员工【${savedLeave.empName}】的请假单(${savedLeave.leaveNo})审批结果：${actionText}${auditDto.auditRemark ? ` (批注: ${auditDto.auditRemark})` : ''}`,
-      data: {
-        leaveId: savedLeave.id,
-        empName: savedLeave.empName,
-        action: auditDto.action,
-        actionText,
-        auditRemark: auditDto.auditRemark,
-      },
-    });
+      this.sseService.sendPendingBadgeUpdate(pendingCount, auditorIds);
+      this.sseService.sendToUsers(applicantIds, {
+        type: 'LEAVE_AUDIT_NOTIFY',
+        title: '请假审批提醒',
+        message: `您的请假单(${savedLeave.leaveNo})审批结果：${actionText}${auditDto.auditRemark ? ` (批注: ${auditDto.auditRemark})` : ''}`,
+        data: {
+          leaveId: savedLeave.id,
+          empName: savedLeave.empName,
+          action: auditDto.action,
+          actionText,
+          auditRemark: auditDto.auditRemark,
+        },
+      });
+    } catch {
+      // 通知异常不阻断主流程
+    }
 
     return savedLeave;
   }
@@ -439,5 +467,41 @@ export class LeaveService extends BaseService<Leave> {
     }
 
     return { createdCount: toInsert.length };
+  }
+
+  /**
+   * 根据员工档案 ID (empId) 解析关联的系统登录账号 userId（用于仅向请假员工本人定向推送审批结果）
+   */
+  private async resolveApplicantUserIds(empId: number): Promise<number[]> {
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT u.id
+       FROM sys_user u
+       INNER JOIN hr_employee e ON e.id = $1
+       WHERE u.status = 1
+         AND (
+           u.username = e.emp_no
+           OR (e.name IS NOT NULL AND u.real_name = e.name)
+           OR (e.phone IS NOT NULL AND e.phone <> '' AND u.phone = e.phone)
+         )`,
+      [empId],
+    );
+    return (rows || []).map((r: any) => Number(r.id)).filter((id: number) => id > 0);
+  }
+
+  /**
+   * 解析所有拥有请假审批权限（admin 角色或 hr:leave:audit 权限码）的启用账号 userId
+   */
+  private async resolveLeaveAuditorUserIds(): Promise<number[]> {
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT u.id
+       FROM sys_user u
+       INNER JOIN sys_user_role ur ON ur.user_id = u.id
+       INNER JOIN sys_role r ON r.id = ur.role_id AND r.status = 1
+       LEFT JOIN sys_role_menu rm ON rm.role_id = r.id
+       LEFT JOIN sys_menu m ON m.id = rm.menu_id AND m.status = 1
+       WHERE u.status = 1
+         AND (r.role_key = 'admin' OR m.perms = 'hr:leave:audit')`,
+    );
+    return (rows || []).map((r: any) => Number(r.id)).filter((id: number) => id > 0);
   }
 }
