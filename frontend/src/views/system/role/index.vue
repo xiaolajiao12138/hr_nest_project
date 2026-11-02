@@ -283,6 +283,34 @@ const handleSubmit = async () => {
   });
 };
 
+/**
+ * 递归筛选当前菜单树中已被选中的末级叶子节点 Key
+ * 彻底解决 Element Plus el-tree 父子联动模式下直接传入父级节点导致下属子节点被反向全选覆盖的经典问题
+ *
+ * @param tree 全量菜单树形结构
+ * @param checkedIds 后端已存储的全部菜单主键 ID (包含父级半选节点)
+ * @returns 仅包含末级叶子节点的 ID 数组
+ */
+const filterLeafKeys = (tree: any[], checkedIds: number[]): number[] => {
+  const leafKeys: number[] = [];
+  const checkedSet = new Set((checkedIds || []).map(Number));
+
+  const traverse = (nodes: any[]) => {
+    for (const node of nodes) {
+      if (!node.children || node.children.length === 0) {
+        if (checkedSet.has(Number(node.id))) {
+          leafKeys.push(node.id);
+        }
+      } else {
+        traverse(node.children);
+      }
+    }
+  };
+
+  traverse(tree || []);
+  return leafKeys;
+};
+
 // 打开分配权限抽屉
 const openPermissionDrawer = async (row: any) => {
   currentRole.value = row;
@@ -297,8 +325,9 @@ const openPermissionDrawer = async (row: any) => {
 
     await nextTick();
     if (menuTreeRef.value) {
-      // 设置已选中的节点
-      menuTreeRef.value.setCheckedKeys(menuIdsRes || []);
+      menuTreeRef.value.setCheckedKeys([]);
+      const leafCheckedKeys = filterLeafKeys(menuTree.value, menuIdsRes || []);
+      menuTreeRef.value.setCheckedKeys(leafCheckedKeys);
     }
   } finally {
     drawerLoading.value = false;
