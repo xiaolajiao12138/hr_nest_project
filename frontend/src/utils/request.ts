@@ -17,6 +17,24 @@ import { usePermissionStore } from '@/stores/permission';
 let isRefreshing = false;
 
 /**
+ * 标记当前用户是否处于主动登出过程中
+ * 防止用户主动退出登录后，残留未完成的请求触发失效弹窗造成跳脸打扰
+ */
+let isLoggingOut = false;
+
+/**
+ * 标记重新登录确认弹窗是否已在展示中（防止多接口并发 401 导致连续弹窗）
+ */
+let isReloginBoxOpen = false;
+
+/**
+ * 设置主动登出状态标记
+ */
+export function setIsLoggingOut(val: boolean) {
+  isLoggingOut = val;
+}
+
+/**
  * 挂起的请求重试队列
  * 当 Token 正在刷新时，后续收到的 401 请求被包装为回调推入此队列，刷新成功后统一注入新 Token 并重试
  */
@@ -150,17 +168,40 @@ service.interceptors.response.use(
 
 /**
  * 登录态完全失效时的兜底处理
- * 清除本地 Token 缓存并弹出确认弹窗引导用户重新登录
+ * 1. 严格检查：若用户正主动登出或当前已经在登录页，坚决不弹出任何失效提示框；
+ * 2. 避免并发 401 多次弹窗；
+ * 3. 真正失效时友好提示并安全引导重定向至登录页。
  */
-function handleRelogin() {
+export function handleRelogin() {
   removeToken();
+
+  // 1. 如果当前页面已经是登录页，或者正处于主动登出过程中，直接安全静默放行，绝不弹窗打扰用户
+  const currentPath = router.currentRoute?.value?.path || window.location.pathname;
+  if (isLoggingOut || currentPath === '/login' || currentPath.startsWith('/login')) {
+    return;
+  }
+
+  // 2. 防抖防重入：已在展示弹窗时直接跳过，杜绝重复弹窗
+  if (isReloginBoxOpen) {
+    return;
+  }
+  isReloginBoxOpen = true;
+
   ElMessageBox.confirm('登录状态已失效，请重新登录系统', '提示', {
     confirmButtonText: '重新登录',
     cancelButtonText: '取消',
     type: 'warning',
-  }).then(() => {
-    window.location.href = '/login';
-  });
+    distinguishCancelAndClose: true,
+  })
+    .then(() => {
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+    })
+    .catch(() => {
+      router.push('/login');
+    })
+    .finally(() => {
+      isReloginBoxOpen = false;
+    });
 }
 
 export default service;

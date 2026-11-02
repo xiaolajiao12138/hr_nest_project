@@ -35,71 +35,24 @@ export const usePermissionStore = defineStore('permission', {
     async generateRoutes(): Promise<RouteRecordRaw[]> {
       const serverRoutes: any = (await getDynamicRoutesApi()) || [];
 
-      // 菜单自愈保底：若人事管理目录存在但尚未包含薪酬核算，自动增补薪酬核算菜单项
-      const hrMenu = serverRoutes.find(
-        (m: any) =>
-          m.path === '/hr' ||
-          m.name === 'HumanResources' ||
-          m.meta?.title === '人事管理',
+      // 首页工作台保底：无论角色如何配置菜单，确保 /dashboard 基础工作台始终可访问
+      const hasDashboard = serverRoutes.some(
+        (m: any) => m.path === '/dashboard' || m.name === 'Dashboard',
       );
-      if (hrMenu) {
-        if (!hrMenu.children) hrMenu.children = [];
-        const hasSalary = hrMenu.children.some(
-          (c: any) => c.path === '/hr/salary' || c.name === 'SalaryManage',
-        );
-        if (!hasSalary) {
-          hrMenu.children.push({
-            id: 204,
-            parentId: hrMenu.id || 2,
-            path: '/hr/salary',
-            name: 'SalaryManage',
-            component: 'views/hr/salary/index.vue',
-            meta: {
-              title: '薪酬核算',
-              icon: 'Money',
-              hidden: false,
-              isFrame: false,
-            },
-          });
-        }
-
-        const hasAttendance = hrMenu.children.some(
-          (c: any) => c.path === '/hr/attendance' || c.name === 'AttendanceManage',
-        );
-        if (!hasAttendance) {
-          hrMenu.children.push({
-            id: 205,
-            parentId: hrMenu.id || 2,
-            path: '/hr/attendance',
-            name: 'AttendanceManage',
-            component: 'views/hr/attendance/index.vue',
-            meta: {
-              title: '考勤管理',
-              icon: 'Calendar',
-              hidden: false,
-              isFrame: false,
-            },
-          });
-        }
-
-        const hasPerformance = hrMenu.children.some(
-          (c: any) => c.path === '/hr/performance' || c.name === 'PerformanceManage',
-        );
-        if (!hasPerformance) {
-          hrMenu.children.push({
-            id: 206,
-            parentId: hrMenu.id || 2,
-            path: '/hr/performance',
-            name: 'PerformanceManage',
-            component: 'views/hr/performance/index.vue',
-            meta: {
-              title: '绩效考评',
-              icon: 'Trophy',
-              hidden: false,
-              isFrame: false,
-            },
-          });
-        }
+      if (!hasDashboard) {
+        serverRoutes.unshift({
+          id: 1,
+          parentId: 0,
+          path: '/dashboard',
+          name: 'Dashboard',
+          component: 'views/dashboard/index.vue',
+          meta: {
+            title: '工作台',
+            icon: 'Odometer',
+            hidden: false,
+            isFrame: false,
+          },
+        });
       }
 
       this.sidebarMenus = serverRoutes;
@@ -153,15 +106,17 @@ export const usePermissionStore = defineStore('permission', {
         };
 
         // 核心处理：若为根级非 Layout 的独立页面（例如首页面板工作台 /dashboard）
-        // 自动在外层包装顶级 Layout 容器，使工作台始终能展示左侧导航栏与顶部工具栏
+        // 自动在外层包装顶级 Layout 容器，并赋予唯一具名标识，确保热重载 removeRoute 时连同外层容器一并卸载，杜绝残留空壳 Layout 导致白屏
         if (isRoot && item.component !== 'Layout') {
+          const childName = item.name || `Route_${item.id}`;
           res.push({
             path: item.path,
+            name: `${childName}__Root`,
             component: Layout,
             children: [
               {
                 path: '',
-                name: item.name || `Route_${item.id}`,
+                name: childName,
                 component: viewComponent || (() => import('@/views/404.vue')),
                 meta,
               },
@@ -204,17 +159,47 @@ export const usePermissionStore = defineStore('permission', {
     },
 
     /**
+     * 递归收集路由树中所有具名路由标识，并统一挂载动态路由、根路径重定向与 404 兜底路由
+     */
+    mountRoutesToRouter(router: any, accessedRoutes: RouteRecordRaw[]) {
+      const recordNames = (list: RouteRecordRaw[]) => {
+        for (const r of list) {
+          if (r.name) {
+            this.registeredRouteNames.push(String(r.name));
+          }
+          if (r.children && r.children.length > 0) {
+            recordNames(r.children);
+          }
+        }
+      };
+
+      for (const route of accessedRoutes) {
+        router.addRoute(route);
+      }
+      recordNames(accessedRoutes);
+
+      // 确保根路径重定向至工作台始终存在
+      router.addRoute({
+        path: '/',
+        name: 'RootRedirect',
+        redirect: '/dashboard',
+      });
+      this.registeredRouteNames.push('RootRedirect');
+
+      // 确保 404 兜底路由始终置于最后
+      router.addRoute({
+        path: '/:pathMatch(.*)*',
+        name: 'DynamicCatchAll',
+        redirect: '/404',
+      });
+      this.registeredRouteNames.push('DynamicCatchAll');
+    },
+
+    /**
      * 实时无感热重载动态路由与侧边栏（无需退出重新登录）
-     *
-     * 核心步骤：
-     * 1. 彻底卸载旧的动态路由记录，杜绝路由残留
-     * 2. 重新向后端拉取最新的权限菜单树并转换
-     * 3. 动态注册挂载最新路由
-     * 4. 响应式刷新 sidebarMenus，驱动左侧导航栏自适应增减
-     * 5. 若当前访问页面已被剥夺权限，平滑重定向至工作台
      */
     async reloadRoutes(router?: any): Promise<RouteRecordRaw[]> {
-      // 1. 先安全移除已注册的旧动态路由
+      // 1. 先按外层父级到子级完整移除已注册的旧动态路由，杜绝空壳父路由残留
       if (router && this.registeredRouteNames.length > 0) {
         for (const name of this.registeredRouteNames) {
           if (router.hasRoute(name)) {
@@ -229,29 +214,9 @@ export const usePermissionStore = defineStore('permission', {
       // 2. 重新向后端发起菜单树请求并生成路由
       const accessedRoutes = await this.generateRoutes();
 
-      // 3. 循环重新挂载至 Vue Router
+      // 3. 统一挂载动态路由、RootRedirect 与 404 兜底路由
       if (router) {
-        accessedRoutes.forEach((route) => {
-          router.addRoute(route);
-          if (route.name) {
-            this.registeredRouteNames.push(String(route.name));
-          }
-          if (route.children) {
-            route.children.forEach((c) => {
-              if (c.name) {
-                this.registeredRouteNames.push(String(c.name));
-              }
-            });
-          }
-        });
-
-        // 重新确保 404 兜底路由置于最后
-        router.addRoute({
-          path: '/:pathMatch(.*)*',
-          name: 'DynamicCatchAll',
-          redirect: '/404',
-        });
-        this.registeredRouteNames.push('DynamicCatchAll');
+        this.mountRoutesToRouter(router, accessedRoutes);
 
         // 4. 检查当前用户停留在的页面是否仍然具有权限
         const currentPath = router.currentRoute?.value?.path;

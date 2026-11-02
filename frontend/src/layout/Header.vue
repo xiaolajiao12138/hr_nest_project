@@ -227,6 +227,7 @@ import {
 import Breadcrumb from './Breadcrumb.vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import MyPayslipDrawer from '@/views/hr/salary/components/MyPayslipDrawer.vue';
+import { setIsLoggingOut } from '@/utils/request';
 
 const payslipDrawerVisible = ref(false);
 
@@ -372,11 +373,15 @@ const handleCommand = (command: string) => {
       confirmButtonText: '确定退出',
       cancelButtonText: '取消',
       type: 'warning',
-    }).then(() => {
+    }).then(async () => {
+      setIsLoggingOut(true);
       notifyStore.closeSSE();
       userStore.logout();
       permissionStore.resetRoutes();
-      router.push('/login');
+      await router.push('/login');
+      setTimeout(() => {
+        setIsLoggingOut(false);
+      }, 800);
     });
   }
 };
