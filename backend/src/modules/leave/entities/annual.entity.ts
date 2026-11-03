@@ -1,8 +1,9 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../common/base/base.entity';
 import { Employee } from '../../employee/entities/employee.entity';
 
 @Entity('hr_annual')
+@Index('uq_annual_employee_year', ['empId','year'], { unique: true })
 export class AnnualLeave extends BaseEntity {
   @Column({ name: 'emp_id', comment: '员工ID' })
   empId: number;

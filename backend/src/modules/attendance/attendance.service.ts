@@ -1,6 +1,7 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In, DataSource } from 'typeorm';
+import { applyScope, assertEmployeeScope, scopeFor, requirePermission, requireAdmin } from '../../common/security/data-scope';
 import { AttendanceShift } from './entities/shift.entity';
 import { AttendanceSchedule } from './entities/schedule.entity';
 import { AttendanceRecord } from './entities/record.entity';
@@ -17,7 +18,7 @@ import { BusinessException } from '../../common/exceptions/business.exception';
 import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
-export class AttendanceService implements OnModuleInit {
+export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
 
   constructor(
@@ -32,74 +33,14 @@ export class AttendanceService implements OnModuleInit {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
-  async onModuleInit() {
-    await this.initDefaultShiftAndMenu();
-  }
+
 
   /**
    * 自动自愈初始化默认标准班次与考勤菜单权限
    */
-  private async initDefaultShiftAndMenu() {
-    try {
-      // 1. 初始化默认正常工时班次 (09:00 - 18:00)
-      const count = await this.shiftRepo.count();
-      if (count === 0) {
-        await this.shiftRepo.save([
-          {
-            name: '标准早九晚六工时制',
-            startTime: '09:00',
-            endTime: '18:00',
-            lateTolerance: 10,
-            earlyTolerance: 0,
-            workHours: 8.0,
-            isDefault: true,
-            status: 1,
-            remark: '标准工时：上午09:00 - 下午18:00，午休1小时',
-          },
-          {
-            name: '弹性错峰制 (09:30-18:30)',
-            startTime: '09:30',
-            endTime: '18:30',
-            lateTolerance: 15,
-            earlyTolerance: 0,
-            workHours: 8.0,
-            isDefault: false,
-            status: 1,
-            remark: '技术与研发部门弹性工时',
-          },
-        ]);
-        this.logger.log('考勤默认班次规则初始化完成');
-      }
 
-      // 2. 数据库自愈装载考勤管理系统菜单与按钮权限 (ID 205)
-      await this.dataSource.query(`
-        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
-        VALUES (205, 2, '考勤管理', 'AttendanceManage', '/hr/attendance', 'views/hr/attendance/index.vue', 'Calendar', 5, 'C', 'hr:attendance:list', false, false, 1)
-        ON CONFLICT (id) DO UPDATE SET title = '考勤管理', path = '/hr/attendance', component = 'views/hr/attendance/index.vue', icon = 'Calendar', status = 1;
-
-        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
-        VALUES
-          (240, 205, '在线打卡', '', '', '', '', 1, 'F', 'hr:attendance:clock', false, false, 1),
-          (241, 205, '排班管理', '', '', '', '', 2, 'F', 'hr:attendance:schedule', false, false, 1),
-          (242, 205, '班次配置', '', '', '', '', 3, 'F', 'hr:attendance:shift', false, false, 1),
-          (243, 205, '补卡修正', '', '', '', '', 4, 'F', 'hr:attendance:repair', false, false, 1)
-        ON CONFLICT (id) DO NOTHING;
-
-        SELECT setval('sys_menu_id_seq', (SELECT MAX(id) FROM sys_menu));
-
-        INSERT INTO sys_role_menu (role_id, menu_id)
-        VALUES 
-          (1, 205), (1, 240), (1, 241), (1, 242), (1, 243),
-          (2, 205), (2, 240), (2, 241), (2, 242), (2, 243)
-        ON CONFLICT DO NOTHING;
-      `);
-      this.logger.log('考勤系统菜单与权限数据自动装配完成');
-    } catch (err: any) {
-      this.logger.warn(`考勤数据初始化提示: ${err?.message || err}`);
-    }
-  }
 
   /**
    * 判断当前登录用户是否具备跨员工/全量考勤管理与查询权限
@@ -107,17 +48,8 @@ export class AttendanceService implements OnModuleInit {
    */
   isAttendanceManager(user?: CurrentUserPayload): boolean {
     if (!user) return false;
-    const roles = user.roles || [];
-    const perms = user.permissions || [];
-    return (
-      roles.includes('admin') ||
-      roles.includes('hr') ||
-      perms.includes('*') ||
-      perms.includes('hr:employee:list') ||
-      perms.includes('hr:attendance:schedule') ||
-      perms.includes('hr:attendance:shift') ||
-      perms.includes('hr:attendance:manage')
-    );
+    const scope = scopeFor(user, 'attendance');
+    return scope.all || scope.deptIds.length > 0;
   }
 
   /**
@@ -152,64 +84,9 @@ export class AttendanceService implements OnModuleInit {
    * 2. 若未匹配（例如新注册账号或测试账号），自愈生成或匹配对应的在职员工档案，确保打卡卡片正常且数据隔离闭环；
    */
   async getOrCreateEmployeeByUser(userId: number): Promise<Employee | null> {
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['dept'],
-    });
-    if (!user) return null;
-
-    // 1. 精准查找：优先手机号（非空），其次姓名，再次工号/账号
-    let employee: Employee | null = null;
-    if (user.phone && user.phone.trim()) {
-      employee = await this.employeeRepo.findOne({
-        where: { phone: user.phone.trim() },
-        relations: ['dept'],
-      });
-    }
-
-    if (!employee && user.realName && user.realName.trim()) {
-      employee = await this.employeeRepo.findOne({
-        where: { name: user.realName.trim() },
-        relations: ['dept'],
-      });
-    }
-
-    if (!employee && user.username) {
-      employee = await this.employeeRepo.findOne({
-        where: [{ empNo: user.username }, { name: user.username }],
-        relations: ['dept'],
-      });
-    }
-
-    // 2. 若仍未匹配，且用户状态正常，为该系统用户自愈创建对应的员工档案
-    if (!employee && user.status === 1) {
-      const generatedEmpNo = `EMP${String(1000 + user.id).slice(-4)}`;
-      const existEmp = await this.employeeRepo.findOne({ where: { empNo: generatedEmpNo } });
-      const finalEmpNo = existEmp ? `EMP${Date.now().toString().slice(-4)}` : generatedEmpNo;
-
-      const newEmp = this.employeeRepo.create({
-        empNo: finalEmpNo,
-        name: user.realName || user.username || '普通员工',
-        phone: user.phone || `138${String(user.id).padStart(8, '0')}`,
-        idCard: '330100199501010000',
-        entryDate: '2026-01-01',
-        post: '常规岗位',
-        deptId: user.deptId || 1,
-        education: '本科',
-        salary: 8000.0,
-        status: 1, // 在职
-        remark: '系统根据用户账号自动自愈关联生成的员工档案',
-      });
-
-      employee = await this.employeeRepo.save(newEmp);
-      employee = await this.employeeRepo.findOne({
-        where: { id: employee.id },
-        relations: ['dept'],
-      });
-      this.logger.log(`[员工档案自愈] 为用户 ${user.username}(ID: ${user.id}) 自动生成并关联在职员工档案: ${employee?.name}(${employee?.empNo})`);
-    }
-
-    return employee;
+    const account = await this.userRepo.findOneBy({ id: userId, status: 1 });
+    if (!account?.employeeId) return null;
+    return this.employeeRepo.findOne({ where: { id: account.employeeId, status: In([1, 3]) }, relations: ['dept'] });
   }
 
   // ==================== 1. 班次规则管理 ====================
@@ -231,25 +108,21 @@ export class AttendanceService implements OnModuleInit {
   }
 
   /** 保存或新增班次 */
-  async saveShift(dto: SaveShiftDto, id?: number) {
-    if (dto.isDefault) {
-      // 若设为默认，取消其他班次的默认状态
-      await this.shiftRepo.update({}, { isDefault: false });
-    }
-
-    if (id) {
-      const shift = await this.shiftRepo.findOne({ where: { id } });
+  async saveShift(dto: SaveShiftDto, id?: number, user?: CurrentUserPayload) {
+    requireAdmin(user);
+    if (dto.startTime >= dto.endTime) throw new BusinessException('结束时间须晚于开始时间');
+    return this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['attendance:shift']);
+      const repo = manager.getRepository(AttendanceShift), shift = id ? await repo.findOneBy({ id }) : repo.create();
       if (!shift) throw new BusinessException('班次不存在');
-      Object.assign(shift, dto);
-      return this.shiftRepo.save(shift);
-    }
-
-    const newShift = this.shiftRepo.create(dto);
-    return this.shiftRepo.save(newShift);
+      if (dto.isDefault) await repo.createQueryBuilder().update().set({ isDefault: false }).where('is_default = true').execute();
+      Object.assign(shift, dto); return repo.save(shift);
+    });
   }
 
   /** 删除班次 */
-  async deleteShift(id: number) {
+  async deleteShift(id: number, user?: CurrentUserPayload) {
+    requireAdmin(user);
     const shift = await this.shiftRepo.findOne({ where: { id } });
     if (!shift) throw new BusinessException('班次不存在');
     if (shift.isDefault) {
@@ -284,14 +157,7 @@ export class AttendanceService implements OnModuleInit {
       .leftJoinAndSelect('employee.dept', 'dept')
       .where('employee.status IN (1, 3)');
 
-    // 1. 数据权限硬隔离：普通员工强制锁定本人档案 ID
-    if (user && !this.isAttendanceManager(user)) {
-      const myEmp = await this.getOrCreateEmployeeByUser(user.userId);
-      if (!myEmp) {
-        return { days: lastDay, yearMonth, list: [] };
-      }
-      empQb.andWhere('employee.id = :myEmpId', { myEmpId: myEmp.id });
-    }
+    applyScope(empQb, user, 'attendance', 'employee.deptId', 'employee.id');
 
     // 2. 筛选条件叠加：所属部门（自动包含子部门）与员工姓名/工号模糊检索
     if (deptId) {
@@ -337,10 +203,10 @@ export class AttendanceService implements OnModuleInit {
         const item = scheduleMap.get(`${emp.id}_${fullDate}`);
         dates[dayStr] = item
           ? {
-              isRest: item.isRest,
-              shiftName: item.isRest ? '休' : item.shift?.name || '班',
-              shiftId: item.shiftId,
-            }
+            isRest: item.isRest,
+            shiftName: item.isRest ? '休' : item.shift?.name || '班',
+            shiftId: item.shiftId,
+          }
           : { isRest: false, shiftName: '默认', shiftId: null };
       }
 
@@ -361,15 +227,14 @@ export class AttendanceService implements OnModuleInit {
    * 批量为员工排班
    */
   async batchSetSchedule(dto: BatchSetScheduleDto, user?: CurrentUserPayload) {
-    if (user && !this.isAttendanceManager(user)) {
-      throw new BusinessException('普通员工无权进行批量排班操作');
-    }
+    requirePermission(user, 'hr:attendance:schedule');
+    for (const id of new Set(dto.empIds)) await assertEmployeeScope(this.dataSource, user, 'attendance', id);
     const { empIds, startDate, endDate, shiftId, isRest = false, includeWeekends = false } = dto;
     if (!empIds.length) throw new BusinessException('请至少选择一位员工');
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    if (start > end) throw new BusinessException('起始日期不能大于结束日期');
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end.getTime() - start.getTime() > 366 * 86400000 || start > end) throw new BusinessException('起始日期不能大于结束日期');
 
     const dateList: string[] = [];
     const cur = new Date(start);
@@ -409,17 +274,21 @@ export class AttendanceService implements OnModuleInit {
     }
 
     // 先清理原有重合区间的排班
-    await this.scheduleRepo.delete({
-      empId: In(empIds),
-      date: Between(startDate, endDate),
+    await this.dataSource.transaction(async manager => {
+      for (const id of [...new Set(empIds)].sort((a, b) => a - b)) await manager.findOne(Employee, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (shiftId && !(await manager.existsBy(AttendanceShift, { id: shiftId, status: 1 }))) throw new BusinessException('班次不存在或已停用');
+      await manager.delete(AttendanceSchedule, {
+        empId: In(empIds),
+        date: Between(startDate, endDate),
+      });
+
+      // 批量分块保存
+      const chunkSize = 100;
+      for (let i = 0; i < recordsToSave.length; i += chunkSize) {
+        await manager.save(recordsToSave.slice(i, i + chunkSize));
+      }
+
     });
-
-    // 批量分块保存
-    const chunkSize = 100;
-    for (let i = 0; i < recordsToSave.length; i += chunkSize) {
-      await this.scheduleRepo.save(recordsToSave.slice(i, i + chunkSize));
-    }
-
     return { success: true, count: recordsToSave.length };
   }
 
@@ -435,122 +304,128 @@ export class AttendanceService implements OnModuleInit {
       throw new BusinessException('当前账号未关联在职员工档案，无法打卡');
     }
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${year}-${month}-${day}`;
+    return this.dataSource.transaction(async manager => {
+      await manager.findOne(Employee, { where: { id: employee.id }, lock: { mode: 'pessimistic_write' } });
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
 
-    // 获取今日员工排班规则
-    const schedule = await this.scheduleRepo.findOne({
-      where: { empId: employee.id, date: todayStr },
-      relations: ['shift'],
-    });
-
-    // 获取默认班次
-    const defaultShift = await this.shiftRepo.findOne({
-      where: { isDefault: true },
-    });
-
-    const activeShift = schedule?.shift || defaultShift;
-
-    // 查找今日已有打卡记录
-    let record = await this.recordRepo.findOne({
-      where: { empId: employee.id, date: todayStr },
-    });
-
-    if (!record) {
-      record = this.recordRepo.create({
-        empId: employee.id,
-        date: todayStr,
-        shiftId: activeShift?.id,
-        checkInStatus: 3,
-        checkOutStatus: 3,
-        status: 4,
-        workHours: 0,
+      // 获取今日员工排班规则
+      const schedule = await manager.getRepository(AttendanceSchedule).findOne({
+        where: { empId: employee.id, date: todayStr },
+        relations: ['shift'],
       });
-    }
 
-    // 时间比对函数：将 'HH:mm' 转化为今日对应时间戳
-    const parseTime = (timeStr: string) => {
-      const [h, m] = timeStr.split(':').map(Number);
-      const d = new Date(now);
-      d.setHours(h, m, 0, 0);
-      return d;
-    };
+      // 获取默认班次
+      const defaultShift = await manager.getRepository(AttendanceShift).findOne({
+        where: { isDefault: true },
+      });
 
-    let clockAction = dto.type || 'AUTO';
+      const activeShift = schedule?.shift || defaultShift;
 
-    // 自动判断打卡行为
-    if (clockAction === 'AUTO') {
-      if (!record.checkInTime) {
-        clockAction = 'CHECK_IN';
-      } else {
-        clockAction = 'CHECK_OUT';
+      // 查找今日已有打卡记录
+      let record = await manager.getRepository(AttendanceRecord).findOne({
+        where: { empId: employee.id, date: todayStr },
+      });
+
+      if (!record) {
+        record = manager.getRepository(AttendanceRecord).create({
+          empId: employee.id,
+          date: todayStr,
+          shiftId: activeShift?.id,
+          checkInStatus: 3,
+          checkOutStatus: 3,
+          status: 4,
+          workHours: 0,
+        });
       }
-    }
 
-    if (clockAction === 'CHECK_IN') {
-      record.checkInTime = now;
-      record.checkInIp = dto.ip || '127.0.0.1';
+      // 时间比对函数：将 'HH:mm' 转化为今日对应时间戳
+      const parseTime = (timeStr: string) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const d = new Date(now);
+        d.setHours(h, m, 0, 0);
+        return d;
+      };
 
-      if (activeShift) {
-        const standardStart = parseTime(activeShift.startTime);
-        const lateLimit = new Date(standardStart.getTime() + activeShift.lateTolerance * 60000);
+      let clockAction = dto.type || 'AUTO';
 
-        if (now <= lateLimit) {
-          record.checkInStatus = 1; // 正常
+      // 自动判断打卡行为
+      if (clockAction === 'AUTO') {
+        if (!record.checkInTime) {
+          clockAction = 'CHECK_IN';
         } else {
-          record.checkInStatus = 2; // 迟到
+          clockAction = 'CHECK_OUT';
+        }
+      }
+
+      if (clockAction === 'CHECK_IN' && record.checkInTime) throw new BusinessException('今日已签到，请勿重复提交');
+      if (clockAction === 'CHECK_OUT' && !record.checkInTime) throw new BusinessException('请先签到');
+      if (clockAction === 'CHECK_OUT' && (now.getTime() - (record.checkOutTime || record.checkInTime).getTime()) < 60000) throw new BusinessException('请勿连续重复打卡');
+      if (clockAction === 'CHECK_IN') {
+        record.checkInTime = now;
+        record.checkInIp = dto.ip || '127.0.0.1';
+
+        if (activeShift) {
+          const standardStart = parseTime(activeShift.startTime);
+          const lateLimit = new Date(standardStart.getTime() + activeShift.lateTolerance * 60000);
+
+          if (now <= lateLimit) {
+            record.checkInStatus = 1; // 正常
+          } else {
+            record.checkInStatus = 2; // 迟到
+          }
+        } else {
+          record.checkInStatus = 1;
         }
       } else {
-        record.checkInStatus = 1;
-      }
-    } else {
-      // 下班打卡
-      record.checkOutTime = now;
-      record.checkOutIp = dto.ip || '127.0.0.1';
+        // 下班打卡
+        record.checkOutTime = now;
+        record.checkOutIp = dto.ip || '127.0.0.1';
 
-      if (activeShift) {
-        const standardEnd = parseTime(activeShift.endTime);
-        const earlyLimit = new Date(standardEnd.getTime() - activeShift.earlyTolerance * 60000);
+        if (activeShift) {
+          const standardEnd = parseTime(activeShift.endTime);
+          const earlyLimit = new Date(standardEnd.getTime() - activeShift.earlyTolerance * 60000);
 
-        if (now >= earlyLimit) {
-          record.checkOutStatus = 1; // 正常
+          if (now >= earlyLimit) {
+            record.checkOutStatus = 1; // 正常
+          } else {
+            record.checkOutStatus = 2; // 早退
+          }
         } else {
-          record.checkOutStatus = 2; // 早退
+          record.checkOutStatus = 1;
         }
-      } else {
-        record.checkOutStatus = 1;
       }
-    }
 
-    // 重新判定全天综合考勤与出勤工时
-    if (record.checkInTime && record.checkOutTime) {
-      const diffMs = record.checkOutTime.getTime() - record.checkInTime.getTime();
-      const diffHours = Math.max(0, Math.round((diffMs / 3600000) * 10) / 10);
-      record.workHours = diffHours;
+      // 重新判定全天综合考勤与出勤工时
+      if (record.checkInTime && record.checkOutTime) {
+        const diffMs = record.checkOutTime.getTime() - record.checkInTime.getTime();
+        const diffHours = Math.max(0, Math.round((diffMs / 3600000) * 10) / 10);
+        record.workHours = diffHours;
 
-      if (record.checkInStatus === 1 && record.checkOutStatus === 1) {
-        record.status = 1; // 正常
-      } else if (record.checkInStatus === 2) {
-        record.status = 2; // 迟到
-      } else if (record.checkOutStatus === 2) {
-        record.status = 3; // 早退
-      } else {
-        record.status = 1;
+        if (record.checkInStatus === 1 && record.checkOutStatus === 1) {
+          record.status = 1; // 正常
+        } else if (record.checkInStatus === 2) {
+          record.status = 2; // 迟到
+        } else if (record.checkOutStatus === 2) {
+          record.status = 3; // 早退
+        } else {
+          record.status = 1;
+        }
+      } else if (record.checkInTime) {
+        record.status = record.checkInStatus === 2 ? 2 : 1;
       }
-    } else if (record.checkInTime) {
-      record.status = record.checkInStatus === 2 ? 2 : 1;
-    }
 
-    const saved = await this.recordRepo.save(record);
-    return {
-      success: true,
-      action: clockAction,
-      record: saved,
-      time: now,
-    };
+      const saved = await manager.getRepository(AttendanceRecord).save(record);
+      return {
+        success: true,
+        action: clockAction,
+        record: saved,
+        time: now,
+      };
+    });
   }
 
   /**
@@ -597,32 +472,6 @@ export class AttendanceService implements OnModuleInit {
       keyword,
     } = query;
 
-    const isManager = this.isAttendanceManager(user);
-    let scopedEmployeeId: number | null = null;
-
-    if (!isManager && user) {
-      // 普通员工数据隔离：严格绑定并锁定本人档案 ID
-      const myEmp = await this.getOrCreateEmployeeByUser(user.userId);
-      if (!myEmp) {
-        return {
-          list: [],
-          total: 0,
-          page,
-          pageSize,
-          kpi: {
-            totalCount: 0,
-            normalCount: 0,
-            lateCount: 0,
-            earlyCount: 0,
-            absentCount: 0,
-            totalWorkHours: 0,
-            attendanceRate: 100,
-          },
-        };
-      }
-      scopedEmployeeId = myEmp.id;
-    }
-
     const qb = this.recordRepo
       .createQueryBuilder('record')
       .leftJoinAndSelect('record.employee', 'employee')
@@ -634,17 +483,13 @@ export class AttendanceService implements OnModuleInit {
     // 独立构建统计查询，绝不带 ORDER BY，防范 GROUP BY 错误
     const statsQb = this.recordRepo.createQueryBuilder('record');
 
-    // 1. 数据范围硬隔离：普通员工牢牢锁定本人档案 ID（搜他人或非本人部门时交集为空自然返回 0 条）
-    if (scopedEmployeeId) {
-      qb.andWhere('record.empId = :scopedEmpId', { scopedEmpId: scopedEmployeeId });
-      statsQb.andWhere('record.empId = :scopedEmpId', { scopedEmpId: scopedEmployeeId });
-    }
+    applyScope(qb, user, 'attendance', 'employee.deptId', 'record.empId');
+    statsQb.leftJoin('record.employee', 'employee');
+    applyScope(statsQb, user, 'attendance', 'employee.deptId', 'record.empId');
 
     // 2. 动态叠加部门（自动包含子孙部门）、指定员工 ID 与关键字检索条件
     const trimmedKw = keyword?.trim();
-    if (deptId || trimmedKw) {
-      statsQb.leftJoin('record.employee', 'employee');
-    }
+
 
     if (deptId) {
       const deptIds = await this.resolveDeptScopeIds(Number(deptId));
@@ -720,51 +565,49 @@ export class AttendanceService implements OnModuleInit {
    * HR / 管理员手动修正或员工申请补卡 (兼容 YYYY-MM-DD HH:mm:ss 与时间戳)
    */
   async repairRecord(dto: RepairAttendanceDto, user?: CurrentUserPayload) {
+    requirePermission(user, 'hr:attendance:approveRepair');
     const { recordId, checkInTime, checkOutTime, status, remark } = dto;
-    const record = await this.recordRepo.findOne({ where: { id: recordId } });
-    if (!record) throw new BusinessException('考勤记录不存在');
+    return this.dataSource.transaction(async manager => {
+      const record = await manager.findOne(AttendanceRecord, { where: { id: recordId }, lock: { mode: 'pessimistic_write' } });
+      if (!record) throw new BusinessException('考勤记录不存在');
 
-    // 越权防御：普通员工只能为本人考勤补卡
-    if (user && !this.isAttendanceManager(user)) {
-      const myEmp = await this.getOrCreateEmployeeByUser(user.userId);
-      if (!myEmp || record.empId !== myEmp.id) {
-        throw new BusinessException('普通员工仅可为本人申请补卡，禁止修改他人考勤记录');
+      await assertEmployeeScope(this.dataSource, user, 'attendance', record.empId);
+
+      const parseToDate = (input?: string | number) => {
+        if (!input) return undefined;
+        if (typeof input === 'number') return new Date(input);
+        if (/^\d{10,13}$/.test(String(input).trim())) {
+          const ts = Number(input);
+          return new Date(ts < 10000000000 ? ts * 1000 : ts);
+        }
+        return new Date(input);
+      };
+
+      if (checkInTime) {
+        record.checkInTime = parseToDate(checkInTime);
+        record.checkInStatus = 1;
       }
-    }
 
-    const parseToDate = (input?: string | number) => {
-      if (!input) return undefined;
-      if (typeof input === 'number') return new Date(input);
-      if (/^\d{10,13}$/.test(String(input).trim())) {
-        const ts = Number(input);
-        return new Date(ts < 10000000000 ? ts * 1000 : ts);
+      if (checkOutTime) {
+        record.checkOutTime = parseToDate(checkOutTime);
+        record.checkOutStatus = 1;
       }
-      return new Date(input);
-    };
 
-    if (checkInTime) {
-      record.checkInTime = parseToDate(checkInTime);
-      record.checkInStatus = 1;
-    }
+      if (status !== undefined) {
+        record.status = status;
+      } else if (record.checkInTime && record.checkOutTime) {
+        record.status = 1; // 修正后默认正常
+      }
 
-    if (checkOutTime) {
-      record.checkOutTime = parseToDate(checkOutTime);
-      record.checkOutStatus = 1;
-    }
+      if (record.checkInTime && record.checkOutTime) {
+        const diffMs = record.checkOutTime.getTime() - record.checkInTime.getTime();
+        record.workHours = Math.max(0, Math.round((diffMs / 3600000) * 10) / 10);
+      }
 
-    if (status !== undefined) {
-      record.status = status;
-    } else if (record.checkInTime && record.checkOutTime) {
-      record.status = 1; // 修正后默认正常
-    }
-
-    if (record.checkInTime && record.checkOutTime) {
-      const diffMs = record.checkOutTime.getTime() - record.checkInTime.getTime();
-      record.workHours = Math.max(0, Math.round((diffMs / 3600000) * 10) / 10);
-    }
-
-    record.remark = remark || (this.isAttendanceManager(user) ? 'HR人工补卡修正' : '员工在线自主补卡申请');
-    return this.recordRepo.save(record);
+      if ((record.checkInTime && !Number.isFinite(record.checkInTime.getTime())) || (record.checkOutTime && !Number.isFinite(record.checkOutTime.getTime())) || (record.checkInTime && record.checkOutTime && record.checkOutTime < record.checkInTime)) throw new BusinessException('补卡时间无效');
+      record.remark = remark || 'HR人工补卡修正';
+      return manager.save(record);
+    });
   }
 
   /**
@@ -779,13 +622,7 @@ export class AttendanceService implements OnModuleInit {
       throw new BusinessException('考勤记录不存在');
     }
 
-    if (user && !this.isAttendanceManager(user)) {
-      const myEmp = await this.getOrCreateEmployeeByUser(user.userId);
-      if (!myEmp || record.empId !== myEmp.id) {
-        throw new BusinessException('无权查看其他员工的考勤详情');
-      }
-    }
-
+    await assertEmployeeScope(this.dataSource, user, 'attendance', record.empId);
     return record;
   }
 }

@@ -1,3 +1,5 @@
+import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { applyScope, assertScope, assertDepartmentScope, requirePermission, isAdmin } from '../../common/security/data-scope';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
@@ -13,11 +15,14 @@ import {
 } from './dto/employee.dto';
 import { PageResultDto } from '../../common/dto/page-result.dto';
 import { BusinessException } from '../../common/exceptions/business.exception';
-import { Response } from 'express';
+import { sanitizeResponse } from '../../common/security/sanitize';
+import { AuthCacheService } from '../rbac/services/auth-cache.service';
+import { SysFile } from '../../upload/entities/file.entity';
+import type { Response } from 'express';
 
 /**
  * 员工档案管理与 Excel 大数据批量服务类
- * 
+ *
  * 核心业务领域：
  * 1. 员工花名册档案的多条件联表检索与分页
  * 2. 入职建档强事务：新增员工档案 + 自动原子开户初始化当前年度 5 天年假账户
@@ -31,7 +36,7 @@ export class EmployeeService extends BaseService<Employee> {
 
   /**
    * 构造函数注入实体仓储、部门、年假及 Excel 工具服务
-   * 
+   *
    * @param empRepo 员工档案实体 Repository
    * @param deptRepo 部门实体 Repository（用于部门名称与 ID 的预匹配）
    * @param annualRepo 年假账户实体 Repository
@@ -47,6 +52,7 @@ export class EmployeeService extends BaseService<Employee> {
     private readonly annualRepo: Repository<AnnualLeave>,
     private readonly excelService: ExcelService,
     dataSource: DataSource,
+    private readonly authCacheService: AuthCacheService,
   ) {
     super(empRepo, dataSource);
   }
@@ -54,12 +60,12 @@ export class EmployeeService extends BaseService<Employee> {
   /**
    * 分页条件查询员工档案列表（精简模式：轻量化返回列表所需字段，降低数据库联表与网络传输负载）
    * 详细的身份证正反面及学历证明等大附件仅在点击编辑/详情时通过独立的 findById 按需查询
-   * 
+   *
    * @param queryDto 查询过滤条件（工号/姓名/手机模糊关键字、部门ID、在职状态、岗位）
    * @returns 标准分页响应对象
    */
   async findEmployeePage(
-    queryDto: QueryEmployeeDto,
+    queryDto: QueryEmployeeDto, user?: CurrentUserPayload
   ): Promise<PageResultDto<Employee>> {
     const page = Number(queryDto.page) || 1;
     const pageSize = Number(queryDto.pageSize) || 10;
@@ -74,6 +80,7 @@ export class EmployeeService extends BaseService<Employee> {
       .orderBy('emp.id', 'DESC');
 
     // 动态拼接搜索条件
+    applyScope(qb, user, 'employee', 'emp.deptId', 'emp.id');
     if (queryDto.keyword) {
       qb.andWhere(
         '(emp.empNo LIKE :kw OR emp.name LIKE :kw OR emp.phone LIKE :kw)',
@@ -99,12 +106,15 @@ export class EmployeeService extends BaseService<Employee> {
 
   /**
    * 创建员工档案（强一致事务：建档 + 原子开户初始化当年年假）
-   * 
+   *
    * @param dto 创建员工入参载荷
    * @returns 创建成功后的员工实体
    * @throws BusinessException 当工号已被占用时抛出业务异常
    */
-  async createEmployee(dto: CreateEmployeeDto): Promise<Employee> {
+  async createEmployee(dto: CreateEmployeeDto, user?: CurrentUserPayload): Promise<Employee> {
+    assertDepartmentScope(user, 'employee', dto.deptId);
+    requirePermission(user, 'hr:employee:sensitive');
+    await this.validateAttachments(dto, user);
     // 校验工号唯一性，防止录入重复工号
     const exist = await this.empRepo.findOne({
       where: { empNo: dto.empNo },
@@ -135,7 +145,7 @@ export class EmployeeService extends BaseService<Employee> {
 
   /**
    * 生成供用户下载的员工批量导入 Excel 模板
-   * 
+   *
    * @returns 包含表头与标准示例数据的 Excel 文件 Buffer 二进制流
    */
   async getImportTemplate(): Promise<Buffer> {
@@ -158,22 +168,27 @@ export class EmployeeService extends BaseService<Employee> {
 
   /**
    * 重点业务：Excel 批量导入员工（严格全量预校验 + 事务级原子入库）
-   * 
+   *
    * 数据一致性与安全规则：
    * 1. 预先加载系统所有正常部门并建立 Name -> ID 哈希映射；
    * 2. 预先加载数据库全量工号，在内存 Set 中进行 O(1) 冲突比对；
    * 3. 逐行执行手机正则、身份证正则、部门存在性、文件内工号唯一性强校验；
    * 4. 若发现任一行存在校验错误，整批数据全量回滚不予入库，一次性返回所有错误行号及具体原因；
    * 5. 校验全部通过后，开启独立数据库事务批量持久化，并为每名员工自动开户初始化年假。
-   * 
+   *
    * @param fileBuffer 上传的 Excel 原始二进制数据
    * @returns 校验结果或导入成功报告
    */
-  async importEmployeesFromExcel(fileBuffer: Buffer) {
+  async importEmployeesFromExcel(fileBuffer: Buffer, user?: CurrentUserPayload) {
+    requirePermission(user, 'hr:employee:sensitive');
     // 预先加载系统所有部门供名称快速匹配
     const depts = await this.deptRepo.find();
     const deptMap = new Map<string, number>();
     depts.forEach((d) => deptMap.set(d.deptName.trim(), d.id));
+    for (const dept of depts) {
+      try { assertDepartmentScope(user, 'employee', dept.id); }
+      catch { deptMap.delete(dept.deptName.trim()); }
+    }
 
     // 预先查询系统中已占用的工号清单
     const existingEmployees = await this.empRepo.find({ select: ['empNo'] });
@@ -283,18 +298,18 @@ export class EmployeeService extends BaseService<Employee> {
 
   /**
    * 重点特性：大数据流式分页导出员工列表（杜绝 Node.js 内存溢出 OOM）
-   * 
+   *
    * 性能优化保障：
    * 1. 采用 HTTP 分块传输（Transfer-Encoding: chunked）配合 ExcelJS WorkbookWriter；
    * 2. 避免一次性在内存中查询和组装十万行实体，按批次（如 500 条）分页拉取并写入流；
    * 3. 写入完成后主动调用 commit 刷新缓冲区，维持极低的内存占用（平稳在 50MB 以内）。
-   * 
+   *
    * @param res Express HTTP 响应对象
    * @param queryDto 导出检索条件
    */
   async exportEmployeesStream(
     res: Response,
-    queryDto: QueryEmployeeDto,
+    queryDto: QueryEmployeeDto, user?: CurrentUserPayload
   ): Promise<void> {
     // 导出列头定义
     const columns = [
@@ -319,10 +334,10 @@ export class EmployeeService extends BaseService<Employee> {
       async (page, pageSize) => {
         // 分页异步查询数据
         const query = { ...queryDto, page, pageSize };
-        const result = await this.findEmployeePage(query);
+        const result = await this.findEmployeePage(query, user);
 
         // 转换为符合 Excel 列头映射的平面数据结构
-        const mappedList = result.list.map((emp) => ({
+        const mappedList = sanitizeResponse(result.list, user).map((emp) => ({
           empNo: emp.empNo,
           name: emp.name,
           gender: emp.gender,
@@ -342,4 +357,66 @@ export class EmployeeService extends BaseService<Employee> {
       500, // 每批次 500 条分页拉取流式下发
     );
   }
+
+  async getEmployeeDetail(id: number, relations: string[] = [], user?: CurrentUserPayload) {
+    const employee = await this.findById(id, relations);
+    assertScope(user, 'employee', employee.id, employee.deptId);
+    return employee;
+  }
+
+  async updateEmployee(id: number, dto: UpdateEmployeeDto, user: CurrentUserPayload) {
+    await this.getEmployeeDetail(id, [], user);
+    if(dto.status===2) await this.assertCanDeactivateEmployee(id,user);
+    if (dto.deptId !== undefined) assertDepartmentScope(user, 'employee', dto.deptId);
+    requirePermission(user, 'hr:employee:sensitive');
+    await this.validateAttachments(dto, user, id);
+    const result = await this.withTransaction(async manager => {
+      await manager.update(Employee, id, dto);
+      if (dto.status===2) await manager.query('UPDATE sys_user SET status=0 WHERE employee_id=$1',[id]);
+      if (dto.deptId !== undefined) await manager.query('UPDATE sys_user SET dept_id = $1 WHERE employee_id = $2', [dto.deptId,id]);
+      return manager.findOneByOrFail(Employee, {id});
+    });
+    await this.authCacheService.clearAllAuthorities();
+    return result;
+  }
+
+  async archiveEmployee(id: number, user: CurrentUserPayload) {
+    await this.getEmployeeDetail(id, [], user);
+    await this.assertCanDeactivateEmployee(id,user);
+    // 人事离职归档保留工资、请假历史，禁止通过 CASCADE 物理删除。
+    await this.withTransaction(async manager => {
+      await manager.update(Employee, id, { status: 2 });
+      await manager.query('UPDATE sys_user SET status = 0 WHERE employee_id = $1', [id]);
+    });
+    await this.authCacheService.clearAllAuthorities();
+    return true;
+  }
+
+  private async validateAttachments(dto: any, user: CurrentUserPayload, employeeId?: number) {
+    const previous = employeeId ? await this.empRepo.findOneBy({ id: employeeId }) : null;
+    for (const key of ['idCardFrontId','idCardBackId','eduCertId']) {
+      if (!dto[key] || dto[key] === previous?.[key]) continue;
+      const file = await this.dataSource.getRepository(SysFile).findOneBy({ id: dto[key] });
+      if (!file || (!isAdmin(user) && file.ownerUserId !== user.userId) || !/^(idcard|cert|employee)\//.test(file.filePath)) throw new BusinessException('附件不存在或不可用于该员工档案');
+    }
+  }
+
+  async getEmployeeOptions(purpose: string, query: QueryEmployeeDto, user: CurrentUserPayload) {
+    const permissions = { leave: 'hr:leave:list', attendance: 'hr:attendance:schedule', performance: 'hr:performance:start', user: 'system:user:assign', employee: 'hr:employee:list' };
+    if (!Object.prototype.hasOwnProperty.call(permissions, purpose)) throw new BusinessException('无效候选用途');
+    requirePermission(user, permissions[purpose]);
+    const page = Math.max(1, Number(query.page) || 1), pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
+    const qb = this.empRepo.createQueryBuilder('emp').leftJoinAndSelect('emp.dept','dept').select(['emp.id','emp.empNo','emp.name','emp.deptId','emp.post','emp.status','dept.id','dept.deptName']).where('emp.status IN (1,3)');
+    applyScope(qb, user, purpose === 'user' ? 'employee' : purpose, 'emp.deptId','emp.id');
+    if (query.deptId) qb.andWhere('emp.deptId = :deptId', {deptId:query.deptId});
+    if (query.keyword) qb.andWhere('(emp.name LIKE :kw OR emp.empNo LIKE :kw)', {kw:'%'+query.keyword+'%'});
+    const [list,total] = await qb.orderBy('emp.empNo','ASC').skip((page-1)*pageSize).take(pageSize).getManyAndCount();
+    return PageResultDto.create(list,total,page,pageSize);
+  }
+
+  private async assertCanDeactivateEmployee(id:number,user:CurrentUserPayload){
+    const protectedAccounts=await this.dataSource.query(`SELECT u.id FROM sys_user u LEFT JOIN sys_user_role ur ON ur.user_id=u.id LEFT JOIN sys_role r ON r.id=ur.role_id WHERE u.employee_id=$1 AND (u.id=$2 OR u.username='admin' OR r.role_key='admin') LIMIT 1`,[id,user.userId]);
+    if(protectedAccounts.length) throw new BusinessException('不能通过员工归档停用当前账号或管理员账号');
+  }
+
 }

@@ -1,3 +1,5 @@
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import {
   Controller,
   Get,
@@ -14,7 +16,7 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { EmployeeService } from './employee.service';
 import {
   CreateEmployeeDto,
@@ -42,10 +44,17 @@ export class EmployeeController {
    * @param query 分页与筛选过滤参数
    * @returns 返回包含员工实体及关联部门的统一分页结果对象
    */
-  @Get('list')
+  @AiTool()
+@Get('options')
+  async options(@CurrentUser() user: CurrentUserPayload, @Query('purpose') purpose: string, @Query() query: QueryEmployeeDto) {
+    return this.employeeService.getEmployeeOptions(purpose, query, user);
+  }
+
+  @AiTool()
+@Get('list')
   @Permissions('hr:employee:list')
-  async getPage(@Query() query: QueryEmployeeDto) {
-    return this.employeeService.findEmployeePage(query);
+  async getPage(@CurrentUser() user: CurrentUserPayload, @Query() query: QueryEmployeeDto) {
+    return this.employeeService.findEmployeePage(query, user);
   }
 
   /**
@@ -78,11 +87,11 @@ export class EmployeeController {
   @Get('export/excel')
   @Permissions('hr:employee:export')
   @OperLog({ title: '导出员工档案Excel', businessType: 'EXPORT' })
-  async exportExcel(
+  async exportExcel(@CurrentUser() user: CurrentUserPayload,
     @Query() query: QueryEmployeeDto,
     @Res() res: Response,
   ) {
-    await this.employeeService.exportEmployeesStream(res, query);
+    await this.employeeService.exportEmployeesStream(res, query, user);
   }
 
   /**
@@ -92,15 +101,16 @@ export class EmployeeController {
    * @param id 员工记录主键 ID
    * @returns 返回员工完整详情对象
    */
-  @Get('detail')
+  @AiTool()
+@Get('detail')
   @Permissions('hr:employee:list')
-  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
-    return this.employeeService.findById(id, [
+  async getDetailByQuery(@CurrentUser() user: CurrentUserPayload, @Query('id', ParseIntPipe) id: number) {
+    return this.employeeService.getEmployeeDetail(id, [
       'dept',
       'idCardFront',
       'idCardBack',
       'eduCert',
-    ]);
+    ], user);
   }
 
   /**
@@ -112,13 +122,13 @@ export class EmployeeController {
    */
   @Get(':id')
   @Permissions('hr:employee:list')
-  async getDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.employeeService.findById(id, [
+  async getDetail(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.employeeService.getEmployeeDetail(id, [
       'dept',
       'idCardFront',
       'idCardBack',
       'eduCert',
-    ]);
+    ], user);
   }
 
   /**
@@ -134,8 +144,8 @@ export class EmployeeController {
   @Post()
   @Permissions('hr:employee:add')
   @OperLog({ title: '新增员工档案', businessType: 'INSERT' })
-  async create(@Body() dto: CreateEmployeeDto) {
-    return this.employeeService.createEmployee(dto);
+  async create(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateEmployeeDto) {
+    return this.employeeService.createEmployee(dto, user);
   }
 
   /**
@@ -148,8 +158,8 @@ export class EmployeeController {
   @Put(':id')
   @Permissions('hr:employee:edit')
   @OperLog({ title: '修改员工档案', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmployeeDto) {
-    return this.employeeService.update(id, dto);
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmployeeDto) {
+    return this.employeeService.updateEmployee(id, dto, user);
   }
 
   /**
@@ -161,8 +171,8 @@ export class EmployeeController {
   @Delete(':id')
   @Permissions('hr:employee:delete')
   @OperLog({ title: '删除员工档案', businessType: 'DELETE' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.employeeService.deleteById(id);
+  async delete(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.employeeService.archiveEmployee(id, user);
   }
 
   /**
@@ -175,8 +185,8 @@ export class EmployeeController {
   @Post('import')
   @Permissions('hr:employee:import')
   @OperLog({ title: 'Excel批量导入员工', businessType: 'IMPORT' })
-  @UseInterceptors(FileInterceptor('file'))
-  async importExcel(@UploadedFile() file: Express.Multer.File) {
-    return this.employeeService.importEmployeesFromExcel(file.buffer);
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, files: 1 } }))
+  async importExcel(@CurrentUser() user: CurrentUserPayload, @UploadedFile() file: Express.Multer.File) {
+    return this.employeeService.importEmployeesFromExcel(file.buffer, user);
   }
 }

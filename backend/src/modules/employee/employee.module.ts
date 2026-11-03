@@ -1,3 +1,4 @@
+import { RbacModule } from '../rbac/rbac.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Employee } from './entities/employee.entity';
@@ -8,7 +9,7 @@ import { EmployeeController } from './employee.controller';
 import { ExcelModule } from '../../excel/excel.module';
 
 @Module({
-  imports: [
+  imports: [RbacModule,
     TypeOrmModule.forFeature([Employee, Dept, AnnualLeave]),
     ExcelModule,
   ],

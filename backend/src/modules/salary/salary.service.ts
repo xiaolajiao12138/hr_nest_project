@@ -1,3 +1,5 @@
+import { applyScope, assertScope, assertEmployeeScope, requirePermission } from '../../common/security/data-scope';
+import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between, DataSource } from 'typeorm';
@@ -17,7 +19,7 @@ import * as ExcelJS from 'exceljs';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
-export class SalaryService implements OnModuleInit {
+export class SalaryService {
   private readonly logger = new Logger(SalaryService.name);
 
   constructor(
@@ -32,59 +34,26 @@ export class SalaryService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
-    await this.initSalaryMenuAndPermissions();
-  }
 
-  /**
-   * 自动自愈同步薪酬核算菜单与按钮权限至 sys_menu 与 sys_role_menu
-   */
-  private async initSalaryMenuAndPermissions() {
-    try {
-      await this.dataSource.query(`
-        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
-        VALUES (204, 2, '薪酬核算', 'SalaryManage', '/hr/salary', 'views/hr/salary/index.vue', 'Money', 4, 'C', 'hr:salary:list', false, false, 1)
-        ON CONFLICT (id) DO UPDATE SET title = '薪酬核算', path = '/hr/salary', component = 'views/hr/salary/index.vue', icon = 'Money', status = 1;
 
-        INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, menu_type, perms, is_frame, is_hidden, status)
-        VALUES
-          (230, 204, '薪资核算', '', '', '', '', 1, 'F', 'hr:salary:calc', false, false, 1),
-          (231, 204, '薪资调整', '', '', '', '', 2, 'F', 'hr:salary:edit', false, false, 1),
-          (232, 204, '发薪确认', '', '', '', '', 3, 'F', 'hr:salary:confirm', false, false, 1),
-          (233, 204, '薪资导出', '', '', '', '', 4, 'F', 'hr:salary:export', false, false, 1)
-        ON CONFLICT (id) DO NOTHING;
-
-        SELECT setval('sys_menu_id_seq', (SELECT MAX(id) FROM sys_menu));
-
-        INSERT INTO sys_role_menu (role_id, menu_id)
-        VALUES 
-          (1, 204), (1, 230), (1, 231), (1, 232), (1, 233),
-          (2, 204), (2, 230), (2, 231), (2, 232), (2, 233)
-        ON CONFLICT DO NOTHING;
-      `);
-      this.logger.log('薪酬核算系统菜单与权限数据自动装载完成');
-    } catch (err: any) {
-      this.logger.warn(`初始化薪酬菜单或权限警告: ${err?.message || err}`);
-    }
-  }
-
-  /**
+/**
    * 一键全员月度薪酬智能核算引擎
    * 1. 抓取所有正常在职/试用期员工
    * 2. 统计当月核准的请假记录折算缺勤扣除
    * 3. 按照标准税法与社保基数自动测算五险一金、应发与实发
    */
-  async calculateMonthlySalary(dto: CalculateSalaryDto) {
+  async calculateMonthlySalary(dto: CalculateSalaryDto, user?: CurrentUserPayload) {
+    requirePermission(user, 'hr:salary:calc');
     const { yearMonth } = dto;
-    if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)) {
       throw new BusinessException('月份格式不正确，应形如 2026-10');
     }
 
+    return this.dataSource.transaction(async manager => {
+    await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['salary:'+yearMonth]);
     // 查询当前有效在岗员工
-    const employees = await this.employeeRepo.find({
-      where: [{ status: 1 }, { status: 3 }],
-      relations: ['dept'],
-    });
+    const employees = await applyScope(manager.createQueryBuilder(Employee, 'emp').where('emp.status IN (:...statuses)', { statuses: [1, 3] }),
+      user, 'salary', 'emp.deptId', 'emp.id').getMany();
 
     if (employees.length === 0) {
       throw new BusinessException('当前系统中没有在职员工可供核算薪酬');
@@ -101,9 +70,15 @@ export class SalaryService implements OnModuleInit {
     let createdCount = 0;
     let updatedCount = 0;
 
+    const leavesByEmployee = new Map<number, number>();
+    const leaveRows = await manager.createQueryBuilder(Leave, 'l').select('l.empId','empId').addSelect('SUM(l.days)','days')
+      .where('l.empId IN (:...empIds)', {empIds:employees.map(e => e.id)}).andWhere("l.status = 'APPROVED' AND l.leaveType = 'CASUAL'")
+      .andWhere('l.startTime >= :start AND l.startTime < :end', {start:new Date(year,month-1,1),end:new Date(year,month,1)}).groupBy('l.empId').getRawMany();
+    for (const row of leaveRows) leavesByEmployee.set(Number(row.empId),Number(row.days));
     for (const emp of employees) {
-      // 基础薪资基数 (来自员工档案，若未设定则兜底 6000)
-      const baseSalary = Number(emp.salary) > 0 ? Number(emp.salary) : 6000;
+      await assertEmployeeScope(manager, user, 'salary', emp.id);
+      // 基础薪资基数来自员工档案
+      const baseSalary = Number(emp.salary ?? 0);
       // 岗位津贴与综合补贴
       const postSalary = Math.round(baseSalary * 0.2);
       const performanceSalary = Math.round(baseSalary * 0.15);
@@ -111,18 +86,7 @@ export class SalaryService implements OnModuleInit {
       const allowance = 500; // 500元餐补与通信补贴
 
       // 统计当月请假单 (仅计算已审核通过状态的假勤)
-      const leaves = await this.leaveRepo.find({
-        where: {
-          empId: emp.id,
-          status: 'APPROVED',
-          startTime: Between(new Date(`${startDate} 00:00:00`), new Date(`${endDate} 23:59:59`)),
-        },
-      });
-
-      let leaveDays = 0;
-      for (const l of leaves) {
-        leaveDays += Number(l.days || 0);
-      }
+      const leaveDays = leavesByEmployee.get(emp.id) || 0;
 
       // 法定计薪工作日标准为 21.75 天，计算事假缺勤扣除
       const dailySalary = baseSalary / 21.75;
@@ -160,12 +124,13 @@ export class SalaryService implements OnModuleInit {
       );
 
       // 查询是否已存在当月记录
-      let record = await this.salaryRepo.findOne({
+      let record = await manager.findOne(SalaryRecord, {
         where: { empId: emp.id, yearMonth },
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!record) {
-        record = this.salaryRepo.create({
+        record = manager.create(SalaryRecord, {
           empId: emp.id,
           yearMonth,
           baseSalary,
@@ -185,7 +150,7 @@ export class SalaryService implements OnModuleInit {
         createdCount++;
       } else {
         // 若已存在但未锁定发放，允许重新核算更新
-        if (record.status === 1) {
+        if (record.status === 1 && dto.overwrite === true) {
           Object.assign(record, {
             baseSalary,
             postSalary,
@@ -201,10 +166,10 @@ export class SalaryService implements OnModuleInit {
             remark: leaveDays > 0 ? `当月含请假考勤扣除 ${leaveDays} 天` : '重新核算更新',
           });
           updatedCount++;
-        }
+        } else { continue; }
       }
 
-      await this.salaryRepo.save(record);
+      await manager.save(record);
     }
 
     return {
@@ -214,12 +179,13 @@ export class SalaryService implements OnModuleInit {
       updatedCount,
       message: `核算完成：新增 ${createdCount} 笔，更新 ${updatedCount} 笔`,
     };
+    });
   }
 
   /**
    * 分页与高级多维查询薪资列表，附带月度全盘财务 KPI 聚合统计
    */
-  async getSalaryList(query: QuerySalaryDto) {
+  async getSalaryList(query: QuerySalaryDto, user?: CurrentUserPayload) {
     const {
       page = 1,
       pageSize = 10,
@@ -239,6 +205,7 @@ export class SalaryService implements OnModuleInit {
       .orderBy('salary.yearMonth', 'DESC')
       .addOrderBy('employee.empNo', 'ASC');
 
+    applyScope(qb, user, 'salary', 'employee.deptId', 'salary.empId');
     if (yearMonth) {
       qb.andWhere('salary.yearMonth = :yearMonth', { yearMonth });
     }
@@ -260,9 +227,8 @@ export class SalaryService implements OnModuleInit {
 
     // 独立构建统计查询（绝不带 ORDER BY，避免 PostgreSQL 报 GROUP BY 语法错误）
     const statsQb = this.salaryRepo.createQueryBuilder('salary');
-    if (filterDeptId || keyword) {
-      statsQb.leftJoin('salary.employee', 'employee');
-    }
+    statsQb.leftJoin('salary.employee', 'employee');
+    applyScope(statsQb, user, 'salary', 'employee.deptId', 'salary.empId');
     if (yearMonth) {
       statsQb.andWhere('salary.yearMonth = :yearMonth', { yearMonth });
     }
@@ -309,7 +275,7 @@ export class SalaryService implements OnModuleInit {
     };
 
     return {
-      list,
+      list: list.map(record => this.salaryView(record)),
       total,
       page,
       pageSize,
@@ -326,88 +292,69 @@ export class SalaryService implements OnModuleInit {
   /**
    * 根据 ID 获取单条薪酬明细详情
    */
-  async getSalaryDetail(id: number) {
-    const record = await this.salaryRepo.findOne({
-      where: { id },
-      relations: ['employee', 'employee.dept'],
-    });
-    if (!record) {
-      throw new BusinessException('薪资记录不存在');
-    }
-    return record;
+  async getSalaryDetail(id: number, user?: CurrentUserPayload) {
+    const record = await this.salaryRepo.findOne({ where: { id }, relations: ['employee', 'employee.dept'] });
+    if (!record) throw new BusinessException('记录不存在或不在授权范围内', 404);
+    assertScope(user, 'salary', record.empId, record.employee?.deptId);
+    return this.salaryView(record);
   }
 
   /**
    * 单条薪酬明细修改并自动联动应发实发
    */
-  async updateSalary(id: number, dto: UpdateSalaryDto) {
-    const record = await this.salaryRepo.findOne({ where: { id } });
-    if (!record) {
-      throw new BusinessException('薪资记录不存在');
-    }
-
-    if (record.status === 3) {
-      throw new BusinessException('该记录已处于发放完成状态，禁止修改');
-    }
-
-    Object.assign(record, dto);
-
-    // 重新计算应发
-    record.grossSalary =
-      Math.round(
-        (Number(record.baseSalary) +
-          Number(record.postSalary) +
-          Number(record.performanceSalary) +
-          Number(record.overtimeSalary) +
-          Number(record.allowance)) *
-          100
-      ) / 100;
-
-    // 重新计算实发
-    record.netSalary = Math.max(
-      0,
-      Math.round(
-        (Number(record.grossSalary) -
-          Number(record.leaveDeduction) -
-          Number(record.socialSecurity) -
-          Number(record.housingFund) -
-          Number(record.tax)) *
-          100
-      ) / 100
-    );
-
-    return this.salaryRepo.save(record);
+  async updateSalary(id: number, dto: UpdateSalaryDto, user?: CurrentUserPayload) {
+    requirePermission(user, 'hr:salary:edit');
+    return this.dataSource.transaction(async manager => {
+      const record = await manager.findOne(SalaryRecord, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!record) throw new BusinessException('记录不存在或不在授权范围内', 404);
+      await assertEmployeeScope(manager as any, user, 'salary', record.empId);
+      if (record.status !== 1) throw new BusinessException('仅草稿可修改，核准或已发工资请走更正流程');
+      const { payslipPassword, ...amounts } = dto;
+      for (const key of ['baseSalary','postSalary','performanceSalary','overtimeSalary','allowance','leaveDeduction','socialSecurity','housingFund','tax','remark']) {
+        if (amounts[key] !== undefined) record[key] = amounts[key];
+      }
+      if (payslipPassword) record.payslipPassword = await bcrypt.hash(payslipPassword, 12);
+      record.grossSalary = Math.round((Number(record.baseSalary) + Number(record.postSalary) + Number(record.performanceSalary)
+        + Number(record.overtimeSalary) + Number(record.allowance)) * 100) / 100;
+      record.netSalary = Math.max(0, Math.round((record.grossSalary - Number(record.leaveDeduction)
+        - Number(record.socialSecurity) - Number(record.housingFund) - Number(record.tax)) * 100) / 100);
+      return this.salaryView(await manager.save(record));
+    });
   }
 
   /**
    * 批量审批流转与发放
    */
-  async batchConfirm(dto: BatchConfirmSalaryDto) {
-    const { ids, targetStatus } = dto;
-    if (!ids || ids.length === 0) {
-      throw new BusinessException('请至少选择一条记录');
-    }
-
-    await this.salaryRepo.update(
-      { id: In(ids) },
-      { status: targetStatus }
-    );
-
-    return {
-      success: true,
-      affected: ids.length,
-    };
+  async batchConfirm(dto: BatchConfirmSalaryDto, user?: CurrentUserPayload) {
+    requirePermission(user, 'hr:salary:confirm');
+    const ids = [...new Set(dto.ids)];
+    if (!ids.length || ![2, 3].includes(dto.targetStatus)) throw new BusinessException('无效的发薪状态或记录');
+    return this.dataSource.transaction(async manager => {
+      const records = await manager.find(SalaryRecord, { where: { id: In(ids) }, lock: { mode: 'pessimistic_write' } });
+      if (records.length !== ids.length) throw new BusinessException('记录不存在或不在授权范围内', 404);
+      for (const record of records) {
+        await assertEmployeeScope(manager as any, user, 'salary', record.empId);
+        if (record.status !== dto.targetStatus - 1) throw new BusinessException('记录状态已变化，请刷新后重试');
+      }
+      const result = await manager.update(SalaryRecord, { id: In(ids), status: dto.targetStatus - 1 }, { status: dto.targetStatus });
+      if (result.affected !== ids.length) throw new BusinessException('状态更新冲突，请刷新后重试');
+      return { success: true, affected: result.affected };
+    });
   }
 
   /**
    * 导出月度薪资明细 Excel 报表
    */
-  async exportExcel(yearMonth: string): Promise<Buffer> {
-    const records = await this.salaryRepo.find({
-      where: yearMonth ? { yearMonth } : {},
-      relations: ['employee', 'employee.dept'],
-      order: { yearMonth: 'DESC', empId: 'ASC' },
-    });
+  async exportExcel(query: QuerySalaryDto, user?: CurrentUserPayload): Promise<Buffer> {
+    const { yearMonth, status, keyword } = query;
+    const qb = this.salaryRepo.createQueryBuilder('salary').leftJoinAndSelect('salary.employee', 'employee')
+      .leftJoinAndSelect('employee.dept', 'dept').orderBy('salary.empId', 'ASC');
+    applyScope(qb, user, 'salary', 'employee.deptId', 'salary.empId');
+    if (yearMonth) qb.andWhere('salary.yearMonth = :month', { month: yearMonth });
+    if (query.deptId || query.departmentId) qb.andWhere('employee.deptId = :dept', { dept: query.deptId || query.departmentId });
+    if (status != null) qb.andWhere('salary.status = :status', { status });
+    if (keyword) qb.andWhere('(employee.name LIKE :kw OR employee.empNo LIKE :kw OR employee.phone LIKE :kw)', { kw: '%' + keyword.trim() + '%' });
+    const records = await qb.getMany();
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`${yearMonth || '全期'}薪资明细宽表`);
@@ -471,64 +418,34 @@ export class SalaryService implements OnModuleInit {
    */
   async getMyPayslips(userId: number) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new BusinessException('当前用户不存在');
-    }
-
-    // 通过姓名或用户名关联员工记录
-    const employee = await this.employeeRepo.findOne({
-      where: [{ name: user.realName }, { empNo: user.username }],
-      relations: ['dept'],
-    });
-
-    if (!employee) {
-      return [];
-    }
-
-    // 仅向员工展示已发放(status=3)或已核准(status=2)的工资条
-    const records = await this.salaryRepo.find({
-      where: {
-        empId: employee.id,
-        status: In([2, 3]),
-      },
-      order: { yearMonth: 'DESC' },
-    });
-
-    return records.map((r) => ({
-      id: r.id,
-      yearMonth: r.yearMonth,
-      grossSalary: r.grossSalary,
-      netSalary: r.netSalary,
-      status: r.status,
-      hasPassword: !!r.payslipPassword,
-      deptName: employee.dept?.deptName,
-      employeeName: employee.name,
-      empNo: employee.empNo,
-    }));
+    if (!user?.employeeId) return [];
+    const employee = await this.employeeRepo.findOne({ where: { id: user.employeeId }, relations: ['dept'] });
+    if (!employee) return [];
+    const records = await this.salaryRepo.find({ where: { empId: employee.id, status: In([2, 3]) }, order: { yearMonth: 'DESC' } });
+    return records.map(record => ({ id: record.id, yearMonth: record.yearMonth, status: record.status,
+      hasPassword: !!record.payslipPassword, deptName: employee.dept?.deptName, employeeName: employee.name, empNo: employee.empNo }));
   }
 
   /**
    * 员工端: 安全验证并解密展示工资条完整收入/扣减明细
    */
   async verifyPayslip(userId: number, dto: VerifyPayslipDto) {
-    const { salaryId, password } = dto;
-    const record = await this.salaryRepo.findOne({
-      where: { id: salaryId },
-      relations: ['employee', 'employee.dept'],
-    });
-
-    if (!record) {
-      throw new BusinessException('工资条记录不存在');
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user?.employeeId) throw new BusinessException('账号尚未关联员工档案', 403);
+    const record = await this.salaryRepo.findOne({ where: { id: dto.salaryId, empId: user.employeeId, status: In([2, 3]) },
+      relations: ['employee', 'employee.dept'] });
+    if (!record) throw new BusinessException('工资条不存在或无权访问', 404);
+    if (record.payslipPassword && (!dto.password || !(await bcrypt.compare(dto.password, record.payslipPassword)))) {
+      throw new BusinessException('工资条安全口令错误，请重新输入', 403);
     }
+    return this.salaryView(record);
+  }
 
-    // 若该条记录配置了独立密码，进行防偷窥比对
-    if (record.payslipPassword && password) {
-      const match = await bcrypt.compare(password, record.payslipPassword);
-      if (!match) {
-        throw new BusinessException('工资条安全口令错误，请重新输入');
-      }
-    }
-
-    return record;
+  private salaryView(record: SalaryRecord) {
+    const { payslipPassword, employee, ...data } = record;
+    return { ...data, hasPassword: !!payslipPassword,
+      totalDeduction: Number(record.leaveDeduction) + Number(record.socialSecurity) + Number(record.housingFund) + Number(record.tax),
+      employee: employee ? { id: employee.id, empNo: employee.empNo, name: employee.name, post: employee.post,
+        dept: employee.dept ? { id: employee.dept.id, deptName: employee.dept.deptName } : undefined } : undefined };
   }
 }

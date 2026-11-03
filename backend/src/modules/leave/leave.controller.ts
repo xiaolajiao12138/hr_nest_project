@@ -1,3 +1,4 @@
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
 import {
   Controller,
   Get,
@@ -43,7 +44,8 @@ export class LeaveController {
    * @param user 当前登录用户运行时载荷
    * @returns 返回待审批单据总数 { count: number }
    */
-  @Get('pending-count')
+  @AiTool()
+@Get('pending-count')
   async getPendingCount(@CurrentUser() user: CurrentUserPayload) {
     return this.leaveService.getPendingCount(user);
   }
@@ -52,10 +54,11 @@ export class LeaveController {
    * 根据 ID 查询请假单详情
    * Query 风格: GET /hr/leave/detail?id=4
    */
-  @Get('detail')
+  @AiTool()
+@Get('detail')
   @Permissions('hr:leave:list')
-  async getDetail(@Query('id', ParseIntPipe) id: number) {
-    return this.leaveService.getLeaveDetail(id);
+  async getDetail(@CurrentUser() user: CurrentUserPayload, @Query('id', ParseIntPipe) id: number) {
+    return this.leaveService.getLeaveDetail(id, user);
   }
 
   /**
@@ -64,10 +67,11 @@ export class LeaveController {
    * @param query 分页与筛选条件（包含页码、页大小、员工ID、审批状态、请假类型等）
    * @returns 返回包含请假单实体和关联员工、审批人信息的标准分页结果
    */
-  @Get('list')
+  @AiTool()
+@Get('list')
   @Permissions('hr:leave:list')
-  async getPage(@Query() query: QueryLeaveDto) {
-    return this.leaveService.findLeavePage(query);
+  async getPage(@CurrentUser() user: CurrentUserPayload, @Query() query: QueryLeaveDto) {
+    return this.leaveService.findLeavePage(query, user);
   }
 
   /**
@@ -77,13 +81,14 @@ export class LeaveController {
    * @param year 查询年份（可选，默认为当前公历年）
    * @returns 返回该员工对应年度的年假总额、已用额度及剩余天数
    */
-  @Get('annual-balance/:empId')
+  @AiTool()
+@Get('annual-balance/:empId')
   @Permissions('hr:leave:list')
-  async getAnnualBalance(
+  async getAnnualBalance(@CurrentUser() user: CurrentUserPayload,
     @Param('empId', ParseIntPipe) empId: number,
     @Query('year') year?: number,
   ) {
-    return this.leaveService.getEmployeeAnnualBalance(empId, year);
+    return this.leaveService.getEmployeeAnnualBalance(empId, year, user);
   }
 
   /**
@@ -94,11 +99,12 @@ export class LeaveController {
    * @returns 返回创建成功的请假实体
    * @throws {BusinessException} 当年假余额不足或时间区间冲突时抛出异常并自动回滚事务
    */
-  @Post('apply')
+  @AiTool('self-service')
+@Post('apply')
   @Permissions('hr:leave:add')
   @OperLog({ title: '提交请假申请', businessType: 'INSERT' })
-  async apply(@Body() dto: CreateLeaveDto) {
-    return this.leaveService.applyLeave(dto);
+  async apply(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateLeaveDto) {
+    return this.leaveService.applyLeave(dto, user);
   }
 
   /**
@@ -120,16 +126,17 @@ export class LeaveController {
     @Body() dto: AuditLeaveDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.leaveService.auditLeave(dto.id, dto, user.userId);
+    return this.leaveService.auditLeave(dto.id, dto, user);
   }
 
   /**
    * 分页查询全员年假额度台账
    */
-  @Get('annual/list')
+  @AiTool()
+@Get('annual/list')
   @Permissions('hr:leave:list')
-  async getAnnualPage(@Query() query: QueryAnnualLeaveDto) {
-    return this.leaveService.findAnnualLeavePage(query);
+  async getAnnualPage(@CurrentUser() user: CurrentUserPayload, @Query() query: QueryAnnualLeaveDto) {
+    return this.leaveService.findAnnualLeavePage(query, user);
   }
 
   /**
@@ -138,8 +145,8 @@ export class LeaveController {
   @Put('annual/adjust')
   @Permissions('hr:leave:audit')
   @OperLog({ title: '手动微调员工年假额度', businessType: 'UPDATE' })
-  async adjustAnnual(@Body() dto: AdjustAnnualLeaveDto) {
-    return this.leaveService.adjustAnnualLeave(dto);
+  async adjustAnnual(@CurrentUser() user: CurrentUserPayload, @Body() dto: AdjustAnnualLeaveDto) {
+    return this.leaveService.adjustAnnualLeave(dto, user);
   }
 
   /**
@@ -148,7 +155,7 @@ export class LeaveController {
   @Post('annual/init-year')
   @Permissions('hr:leave:audit')
   @OperLog({ title: '全员年假额度年度初始化', businessType: 'INSERT' })
-  async initAnnualForYear(@Body() dto: InitAnnualLeaveDto) {
-    return this.leaveService.initAnnualLeaveForYear(dto);
+  async initAnnualForYear(@CurrentUser() user: CurrentUserPayload, @Body() dto: InitAnnualLeaveDto) {
+    return this.leaveService.initAnnualLeaveForYear(dto, user);
   }
 }

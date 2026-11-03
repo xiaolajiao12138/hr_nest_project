@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
+import { requirePermission, isAdmin } from '../../common/security/data-scope';
+import { SysFile } from '../../upload/entities/file.entity';
 import { Notice } from './entities/notice.entity';
 import { BaseService } from '../../common/base/base.service';
 import { QueryNoticeDto } from './dto/notice.dto';
@@ -85,7 +88,10 @@ export class NoticeService extends BaseService<Notice> {
    * @param data 新建公告实体属性载荷
    * @returns 返回创建成功的公告实体
    */
-  override async create(data: any): Promise<Notice> {
+  override async create(data: any, user?: CurrentUserPayload): Promise<Notice> {
+    requirePermission(user, 'ops:notice:add');
+    if (Number(data.status ?? 1) === 1) requirePermission(user, 'ops:notice:publish');
+    await this.validateAttachment(data.fileId, user);
     const notice = await super.create(data);
     // 判断若创建即发布，则触发全员实时通知
     if (Number(notice.status) === 1) {
@@ -102,7 +108,8 @@ export class NoticeService extends BaseService<Notice> {
    * @param status 目标状态（0: 撤回为草稿 / 1: 正式发布）
    * @returns 返回操作是否成功
    */
-  async changeStatus(id: number, status: number): Promise<boolean> {
+  async changeStatus(id: number, status: number, user?: CurrentUserPayload): Promise<boolean> {
+    requirePermission(user, 'ops:notice:publish');
     const notice = await this.findById(id);
     await this.noticeRepo.update(id, { status: Number(status) });
     // 若变为已发布状态，触发 SSE 广播事件
@@ -132,4 +139,19 @@ export class NoticeService extends BaseService<Notice> {
       },
     });
   }
+
+  async update(id: number, data: any, user?: CurrentUserPayload): Promise<Notice> {
+    requirePermission(user, 'ops:notice:edit');
+    const previous = await this.findById(id);
+    if ((data.status !== undefined && data.status !== previous.status) || previous.status === 1) requirePermission(user, 'ops:notice:publish');
+    if (data.fileId && data.fileId !== previous.fileId) await this.validateAttachment(data.fileId, user);
+    return super.update(id, data);
+  }
+
+  private async validateAttachment(id: number, user: CurrentUserPayload) {
+    if (!id) return;
+    const file = await this.dataSource.getRepository(SysFile).findOneBy({ id });
+    if (!file || !file.filePath.startsWith('notice/') || (!isAdmin(user) && file.ownerUserId !== user.userId)) throw new ForbiddenException('公告只能关联本人上传的公告附件');
+  }
+
 }

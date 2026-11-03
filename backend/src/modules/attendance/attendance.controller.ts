@@ -1,3 +1,5 @@
+import { OperLog } from '../../common/decorators/oper-log.decorator';
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
 import {
   Controller,
   Get,
@@ -50,29 +52,33 @@ export class AttendanceController {
   }
 
   @Post('shift')
+  @OperLog({title:'新增班次',businessType:'UPDATE'})
   @Permissions('hr:attendance:shift')
-  async createShift(@Body() dto: SaveShiftDto) {
-    return this.attendanceService.saveShift(dto);
+  async createShift(@CurrentUser() user: CurrentUserPayload, @Body() dto: SaveShiftDto) {
+    return this.attendanceService.saveShift(dto, undefined, user);
   }
 
   @Put('shift/:id')
+  @OperLog({title:'维护班次',businessType:'UPDATE'})
   @Permissions('hr:attendance:shift')
-  async updateShift(
+  async updateShift(@CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SaveShiftDto,
   ) {
-    return this.attendanceService.saveShift(dto, id);
+    return this.attendanceService.saveShift(dto, id, user);
   }
 
   @Delete('shift/:id')
+  @OperLog({title:'维护班次',businessType:'UPDATE'})
   @Permissions('hr:attendance:shift')
-  async deleteShift(@Param('id', ParseIntPipe) id: number) {
-    return this.attendanceService.deleteShift(id);
+  async deleteShift(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.attendanceService.deleteShift(id, user);
   }
 
   // ==================== 排班日历 ====================
 
-  @Get('schedule/month')
+  @AiTool()
+@Get('schedule/month')
   @Permissions('hr:attendance:list')
   async getMonthSchedule(
     @Query('yearMonth') yearMonth: string,
@@ -89,6 +95,7 @@ export class AttendanceController {
   }
 
   @Post('schedule/batch-set')
+  @OperLog({title:'批量排班',businessType:'UPDATE'})
   @Permissions('hr:attendance:schedule')
   async batchSetSchedule(
     @Body() dto: BatchSetScheduleDto,
@@ -99,7 +106,8 @@ export class AttendanceController {
 
   // ==================== 打卡业务 ====================
 
-  @Post('clock')
+  @AiTool('self-service')
+@Post('clock')
   @Permissions('hr:attendance:clock')
   async clockIn(
     @CurrentUser() user: CurrentUserPayload,
@@ -108,7 +116,8 @@ export class AttendanceController {
     return this.attendanceService.clockIn(user.userId, dto);
   }
 
-  @Get('today')
+  @AiTool()
+@Get('today')
   async getTodayStatus(@CurrentUser() user: CurrentUserPayload) {
     return this.attendanceService.getTodayStatus(user.userId);
   }
@@ -119,7 +128,8 @@ export class AttendanceController {
    * 根据 ID 查询单条考勤记录详情
    * Query 传参: GET /attendance/record/detail?id=4
    */
-  @Get('record/detail')
+  @AiTool()
+@Get('record/detail')
   @Permissions('hr:attendance:list')
   async getRecordDetail(
     @Query('id', ParseIntPipe) id: number,
@@ -128,7 +138,8 @@ export class AttendanceController {
     return this.attendanceService.getRecordDetail(id, user);
   }
 
-  @Get('record/list')
+  @AiTool()
+@Get('record/list')
   @Permissions('hr:attendance:list')
   async getRecordList(
     @Query() query: QueryAttendanceRecordDto,
@@ -138,7 +149,8 @@ export class AttendanceController {
   }
 
   @Post('record/repair')
-  @Permissions('hr:attendance:repair')
+  @OperLog({title:'考勤补卡修正',businessType:'UPDATE'})
+  @Permissions('hr:attendance:approveRepair')
   async repairRecord(
     @Body() dto: RepairAttendanceDto,
     @CurrentUser() user: CurrentUserPayload,

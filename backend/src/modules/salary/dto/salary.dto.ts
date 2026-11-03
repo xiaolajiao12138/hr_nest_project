@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsBoolean, IsArray, IsInt, IsIn, Length, Matches, ArrayNotEmpty, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
 
@@ -6,8 +6,12 @@ import { PageParamDto } from '../../../common/dto/page-param.dto';
  * 月度薪酬一键智能核算入参
  */
 export class CalculateSalaryDto {
+  @IsOptional()
+  @IsBoolean()
+  overwrite?: boolean = false;
   @IsString()
   @IsNotEmpty({ message: '核算月份不能为空，格式如 2026-10' })
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
   yearMonth: string;
 }
 
@@ -94,23 +98,29 @@ export class UpdateSalaryDto {
   tax?: number;
 
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  status?: number;
+  @IsString()
+  remark?: string;
 
   @IsOptional()
   @IsString()
-  remark?: string;
+  @Length(6, 72)
+  payslipPassword?: string;
 }
 
 /**
  * 批量审批与发放薪资入参
  */
 export class BatchConfirmSalaryDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(500)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   @IsNotEmpty({ message: '待操作记录ID列表不能为空' })
   ids: number[];
 
   @IsNumber()
+  @IsIn([2, 3])
   @Type(() => Number)
   targetStatus: number; // 2:已核准 3:已发放
 }

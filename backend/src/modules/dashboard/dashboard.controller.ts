@@ -1,3 +1,5 @@
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { DashboardService, DashboardStatsResult } from './dashboard.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,8 +18,9 @@ export class DashboardController {
    *
    * @returns 返回工作台全量图表及指标聚合对象
    */
-  @Get('stats')
-  async getDashboardStats(): Promise<DashboardStatsResult> {
-    return this.dashboardService.getDashboardStats();
+  @AiTool()
+@Get('stats')
+  async getDashboardStats(@CurrentUser() user: CurrentUserPayload): Promise<DashboardStatsResult> {
+    return this.dashboardService.getDashboardStats(user);
   }
 }

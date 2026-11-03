@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../common/base/base.entity';
 import { Employee } from '../../employee/entities/employee.entity';
 import { AttendanceShift } from './shift.entity';
@@ -7,6 +7,7 @@ import { AttendanceShift } from './shift.entity';
  * 员工考勤排班记录实体 (hr_attendance_schedule)
  */
 @Entity('hr_attendance_schedule')
+@Index('uq_schedule_employee_date', ['empId','date'], { unique: true })
 export class AttendanceSchedule extends BaseEntity {
   @Column({ name: 'emp_id', comment: '关联员工ID' })
   empId: number;

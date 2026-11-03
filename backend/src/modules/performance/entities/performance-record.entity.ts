@@ -5,6 +5,7 @@ import { BaseEntity } from '../../../common/base/base.entity';
  * 员工绩效考评明细与闭环评定记录实体
  */
 @Entity('hr_performance_record')
+@Index('uq_performance_employee_plan', ['empId','planId'], { unique: true })
 export class PerformanceRecord extends BaseEntity {
   @Index()
   @Column({ name: 'plan_id', comment: '关联考核方案ID' })

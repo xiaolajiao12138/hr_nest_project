@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../common/base/base.entity';
 import { Employee } from '../../employee/entities/employee.entity';
 
@@ -6,6 +6,7 @@ import { Employee } from '../../employee/entities/employee.entity';
  * 员工月度薪酬核算与发薪记录实体
  */
 @Entity('hr_salary_record')
+@Index('uq_salary_employee_month', ['empId','yearMonth'], { unique: true })
 export class SalaryRecord extends BaseEntity {
   @Column({ name: 'emp_id', comment: '关联员工ID' })
   empId: number;

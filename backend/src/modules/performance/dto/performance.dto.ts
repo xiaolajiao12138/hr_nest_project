@@ -1,5 +1,6 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max, IsArray, IsInt, IsIn, Matches, IsDateString } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { Type, Transform } from 'class-transformer';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
 
 /**
@@ -18,6 +19,8 @@ export class QueryPerformanceRecordDto extends PageParamDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['PENDING_SELF', 'PENDING_MANAGER', 'COMPLETED'])
+  @Transform(({ value }) => (value === '' ? undefined : value))
   status?: string;
 
   @IsOptional()
@@ -35,14 +38,17 @@ export class CreatePerformancePlanDto {
 
   @IsString()
   @IsNotEmpty({ message: '周期类型不能为空' })
+  @IsIn(['MONTHLY', 'QUARTERLY', 'ANNUAL'])
   cycleType: string;
 
   @IsString()
   @IsNotEmpty({ message: '起始日期不能为空' })
+  @IsDateString()
   startDate: string;
 
   @IsString()
   @IsNotEmpty({ message: '截止日期不能为空' })
+  @IsDateString()
   endDate: string;
 
   @IsOptional()
@@ -83,10 +89,14 @@ export class LaunchAppraisalDto {
 
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   deptIds?: number[];
 
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   empIds?: number[];
 }
 
@@ -101,6 +111,7 @@ export class EvaluateAppraisalDto {
 
   @IsString()
   @IsNotEmpty({ message: '打分评审类型不能为空(self/manager/both)' })
+  @IsIn(['self', 'manager'])
   evalType: 'self' | 'manager' | 'both';
 
   @IsOptional()
@@ -134,6 +145,7 @@ export class EvaluateAppraisalDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['S', 'A', 'B', 'C', 'D'])
   customRating?: string;
 }
 
@@ -148,5 +160,8 @@ export class SyncPerformanceToSalaryDto {
 
   @IsString()
   @IsNotEmpty({ message: '薪资生效月份不能为空 (格式: YYYY-MM)' })
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
   yearMonth: string;
 }
+
+export class UpdatePerformancePlanDto extends PartialType(CreatePerformancePlanDto) { }

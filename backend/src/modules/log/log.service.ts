@@ -1,3 +1,4 @@
+import { sanitizeLog } from '../../common/security/sanitize';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -48,7 +49,7 @@ export class LogService {
     }
 
     const [list, total] = await qb.getManyAndCount();
-    return PageResultDto.create(list, total, page, pageSize);
+    return PageResultDto.create(list.map(sanitizeLog), total, page, pageSize);
   }
 
   /**
@@ -59,7 +60,7 @@ export class LogService {
     if (!log) {
       throw new BusinessException('操作日志不存在');
     }
-    return log;
+    return sanitizeLog(log);
   }
 
   async cleanLogs(): Promise<boolean> {

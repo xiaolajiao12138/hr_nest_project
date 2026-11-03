@@ -1,3 +1,4 @@
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
 import {
   Controller,
   Get,
@@ -33,7 +34,8 @@ export class DeptController {
    * @param user 当前登录用户载荷
    * @returns 返回符合前端 el-tree / el-cascader 规范的部门树状数组
    */
-  @Get('tree')
+  @AiTool()
+@Get('tree')
   async getTree(@CurrentUser() user: CurrentUserPayload) {
     return this.deptService.getDeptTreeForUser(user);
   }
@@ -46,8 +48,8 @@ export class DeptController {
    */
   @Get('detail')
   @Permissions('hr:dept:list')
-  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
-    return this.deptService.findById(id);
+  async getDetailByQuery(@CurrentUser() user: CurrentUserPayload, @Query('id', ParseIntPipe) id: number) {
+    return this.deptService.getScopedDetail(id, user);
   }
 
   /**
@@ -58,8 +60,8 @@ export class DeptController {
    */
   @Get(':id')
   @Permissions('hr:dept:list')
-  async getDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.deptService.findById(id);
+  async getDetail(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.deptService.getScopedDetail(id, user);
   }
 
   /**
@@ -69,10 +71,10 @@ export class DeptController {
    * @returns 返回新增后的部门实体
    */
   @Post()
-  @Permissions('hr:dept:list')
+  @Permissions('hr:dept:add')
   @OperLog({ title: '新增部门', businessType: 'INSERT' })
-  async create(@Body() dto: CreateDeptDto) {
-    return this.deptService.create(dto);
+  async create(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateDeptDto) {
+    return this.deptService.createScoped(dto, user);
   }
 
   /**
@@ -82,10 +84,10 @@ export class DeptController {
    * @returns 返回更新后的部门实体
    */
   @Put('sort')
-  @Permissions('hr:dept:list')
+  @Permissions('hr:dept:edit')
   @OperLog({ title: '调整部门层级排序', businessType: 'UPDATE' })
-  async updateSort(@Body() dto: UpdateDeptSortDto) {
-    return this.deptService.updateSort(dto.id, dto.parentId, dto.sort);
+  async updateSort(@CurrentUser() user: CurrentUserPayload, @Body() dto: UpdateDeptSortDto) {
+    return this.deptService.updateSort(dto.id, dto.parentId, dto.sort, user);
   }
 
   /**
@@ -96,10 +98,10 @@ export class DeptController {
    * @returns 返回修改后的部门实体
    */
   @Put(':id')
-  @Permissions('hr:dept:list')
+  @Permissions('hr:dept:edit')
   @OperLog({ title: '修改部门', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDeptDto) {
-    return this.deptService.update(id, dto);
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDeptDto) {
+    return this.deptService.updateScoped(id, dto, user);
   }
 
   /**
@@ -111,9 +113,9 @@ export class DeptController {
    * @throws {BusinessException} 当部门或子部门下仍有关联在职员工时抛出异常
    */
   @Delete(':id')
-  @Permissions('hr:dept:list')
+  @Permissions('hr:dept:delete')
   @OperLog({ title: '删除部门', businessType: 'DELETE' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.deptService.deleteDeptWithCascade(id);
+  async delete(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.deptService.deleteDeptWithCascade(id, user);
   }
 }

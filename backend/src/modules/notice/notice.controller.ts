@@ -1,3 +1,4 @@
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
 import {
   Controller,
   Get,
@@ -50,7 +51,8 @@ export class NoticeController {
    *
    * @returns 返回最新发布的已生效公告列表
    */
-  @Get('latest')
+  @AiTool()
+@Get('latest')
   async getLatest() {
     return this.noticeService.getLatestNotices(5);
   }
@@ -88,7 +90,7 @@ export class NoticeController {
    * @returns 返回新建成功的公告实体
    */
   @Post()
-  @Permissions('ops:notice:list')
+  @Permissions('ops:notice:add')
   @OperLog({ title: '新增系统公告', businessType: 'INSERT' })
   async create(
     @Body() dto: CreateNoticeDto,
@@ -97,7 +99,7 @@ export class NoticeController {
     return this.noticeService.create({
       ...dto,
       createdBy: user.username,
-    });
+    }, user);
   }
 
   /**
@@ -108,10 +110,10 @@ export class NoticeController {
    * @returns 返回变更结果布尔值
    */
   @Put('status')
-  @Permissions('ops:notice:list')
+  @Permissions('ops:notice:publish')
   @OperLog({ title: '调整公告发布状态', businessType: 'UPDATE' })
-  async changeStatus(@Body() dto: ChangeNoticeStatusDto) {
-    return this.noticeService.changeStatus(dto.id, dto.status);
+  async changeStatus(@CurrentUser() user: CurrentUserPayload, @Body() dto: ChangeNoticeStatusDto) {
+    return this.noticeService.changeStatus(dto.id, dto.status, user);
   }
 
   /**
@@ -122,10 +124,10 @@ export class NoticeController {
    * @returns 返回更新后的实体
    */
   @Put(':id')
-  @Permissions('ops:notice:list')
+  @Permissions('ops:notice:edit')
   @OperLog({ title: '修改系统公告', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateNoticeDto) {
-    return this.noticeService.update(id, dto);
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateNoticeDto) {
+    return this.noticeService.update(id, dto, user);
   }
 
   /**
@@ -135,7 +137,7 @@ export class NoticeController {
    * @returns 返回受影响的记录行数对象
    */
   @Delete(':id')
-  @Permissions('ops:notice:list')
+  @Permissions('ops:notice:delete')
   @OperLog({ title: '删除系统公告', businessType: 'DELETE' })
   async delete(@Param('id', ParseIntPipe) id: number) {
     return this.noticeService.deleteById(id);

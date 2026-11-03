@@ -1,3 +1,5 @@
+import { OperLog } from '../../common/decorators/oper-log.decorator';
+import { AiTool } from '../../common/decorators/ai-tool.decorator';
 import {
   Controller,
   Get,
@@ -10,7 +12,7 @@ import {
   Res,
   ParseIntPipe,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { SalaryService } from './salary.service';
 import {
   CalculateSalaryDto,
@@ -36,62 +38,70 @@ export class SalaryController {
    * 一键智能核算当月全员薪资草稿
    */
   @Post('calculate')
+  @OperLog({title:'薪资核算',businessType:'UPDATE'})
   @Permissions('hr:salary:calc')
-  async calculateMonthlySalary(@Body() dto: CalculateSalaryDto) {
-    return this.salaryService.calculateMonthlySalary(dto);
+  async calculateMonthlySalary(@CurrentUser() user: CurrentUserPayload, @Body() dto: CalculateSalaryDto) {
+    return this.salaryService.calculateMonthlySalary(dto, user);
   }
 
   /**
    * 根据 ID 查询单条薪酬详情
    * Query 风格: GET /salary/detail?id=4
    */
+  @AiTool()
   @Get('detail')
+  @OperLog({title:'读取薪资详情',businessType:'OTHER'})
   @Permissions('hr:salary:list')
-  async getSalaryDetail(@Query('id', ParseIntPipe) id: number) {
-    return this.salaryService.getSalaryDetail(id);
+  async getSalaryDetail(@CurrentUser() user: CurrentUserPayload, @Query('id', ParseIntPipe) id: number) {
+    return this.salaryService.getSalaryDetail(id, user);
   }
 
   /**
    * 分页查询薪酬列表与核心指标总览
    */
+  @AiTool()
   @Get('list')
+  @OperLog({title:'读取薪资列表',businessType:'OTHER'})
   @Permissions('hr:salary:list')
-  async getSalaryList(@Query() query: QuerySalaryDto) {
-    return this.salaryService.getSalaryList(query);
+  async getSalaryList(@CurrentUser() user: CurrentUserPayload, @Query() query: QuerySalaryDto) {
+    return this.salaryService.getSalaryList(query, user);
   }
 
   /**
    * 手工微调单条薪酬明细
    */
   @Put(':id')
+  @OperLog({title:'调整薪资',businessType:'UPDATE'})
   @Permissions('hr:salary:edit')
-  async updateSalary(
+  async updateSalary(@CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSalaryDto
   ) {
-    return this.salaryService.updateSalary(id, dto);
+    return this.salaryService.updateSalary(id, dto, user);
   }
 
   /**
    * 批量审批与流转薪资状态
    */
   @Post('batch-confirm')
+  @OperLog({title:'薪资核准发放',businessType:'UPDATE'})
   @Permissions('hr:salary:confirm')
-  async batchConfirm(@Body() dto: BatchConfirmSalaryDto) {
-    return this.salaryService.batchConfirm(dto);
+  async batchConfirm(@CurrentUser() user: CurrentUserPayload, @Body() dto: BatchConfirmSalaryDto) {
+    return this.salaryService.batchConfirm(dto, user);
   }
 
   /**
    * 导出月度薪资明细 Excel
    */
   @Get('export')
+  @OperLog({title:'导出薪资',businessType:'EXPORT'})
   @Permissions('hr:salary:export')
-  async exportExcel(
-    @Query('yearMonth') yearMonth: string,
+  async exportExcel(@CurrentUser() user: CurrentUserPayload,
+    @Query() query: QuerySalaryDto,
     @Res() res: Response
   ) {
-    const buffer = await this.salaryService.exportExcel(yearMonth);
-    const fileName = encodeURIComponent(`员工薪资明细_${yearMonth || '全期'}.xlsx`);
+    const buffer = await this.salaryService.exportExcel(query, user);
+    const fileName = encodeURIComponent(`员工薪资明细_${query.yearMonth || '全期'}.xlsx`);
 
     res.setHeader(
       'Content-Type',
@@ -104,7 +114,8 @@ export class SalaryController {
   /**
    * 员工端: 获取个人电子工资条历史列表
    */
-  @Get('my-payslips')
+  @AiTool()
+@Get('my-payslips')
   async getMyPayslips(@CurrentUser() user: CurrentUserPayload) {
     return this.salaryService.getMyPayslips(user.userId);
   }
@@ -113,6 +124,7 @@ export class SalaryController {
    * 员工端: 安全验证并解密个人工资条详细数据
    */
   @Post('my-payslips/verify')
+  @OperLog({title:'读取个人工资条',businessType:'OTHER'})
   async verifyPayslip(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: VerifyPayslipDto

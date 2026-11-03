@@ -28,7 +28,7 @@ export class LogController {
   }
 
   @Delete('clean')
-  @Permissions('ops:log:list')
+  @Permissions('ops:log:clean')
   @OperLog({ title: '清空操作日志', businessType: 'DELETE' })
   async clean() {
     return this.logService.cleanLogs();

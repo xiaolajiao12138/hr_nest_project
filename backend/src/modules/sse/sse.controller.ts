@@ -1,6 +1,7 @@
 import { Controller, Sse, Req, Query, UnauthorizedException, Logger, MessageEvent } from '@nestjs/common';
-import { Request } from 'express';
-import { Observable } from 'rxjs';
+import type { Request } from 'express';
+import { Observable, concatMap, takeWhile, map } from 'rxjs';
+import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { SseService } from './sse.service';
@@ -17,6 +18,7 @@ export class SseController {
     private readonly sseService: SseService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -30,10 +32,10 @@ export class SseController {
    * @throws {UnauthorizedException} 当未提供凭证或凭证已过期/非法时抛出未授权异常
    */
   @Sse('stream')
-  stream(
+  async stream(
     @Req() req: Request,
     @Query('token') queryToken?: string,
-  ): Observable<MessageEvent> {
+  ): Promise<Observable<MessageEvent>> {
     // 1. 提取身份凭证 Token（优先兼容原生 EventSource 的 Query 传递，兼顾标准 Header 传递）
     let token = queryToken;
     const authHeader = req.headers.authorization;
@@ -47,12 +49,14 @@ export class SseController {
 
     // 2. 校验 Token 合法性并解析绑定的当前登录用户 ID
     let userId: number;
+    let expires = 0;
     try {
       const secret =
         this.configService.get<string>('jwt.secret') ||
         'hr_jwt_secret_dev_2026_key';
       const decoded: any = this.jwtService.verify(token, { secret });
       userId = Number(decoded.userId);
+      expires = Number(decoded.exp) * 1000;
       if (!userId) {
         throw new Error('无效的 Token 载荷: 缺少 userId');
       }
@@ -61,12 +65,19 @@ export class SseController {
       throw new UnauthorizedException('Token 无效或已过期');
     }
 
+    const accounts = await this.dataSource.query('SELECT id FROM sys_user WHERE id = $1 AND status = 1', [userId]);
+    if (!accounts.length) throw new UnauthorizedException('账号已停用或删除');
+
     // 3. 监听网络波动或客户端主动关闭窗口/注销导致的 TCP 连接中断，及时回收内存
     req.on('close', () => {
       this.sseService.removeClient(userId);
     });
 
     // 4. 返回 RxJS 响应式事件流，建立持续单向推送通道
-    return this.sseService.addClient(userId);
+    return this.sseService.addClient(userId).pipe(
+      concatMap(async event => ({event, active: Date.now() < expires && (await this.dataSource.query('SELECT id FROM sys_user WHERE id = $1 AND status = 1', [userId])).length > 0})),
+      takeWhile(result => result.active),
+      map(result => result.event),
+    );
   }
 }

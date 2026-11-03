@@ -16,7 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { OperLog } from '../../common/decorators/oper-log.decorator';
-import { Dict } from './entities/dict.entity';
+import { CreateDictDto, UpdateDictDto } from './dict.dto';
 
 @Controller('ops/dict')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -57,9 +57,9 @@ export class DictController {
    * 新增字典项
    */
   @Post()
-  @Permissions('ops:dict:list')
+  @Permissions('ops:dict:add')
   @OperLog({ title: '新增数据字典', businessType: 'INSERT' })
-  async create(@Body() body: Partial<Dict>) {
+  async create(@Body() body: CreateDictDto) {
     return this.dictService.create(body);
   }
 
@@ -67,9 +67,9 @@ export class DictController {
    * 修改字典项
    */
   @Put(':id')
-  @Permissions('ops:dict:list')
+  @Permissions('ops:dict:edit')
   @OperLog({ title: '修改数据字典', businessType: 'UPDATE' })
-  async update(@Param('id') id: number, @Body() body: Partial<Dict>) {
+  async update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateDictDto) {
     return this.dictService.update(id, body);
   }
 
@@ -77,9 +77,9 @@ export class DictController {
    * 删除字典项
    */
   @Delete(':id')
-  @Permissions('ops:dict:list')
+  @Permissions('ops:dict:delete')
   @OperLog({ title: '删除数据字典', businessType: 'DELETE' })
-  async delete(@Param('id') id: number) {
+  async delete(@Param('id', ParseIntPipe) id: number) {
     return this.dictService.deleteById(id);
   }
 }

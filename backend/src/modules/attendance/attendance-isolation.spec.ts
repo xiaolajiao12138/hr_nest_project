@@ -31,10 +31,12 @@ function createMockQueryBuilder(options?: {
       whereCalls.push({ sql, params });
       return qb;
     },
-    andWhere: (sql: string, params?: Record<string, any>) => {
+    andWhere: (sql: any, params?: Record<string, any>) => {
+      if (sql?.whereFactory) { sql.whereFactory(qb); return qb; }
       andWhereCalls.push({ sql, params });
       return qb;
     },
+    orWhere: (sql: string, params?: Record<string, any>) => { andWhereCalls.push({sql,params}); return qb; },
     orderBy: () => qb,
     addOrderBy: () => qb,
     select: () => qb,
@@ -111,7 +113,7 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
       userId: 8,
       username: 'ptyg',
       roles: ['employee'],
-      permissions: ['hr:attendance:list', 'hr:attendance:clock'],
+      permissions: ['hr:attendance:list', 'hr:attendance:clock'], employeeId: 104,
     };
 
     await service.getRecordList(
@@ -128,7 +130,7 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
     // 1. 必须包含本人 empId 硬隔离条件
     assert.ok(
       recordListQb.andWhereCalls.some(
-        (c) => c.sql.includes('record.empId = :scopedEmpId') && c.params?.scopedEmpId === 104,
+        (c) => c.sql.includes('record.empId = :scope_attendance_self') && c.params?.scope_attendance_self === 104,
       ),
       '普通员工查询必须强制叠加本人 empId 隔离条件',
     );
@@ -152,7 +154,7 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
     );
     assert.ok(
       statsQb.andWhereCalls.some(
-        (c) => c.sql.includes('record.empId = :scopedEmpId') && c.params?.scopedEmpId === 104,
+        (c) => c.sql.includes('record.empId = :scope_attendance_self') && c.params?.scope_attendance_self === 104,
       ),
       '统计查询器也必须强制锁定本人 empId',
     );
@@ -164,7 +166,7 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
     );
   });
 
-  it('具备考勤排班或班次管理权限的角色应被识别为考勤管理者，支持按父部门自动包含子部门检索全员考勤', async () => {
+  it('具备考勤排班或班次管理权限的角色应被识别为考勤管理者，按授权部门范围与父部门筛选取交集', async () => {
     const recordListQb = createMockQueryBuilder({ manyAndCount: [[{ id: 1 }], 1] });
     const statsQb = createMockQueryBuilder();
 
@@ -200,6 +202,7 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
       username: 'kqzg',
       roles: ['attendance_supervisor'],
       permissions: ['hr:attendance:list', 'hr:attendance:schedule'],
+      dataScopes: {attendance:{all:false,deptIds:[2],self:true}},
     };
 
     assert.equal(
@@ -220,13 +223,13 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
 
     // 不应锁定本人 empId
     assert.equal(
-      recordListQb.andWhereCalls.some((c) => c.sql.includes('scopedEmpId')),
+      recordListQb.andWhereCalls.some((c) => c.sql.includes('scope_attendance_self')),
       false,
       '考勤管理人员不应被锁定本人 empId',
     );
 
     // 选择父部门 deptId=2 时应自动展开包含子部门 [2, 5]
-    const deptCall = recordListQb.andWhereCalls.find((c) => c.sql.includes('employee.deptId'));
+    const deptCall = recordListQb.andWhereCalls.find((c) => c.params?.deptIds);
     assert.ok(deptCall, '应包含部门过滤条件');
     assert.deepEqual(
       deptCall?.params?.deptIds?.sort((a: number, b: number) => a - b),
@@ -273,14 +276,14 @@ describe('AttendanceService 考勤检索与数据范围隔离测试', () => {
       userId: 8,
       username: 'ptyg',
       roles: ['employee'],
-      permissions: ['hr:attendance:list'],
+      permissions: ['hr:attendance:list'], employeeId: 104,
     };
 
     await (service as any).getMonthSchedule('2026-10', 5, normalUser, 'EMP1004');
 
     assert.ok(
       empQb.andWhereCalls.some(
-        (c) => c.sql.includes('employee.id = :myEmpId') && c.params?.myEmpId === 104,
+        (c) => c.sql.includes('employee.id = :scope_attendance_self') && c.params?.scope_attendance_self === 104,
       ),
       '普通员工查询排班日历必须锁定本人 employee.id',
     );

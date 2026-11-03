@@ -11,6 +11,9 @@ import { PageParamDto } from '../../../common/dto/page-param.dto';
 
 export class QueryEmployeeDto extends PageParamDto {
   @IsOptional()
+  @IsString()
+  purpose?: string;
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   deptId?: number;

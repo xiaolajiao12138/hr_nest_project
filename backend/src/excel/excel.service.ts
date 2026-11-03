@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { BusinessException } from '../common/exceptions/business.exception';
 
 /**

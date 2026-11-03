@@ -6,7 +6,7 @@ import {
   IsBoolean,
   IsArray,
   Min,
-  Max,
+  Max, IsInt, IsIn, Matches, ArrayNotEmpty, ArrayMaxSize, ArrayUnique, IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
@@ -21,10 +21,12 @@ export class SaveShiftDto {
 
   @IsString()
   @IsNotEmpty({ message: '上班标准时间不能为空，格式如 09:00' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   startTime: string;
 
   @IsString()
   @IsNotEmpty({ message: '下班标准时间不能为空，格式如 18:00' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   endTime: string;
 
   @IsOptional()
@@ -66,14 +68,17 @@ export class SaveShiftDto {
 export class BatchSetScheduleDto {
   @IsArray()
   @IsNotEmpty({ message: '请至少选择一位员工' })
+  @ArrayNotEmpty() @ArrayMaxSize(500) @ArrayUnique() @IsInt({each:true}) @Min(1,{each:true})
   empIds: number[];
 
   @IsString()
   @IsNotEmpty({ message: '排班起始日期不能为空 (YYYY-MM-DD)' })
+  @IsDateString()
   startDate: string;
 
   @IsString()
   @IsNotEmpty({ message: '排班结束日期不能为空 (YYYY-MM-DD)' })
+  @IsDateString()
   endDate: string;
 
   @IsOptional()
@@ -96,6 +101,7 @@ export class BatchSetScheduleDto {
 export class ClockInDto {
   @IsOptional()
   @IsString()
+  @IsIn(['CHECK_IN','CHECK_OUT','AUTO'])
   type?: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO';
 
   @IsOptional()
