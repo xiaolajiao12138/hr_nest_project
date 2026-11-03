@@ -8,10 +8,12 @@ import {
   JoinTable,
   ManyToOne,
   JoinColumn,
+  OneToOne,
 } from 'typeorm';
 import { Role } from './role.entity';
 import { BaseEntity } from '../../../common/base/base.entity';
 import { Dept } from '../../department/entities/dept.entity';
+import { Employee } from '../../employee/entities/employee.entity';
 
 @Entity('sys_user')
 export class User extends BaseEntity {
@@ -38,6 +40,13 @@ export class User extends BaseEntity {
 
   @Column({ name: 'dept_id', nullable: true, comment: '所属部门ID' })
   deptId: number;
+
+  @Column({ name: 'employee_id', type: 'integer', nullable: true, unique: true, comment: '可信员工身份绑定' })
+  employeeId: number | null;
+
+  @OneToOne(() => Employee, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'employee_id' })
+  employee?: Employee;
 
   @ManyToOne(() => Dept, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'dept_id' })

@@ -1,6 +1,8 @@
+import { CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
+import { requireAdmin } from '../../../common/security/data-scope';
 import { Role } from '../entities/role.entity';
 import { Menu } from '../entities/menu.entity';
 import { BaseService } from '../../../common/base/base.service';
@@ -26,7 +28,8 @@ export class RoleService extends BaseService<Role> {
   /**
    * 创建角色
    */
-  async createRole(dto: CreateRoleDto): Promise<Role> {
+  async createRole(dto: CreateRoleDto, user?: CurrentUserPayload): Promise<Role> {
+    requireAdmin(user);
     const exist = await this.roleRepo.findOne({
       where: { roleKey: dto.roleKey },
     });
@@ -38,7 +41,10 @@ export class RoleService extends BaseService<Role> {
       roleName: dto.roleName,
       roleKey: dto.roleKey,
       sort: dto.sort || 0,
+      status: dto.status ?? 1,
       remark: dto.remark,
+      dataScope: dto.dataScope || 'SELF',
+      scopeDeptIds: dto.dataScope === 'CUSTOM' ? dto.scopeDeptIds || [] : [],
     });
 
     if (dto.menuIds && dto.menuIds.length > 0) {
@@ -57,7 +63,8 @@ export class RoleService extends BaseService<Role> {
   /**
    * 分配角色菜单与按钮权限
    */
-  async updateRoleMenus(roleId: number, dto: UpdateRoleMenusDto): Promise<boolean> {
+  async updateRoleMenus(roleId: number, dto: UpdateRoleMenusDto, user?: CurrentUserPayload): Promise<boolean> {
+    requireAdmin(user);
     const res = await this.withTransaction(async (manager) => {
       const role = await manager.findOne(Role, {
         where: { id: roleId },
@@ -67,6 +74,7 @@ export class RoleService extends BaseService<Role> {
         throw new BusinessException('角色不存在');
       }
 
+      if (role.roleKey === 'admin') throw new BusinessException('系统管理员权限不可变更');
       if (dto.menuIds && dto.menuIds.length > 0) {
         role.menus = await manager.findBy(Menu, { id: In(dto.menuIds) });
       } else {
@@ -87,8 +95,13 @@ export class RoleService extends BaseService<Role> {
   /**
    * 重写角色信息更新
    */
-  async update(id: number, attrs: any): Promise<Role> {
-    const updated = await super.update(id, attrs);
+  async update(id: number, attrs: any, user?: CurrentUserPayload): Promise<Role> {
+    requireAdmin(user);
+    const role = await this.findById(id);
+    if (role.roleKey === 'admin') throw new BusinessException('系统管理员角色不可变更');
+    const allowed = {};
+    for (const key of ['roleName','roleKey','sort','remark','status','dataScope','scopeDeptIds']) if (attrs[key] !== undefined) allowed[key] = attrs[key];
+    const updated = await super.update(id, allowed);
     await this.authCacheService.clearAllAuthorities();
     this.sseService.broadcastPermissionUpdate('角色基础信息已更新');
     return updated;
@@ -97,7 +110,10 @@ export class RoleService extends BaseService<Role> {
   /**
    * 重写角色删除
    */
-  async deleteById(id: number): Promise<boolean> {
+  async deleteById(id: number, user?: CurrentUserPayload): Promise<boolean> {
+    requireAdmin(user);
+    const role = await this.findById(id);
+    if (role.roleKey === 'admin') throw new BusinessException('系统管理员角色不可删除');
     const res = await super.deleteById(id);
     await this.authCacheService.clearAllAuthorities();
     this.sseService.broadcastPermissionUpdate('系统角色已删除并同步权限');

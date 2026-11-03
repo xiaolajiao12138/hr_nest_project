@@ -13,6 +13,8 @@ export interface UserAuthorityData {
   roles: string[];
   permissions: string[];
   deptId?: number;
+  employeeId?: number;
+  dataScopes?: Record<string, { all: boolean; deptIds: number[]; self: boolean }>;
   status: number;
 }
 
@@ -23,7 +25,7 @@ export interface UserAuthorityData {
 @Injectable()
 export class AuthCacheService {
   private readonly logger = new Logger(AuthCacheService.name);
-  private readonly CACHE_PREFIX = 'auth:user_auth:';
+  private readonly CACHE_PREFIX = 'auth:user_auth:v2:';
   private readonly CACHE_TTL = 1800; // 30 分钟
 
   constructor(
@@ -54,13 +56,14 @@ export class AuthCacheService {
     // 缓存未命中或解析失败，从数据库精准拉取最新状态及权限
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      relations: ['roles', 'roles.menus'],
+      relations: ['roles', 'roles.menus', 'employee'],
     });
 
     if (!user) {
       return null;
     }
 
+    if (user.employeeId && user.employee) user.deptId = user.employee.deptId;
     const activeRoles = (user.roles || []).filter((r) => r.status === 1);
     const roleKeys = activeRoles.map((r) => r.roleKey);
 
@@ -81,12 +84,37 @@ export class AuthCacheService {
       permissions = Array.from(permsSet);
     }
 
+    // 每种资源只合并拥有该资源权限的角色，避免无关角色扩大薪资等敏感范围。
+    const resources = { employee: 'hr:employee:', salary: 'hr:salary:', leave: 'hr:leave:',
+      attendance: 'hr:attendance:', performance: 'hr:performance:', user: 'system:user:', dept: 'hr:dept:' };
+    const dataScopes: NonNullable<UserAuthorityData['dataScopes']> = {};
+    let descendants: number[] | undefined;
+    for (const [resource, prefix] of Object.entries(resources)) {
+      const scope = { all: false, deptIds: [] as number[], self: true };
+      for (const role of activeRoles) {
+        if (!role.menus?.some(menu => menu.status === 1 && menu.perms?.startsWith(prefix))) continue;
+        const mode = role.dataScope || 'SELF';
+        if (mode === 'ALL') scope.all = true;
+        if ((mode === 'DEPT' || mode === 'DEPT_AND_CHILDREN') && user.deptId) scope.deptIds.push(user.deptId);
+        if (mode === 'CUSTOM') scope.deptIds.push(...(role.scopeDeptIds || []));
+        if (mode === 'DEPT_AND_CHILDREN' && user.deptId) {
+          descendants ??= (await this.userRepo.manager.query(`WITH RECURSIVE tree AS (
+            SELECT id FROM sys_dept WHERE id = $1 UNION SELECT d.id FROM sys_dept d JOIN tree t ON d.parent_id = t.id
+          ) SELECT id FROM tree`, [user.deptId])).map(row => Number(row.id));
+          scope.deptIds.push(...descendants);
+        }
+      }
+      scope.deptIds = [...new Set(scope.deptIds)];
+      dataScopes[resource] = scope;
+    }
     const authData: UserAuthorityData = {
       userId: user.id,
       username: user.username,
       roles: roleKeys,
       permissions,
       deptId: user.deptId,
+      employeeId: user.employeeId || undefined,
+      dataScopes,
       status: user.status,
     };
 

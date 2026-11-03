@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, Length, IsOptional, IsInt, IsArray } from 'class-validator';
+import { IsNotEmpty, IsString, Length, IsOptional, IsInt, IsArray, IsIn, Min } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
 
 export class LoginDto {
   @IsNotEmpty({ message: '用户名不能为空' })
@@ -25,6 +26,10 @@ export class RefreshTokenDto {
 }
 
 export class CreateUserDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  employeeId?: number;
   @IsNotEmpty({ message: '用户名不能为空' })
   @Length(3, 30, { message: '用户名长度需在3-30个字符' })
   username: string;
@@ -48,10 +53,16 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   roleIds?: number[];
 }
 
 export class UpdateUserDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  employeeId?: number | null;
   @IsOptional()
   realName?: string;
 
@@ -67,10 +78,13 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   roleIds?: number[];
 
   @IsOptional()
   @IsInt()
+  @IsIn([0, 1])
   status?: number;
 }
 
@@ -85,6 +99,16 @@ export class ResetPasswordDto {
 }
 
 export class CreateRoleDto {
+  @IsOptional() @IsInt() @IsIn([0,1]) status?: number;
+  @IsOptional()
+  @IsIn(['SELF', 'DEPT', 'DEPT_AND_CHILDREN', 'CUSTOM', 'ALL'])
+  dataScope?: 'SELF' | 'DEPT' | 'DEPT_AND_CHILDREN' | 'CUSTOM' | 'ALL';
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  scopeDeptIds?: number[];
   @IsNotEmpty({ message: '角色名称不能为空' })
   roleName: string;
 
@@ -99,6 +123,8 @@ export class CreateRoleDto {
 
   @IsOptional()
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   menuIds?: number[];
 }
 
@@ -108,6 +134,7 @@ export class UpdateRoleMenusDto {
   roleId: number;
 
   @IsArray({ message: '菜单ID集合必须是数组' })
+  @IsInt({each:true}) @Min(1,{each:true})
   menuIds: number[];
 }
 
@@ -153,6 +180,7 @@ export class ChangeUserStatusDto {
 
   @IsNotEmpty({ message: '状态值不能为空' })
   @IsInt({ message: '状态值必须为数值 (1:启用, 0:停用)' })
+  @IsIn([0, 1])
   status: number;
 }
 
@@ -185,3 +213,6 @@ export class UpdatePasswordDto {
   @IsString()
   newPassword: string;
 }
+
+export class UpdateRoleDto extends PartialType(CreateRoleDto) {}
+export class UpdateMenuDto extends PartialType(CreateMenuDto) {}

@@ -6,6 +6,8 @@ export interface CurrentUserPayload {
   roles: string[];
   permissions: string[];
   deptId?: number;
+  employeeId?: number;
+  dataScopes?: Record<string, { all: boolean; deptIds: number[]; self: boolean }>;
 }
 
 /**

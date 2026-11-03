@@ -6,13 +6,13 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { BusinessException } from '../exceptions/business.exception';
 import { QueryFailedError } from 'typeorm';
 
 /**
  * 全局统一异常捕获过滤器
- * 
+ *
  * 核心机制：
  * 1. 集中捕获业务异常 (BusinessException)、HTTP 标准异常、TypeORM 数据库异常与系统运行时错误
  * 2. 统一将底层各类 HTTP 错误码映射为标准 JSON 格式：`{ code, msg, data: null, timestamp, path }`，避免前端网络直接报红
@@ -25,7 +25,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   /**
    * 异常统一拦截处理函数
-   * 
+   *
    * @param exception 捕获到的异常对象
    * @param host 当前执行上下文参数宿主
    */
@@ -66,28 +66,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof QueryFailedError) {
       // 3. TypeORM 数据库底层执行异常（唯一约束冲突、外键受限等）
       code = 500;
-      message = maskStackError ? '数据库执行异常，请检查数据完整性' : (exception as any).message;
+      message = (exception as any).driverError?.code === '23505' ? '记录已存在，请勿重复提交' : '数据完整性校验失败，请检查关联记录';
       rawError = (exception as any).detail || (exception as any).message;
     } else if (exception instanceof Error) {
       // 4. 普通 JS 运行时未知异常
       code = 500;
-      message = maskStackError ? '系统繁忙，请稍后重试' : exception.message;
+      message = '系统繁忙，请稍后重试';
       rawError = exception.stack || exception.message;
     }
 
     // 格式化输出错误日志，方便运维排查
     this.logger.error(
-      `[${request.method}] ${request.originalUrl} | Code: ${code} | Message: ${message} | RawError: ${rawError}`,
+      `[${request.method}] ${request.originalUrl.split('?')[0]} | Code: ${code} | Message: ${message}`,
     );
 
-    // 统一以 200 HTTP 状态码返回，通过响应体内部 code 标示业务状态
-    response.status(HttpStatus.OK).json({
+    // 使用真实 HTTP 错误状态，同时保留统一业务错误结构
+    response.status(code >= 400 && code <= 599 ? code : HttpStatus.BAD_REQUEST).json({
       code,
       msg: message,
       data: null,
       timestamp: new Date().toISOString(),
-      path: request.originalUrl,
-      ...(maskStackError ? {} : { debugError: rawError }),
+      path: request.originalUrl.split('?')[0],
+
     });
   }
 }

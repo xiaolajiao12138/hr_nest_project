@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   CallHandler,
 } from '@nestjs/common';
+import { redactAudit } from '../security/sanitize';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -12,7 +13,7 @@ import { DataSource } from 'typeorm';
 
 /**
  * 业务操作日志记录拦截器
- * 
+ *
  * 核心机制：
  * 1. 扫描控制器方法上的 `@OperLog` 自定义元数据注解
  * 2. 统计接口调用的响应耗时（毫秒数）
@@ -23,7 +24,7 @@ import { DataSource } from 'typeorm';
 export class OperLogInterceptor implements NestInterceptor {
   /**
    * 构造函数注入元数据反射器与全局数据库连接
-   * 
+   *
    * @param reflector NestJS 元数据反射器
    * @param dataSource TypeORM 数据源
    */
@@ -34,7 +35,7 @@ export class OperLogInterceptor implements NestInterceptor {
 
   /**
    * 拦截请求并对请求生命周期（成功/异常）实施审计埋点
-   * 
+   *
    * @param context 当前 HTTP 执行上下文
    * @param next 调用链处理器
    * @returns 响应流管道
@@ -57,7 +58,7 @@ export class OperLogInterceptor implements NestInterceptor {
     const operName = user?.username || '匿名用户';
 
     // 参数安全截断处理，限制 1000 字符内防止超大报文拖慢数据库
-    const safeParams = JSON.stringify({ ...query, ...body }).slice(0, 1000);
+    const safeParams = JSON.stringify(redactAudit({ ...query, ...body })).slice(0, 1000);
 
     return next.handle().pipe(
       tap({
@@ -70,10 +71,10 @@ export class OperLogInterceptor implements NestInterceptor {
             method: `${context.getClass().name}.${context.getHandler().name}`,
             requestMethod: method,
             operName,
-            operUrl: originalUrl,
+            operUrl: originalUrl.split('?')[0],
             operIp: ip || '127.0.0.1',
             operParam: safeParams,
-            jsonResult: JSON.stringify(res || {}).slice(0, 1000),
+            jsonResult: JSON.stringify({ id: res?.id, success: true }).slice(0, 1000),
             status: 1, // 1: 成功
             costTime,
           });
@@ -87,11 +88,11 @@ export class OperLogInterceptor implements NestInterceptor {
             method: `${context.getClass().name}.${context.getHandler().name}`,
             requestMethod: method,
             operName,
-            operUrl: originalUrl,
+            operUrl: originalUrl.split('?')[0],
             operIp: ip || '127.0.0.1',
             operParam: safeParams,
             status: 0, // 0: 失败
-            errorMsg: (err.message || '未知错误').slice(0, 500),
+            errorMsg: '操作失败: '+(err.getStatus?.() || 500),
             costTime,
           });
         },
@@ -101,7 +102,7 @@ export class OperLogInterceptor implements NestInterceptor {
 
   /**
    * 异步将操作日志写入数据库
-   * 
+   *
    * @param logData 操作日志实体数据
    */
   private async saveLog(logData: any) {

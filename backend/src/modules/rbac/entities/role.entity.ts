@@ -22,6 +22,12 @@ export class Role extends BaseEntity {
   @Column({ type: 'smallint', default: 1, comment: '角色状态 1:正常 0:停用' })
   status: number;
 
+  @Column({ name: 'data_scope', type: 'varchar', length: 30, default: 'SELF' })
+  dataScope: 'SELF' | 'DEPT' | 'DEPT_AND_CHILDREN' | 'CUSTOM' | 'ALL';
+
+  @Column({ name: 'scope_dept_ids', type: 'jsonb', default: () => "'[]'::jsonb" })
+  scopeDeptIds: number[];
+
   @Column({ length: 255, nullable: true, comment: '备注' })
   remark: string;
 

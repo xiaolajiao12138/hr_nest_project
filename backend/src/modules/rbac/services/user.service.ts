@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { SysFile } from '../../../upload/entities/file.entity';
+import { sanitizeLog } from '../../../common/security/sanitize';
+import { CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, Like } from 'typeorm';
+import { applyScope, assertScope, assertDepartmentScope, assertEmployeeScope, requireAdmin, isAdmin } from '../../../common/security/data-scope';
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { BaseService } from '../../../common/base/base.service';
@@ -38,7 +42,7 @@ export class UserService extends BaseService<User> {
    */
   async findUserPage(
     pageParam: PageParamDto,
-    deptId?: number,
+    deptId?: number, user?: CurrentUserPayload
   ): Promise<PageResultDto<User>> {
     const page = Number(pageParam.page) || 1;
     const pageSize = Number(pageParam.pageSize) || 10;
@@ -52,6 +56,7 @@ export class UserService extends BaseService<User> {
       .take(pageSize)
       .orderBy('user.id', 'DESC');
 
+    applyScope(queryBuilder, user, 'user', 'user.deptId', 'user.employeeId');
     if (pageParam.keyword) {
       queryBuilder.andWhere(
         '(user.username LIKE :kw OR user.realName LIKE :kw OR user.phone LIKE :kw)',
@@ -70,100 +75,99 @@ export class UserService extends BaseService<User> {
   /**
    * 新增用户
    */
-  async createUser(dto: CreateUserDto): Promise<User> {
-    const exist = await this.userRepo.findOne({
-      where: { username: dto.username },
-    });
-    if (exist) {
-      throw new BusinessException(`用户名 ${dto.username} 已存在`);
+  async createUser(dto: CreateUserDto, actor?: CurrentUserPayload): Promise<User> {
+    requireAdmin(actor);
+    if (await this.userRepo.existsBy({ username: dto.username })) throw new BusinessException('用户名已存在');
+    const boundDept = await this.validateBinding(dto.employeeId, actor);
+    if(boundDept && dto.deptId && dto.deptId!==boundDept) throw new BusinessException('账号部门必须与关联员工一致');
+    const roles = dto.roleIds?.length ? await this.roleRepo.findBy({ id: In(dto.roleIds) }) : [];
+    if (roles.length !== new Set(dto.roleIds || []).size) throw new BusinessException('角色不存在');
+    const account = this.userRepo.create({ username: dto.username, password: await bcrypt.hash(dto.password, 12),
+      realName: dto.realName, phone: dto.phone, email: dto.email, deptId: boundDept ?? dto.deptId,
+      employeeId: dto.employeeId, roles, status: 1 });
+    const saved = await this.userRepo.save(account);
+    delete saved.password; delete saved.salt;
+    return saved;
+  }
+
+  async getUserDetail(id: number, relations: string[] = [], actor?: CurrentUserPayload): Promise<User> {
+    const account = await super.findById(id, [...new Set([...relations, 'roles'])]);
+    if (account.id !== actor?.userId) assertScope(actor, 'user', account.employeeId, account.deptId);
+    return account;
+  }
+
+  private async validateBinding(employeeId: number | null | undefined, actor: CurrentUserPayload, accountId?: number) {
+    if (!employeeId) return null;
+    if (accountId === undefined || (await this.userRepo.findOneBy({id:accountId}))?.employeeId !== employeeId) await assertEmployeeScope(this.dataSource, actor, 'employee', employeeId);
+    const bound = await this.userRepo.findOneBy({ employeeId });
+    if (bound && bound.id !== accountId) throw new BusinessException('该员工档案已关联其他账号');
+    const [employee] = await this.dataSource.query('SELECT dept_id, status FROM hr_employee WHERE id=$1',[employeeId]);
+    if (![1,3].includes(Number(employee.status))) throw new BusinessException('只能关联在职或试用员工');
+    return Number(employee.dept_id);
+  }
+
+  private async writableAccount(id: number, actor: CurrentUserPayload) {
+    const account = await this.getUserDetail(id, ['roles'], actor);
+    if (!isAdmin(actor) && (account.username === 'admin' || account.roles?.some(r => r.roleKey === 'admin'))) {
+      throw new ForbiddenException('无权维护管理员账号');
     }
-
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = this.userRepo.create({
-      username: dto.username,
-      password: hashedPassword,
-      realName: dto.realName,
-      phone: dto.phone,
-      email: dto.email,
-      deptId: dto.deptId,
-      status: 1,
-    });
-
-    if (dto.roleIds && dto.roleIds.length > 0) {
-      user.roles = await this.roleRepo.findBy({ id: In(dto.roleIds) });
-    }
-
-    return this.userRepo.save(user);
+    return account;
   }
 
   /**
    * 编辑用户
    */
-  async updateUser(id: number, dto: UpdateUserDto): Promise<User> {
-    const user = await this.findById(id, ['roles']);
-    if (!user) {
-      throw new BusinessException('用户不存在');
+  async updateUser(id: number, dto: UpdateUserDto, actor?: CurrentUserPayload): Promise<User> {
+    const account = await this.writableAccount(id, actor);
+    if (dto.roleIds !== undefined || dto.employeeId !== undefined) requireAdmin(actor);
+    if (dto.deptId !== undefined && dto.deptId !== account.deptId) assertDepartmentScope(actor, 'user', dto.deptId);
+    const boundDept = await this.validateBinding(dto.employeeId === undefined ? account.employeeId : dto.employeeId, actor, id);
+    if(boundDept && dto.deptId !== undefined && dto.deptId!==boundDept) throw new BusinessException('账号部门必须与关联员工一致');
+    if(boundDept) dto.deptId=boundDept;
+    if (dto.status !== undefined && ![0,1].includes(dto.status)) throw new BusinessException('无效账号状态');
+    if ((id === actor.userId || account.username === 'admin') && dto.status === 0) throw new BusinessException('不能停用当前账号或系统管理员');
+    for (const key of ['realName','phone','email','deptId','status','employeeId']) {
+      if (dto[key] !== undefined) account[key] = dto[key];
     }
-
-    user.realName = dto.realName ?? user.realName;
-    user.phone = dto.phone ?? user.phone;
-    user.email = dto.email ?? user.email;
-    user.deptId = dto.deptId ?? user.deptId;
-    if (dto.status !== undefined) {
-      user.status = dto.status;
+    if (dto.roleIds !== undefined) {
+      if (account.username === 'admin') throw new BusinessException('系统管理员角色不可变更');
+      account.roles = dto.roleIds.length ? await this.roleRepo.findBy({ id: In(dto.roleIds) }) : [];
+      if (account.roles.length !== new Set(dto.roleIds).size) throw new BusinessException('角色不存在');
     }
-
-    if (dto.roleIds) {
-      user.roles = await this.roleRepo.findBy({ id: In(dto.roleIds) });
-    }
-
-    const saved = await this.userRepo.save(user);
-
-    // 实时清除权限缓存，并仅向被修改的该用户本人定向发送权限重载信号
+    const saved = await this.userRepo.save(account);
     await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.sendPermissionUpdateToUser(id, '您的角色分配与状态已更新');
-
+    this.sseService.sendPermissionUpdateToUser(id, '账号权限已更新');
+    delete saved.password; delete saved.salt;
     return saved;
   }
 
   /**
    * 重置密码
    */
-  async resetPassword(id: number, dto: ResetPasswordDto): Promise<boolean> {
-    const user = await this.findById(id);
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
-    await this.userRepo.update(user.id, { password: hashedPassword });
+  async resetPassword(id: number, dto: ResetPasswordDto, actor?: CurrentUserPayload): Promise<boolean> {
+    await this.writableAccount(id, actor);
+    await this.userRepo.update(id, { password: await bcrypt.hash(dto.newPassword, 12) });
+    await this.authCacheService.clearUserAuthorities(id);
     return true;
   }
 
   /**
    * 修改用户状态
    */
-  async changeStatus(id: number, status: number): Promise<boolean> {
-    const user = await this.findById(id);
-    if (!user) {
-      throw new BusinessException('待修改状态的用户不存在');
-    }
-    // 企业级核心防护：超级管理员禁止停用
-    if (user.username === 'admin' && Number(status) === 0) {
-      throw new BusinessException('系统安全保护：超级管理员账号禁止停用');
-    }
-    await this.userRepo.update(id, { status: Number(status) });
-
-    // 状态修改立即清除缓存，仅定向通知目标用户
-    await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.sendPermissionUpdateToUser(id, '您的账号启停状态已更新');
-
+  async changeStatus(id: number, status: number, actor?: CurrentUserPayload): Promise<boolean> {
+    await this.updateUser(id, { status: Number(status) }, actor);
     return true;
   }
 
   /**
    * 重写用户删除
    */
-  async deleteById(id: number): Promise<boolean> {
+  async deleteById(id: number, actor?: CurrentUserPayload): Promise<boolean> {
+    const account = await this.writableAccount(id, actor);
+    if (id === actor.userId || account.username === 'admin') throw new BusinessException('不能删除当前账号或系统管理员');
     const res = await super.deleteById(id);
     await this.authCacheService.clearUserAuthorities(id);
-    this.sseService.sendPermissionUpdateToUser(id, '账号已被移除');
+    this.sseService.sendPermissionUpdateToUser(id, '账号已移除');
     return res;
   }
 
@@ -217,7 +221,30 @@ export class UserService extends BaseService<User> {
       user.email = dto.email;
     }
     if (dto.avatar !== undefined) {
-      user.avatar = dto.avatar;
+      if (!dto.avatar || /^\/avatars\/avatar-\d+\.svg$/.test(dto.avatar)) {
+        user.avatar = dto.avatar;
+      } else {
+        const directFile = /^\/api\/upload\/avatar\/([a-zA-Z0-9_.-]+\.(?:png|jpg|jpeg|webp|gif))$/i.exec(dto.avatar);
+        const logical = /^\/api\/upload\/avatar\/(\d+)$/.exec(dto.avatar);
+        const signed = /[?&]fileId=(\d+)(?:&|$)/.exec(dto.avatar);
+        const repo = this.dataSource.getRepository(SysFile);
+        let file: SysFile | null = null;
+        if (directFile?.[1]) {
+          file = await repo.findOneBy({ fileName: directFile[1] });
+        } else {
+          const id = Number(logical?.[1] || signed?.[1]);
+          file = Number.isSafeInteger(id) ? await repo.findOneBy({ id }) : null;
+        }
+        if (
+          !file ||
+          file.ownerUserId !== userId ||
+          !file.filePath.startsWith('avatar/') ||
+          !['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes((file.fileExt || '').toLowerCase())
+        ) {
+          throw new BusinessException('请选择本人上传的图片头像');
+        }
+        user.avatar = `/api/upload/avatar/${file.fileName}`;
+      }
     }
 
     const updated = await this.userRepo.save(user);
@@ -275,6 +302,6 @@ export class UserService extends BaseService<User> {
       take: pageSize,
     });
 
-    return PageResultDto.create(list, total, page, pageSize);
+    return PageResultDto.create(list.map(sanitizeLog), total, page, pageSize);
   }
 }

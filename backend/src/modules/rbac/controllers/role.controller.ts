@@ -1,3 +1,4 @@
+import { CurrentUser, CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
 import {
   Controller,
   Get,
@@ -11,7 +12,7 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { RoleService } from '../services/role.service';
-import { CreateRoleDto, UpdateRoleMenusDto } from '../dto/rbac.dto';
+import { CreateRoleDto, UpdateRoleDto, UpdateRoleMenusDto } from '../dto/rbac.dto';
 import { PageParamDto } from '../../../common/dto/page-param.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -46,6 +47,7 @@ export class RoleController {
    * @returns 返回状态为 1 的角色列表
    */
   @Get('all')
+  @Permissions('system:user:assign')
   async getAllRoles() {
     return this.roleService.findList({ status: 1 });
   }
@@ -83,8 +85,8 @@ export class RoleController {
   @Post()
   @Permissions('system:role:add')
   @OperLog({ title: '新增角色', businessType: 'INSERT' })
-  async create(@Body() dto: CreateRoleDto) {
-    return this.roleService.createRole(dto);
+  async create(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateRoleDto) {
+    return this.roleService.createRole(dto, user);
   }
 
   /**
@@ -97,8 +99,8 @@ export class RoleController {
   @Put('menus')
   @Permissions('system:role:edit')
   @OperLog({ title: '分配角色权限', businessType: 'UPDATE' })
-  async updateRoleMenus(@Body() dto: UpdateRoleMenusDto) {
-    return this.roleService.updateRoleMenus(dto.roleId, dto);
+  async updateRoleMenus(@CurrentUser() user: CurrentUserPayload, @Body() dto: UpdateRoleMenusDto) {
+    return this.roleService.updateRoleMenus(dto.roleId, dto, user);
   }
 
   /**
@@ -111,8 +113,8 @@ export class RoleController {
   @Put(':id')
   @Permissions('system:role:edit')
   @OperLog({ title: '编辑角色', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CreateRoleDto>) {
-    return this.roleService.update(id, dto);
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRoleDto) {
+    return this.roleService.update(id, dto, user);
   }
 
   /**
@@ -124,7 +126,7 @@ export class RoleController {
   @Delete(':id')
   @Permissions('system:role:delete')
   @OperLog({ title: '删除角色', businessType: 'DELETE' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.roleService.deleteById(id);
+  async delete(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.roleService.deleteById(id, user);
   }
 }

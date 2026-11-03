@@ -1,3 +1,4 @@
+import type { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
@@ -6,7 +7,7 @@ import * as path from 'path';
 const env = process.env.NODE_ENV || 'development';
 dotenv.config({ path: path.resolve(process.cwd(), `.env.${env}`) });
 
-export const dataSourceOptions: DataSourceOptions = {
+export const dataSourceOptions: PostgresConnectionOptions = {
   type: 'postgres',
   host: process.env.DB_HOST || '127.0.0.1',
   port: parseInt(process.env.DB_PORT, 10) || 5432,

@@ -1,3 +1,4 @@
+import { AuthCacheService } from './auth-cache.service';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,7 +15,7 @@ import { RsaService } from '../../../common/security/rsa.service';
 
 /**
  * 身份认证与安全鉴权核心服务类
- * 
+ *
  * 核心安全机制：
  * 1. 纯数字 SVG 图形验证码生成与 Redis 防刷校验（单次有效、阅后即焚）
  * 2. 账号密码登录认证：bcrypt 哈希安全对比、账号启用停用拦截
@@ -26,7 +27,7 @@ import { RsaService } from '../../../common/security/rsa.service';
 export class AuthService {
   /**
    * 构造函数注入用户仓储、JWT服务、配置、Redis缓存及菜单权限服务
-   * 
+   *
    * @param userRepo 系统用户仓储
    * @param jwtService NestJS JWT 签名与验签服务
    * @param configService 全局配置服务
@@ -41,11 +42,12 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly menuService: MenuService,
     private readonly rsaService: RsaService,
+    private readonly authCacheService: AuthCacheService,
   ) {}
 
   /**
    * 生成纯数字防机器刷取的 SVG 图形验证码
-   * 
+   *
    * @returns 包含唯一 uuid 和可供前端直接渲染的 data:image/svg+xml base64 图片字符串
    */
   async generateCaptcha() {
@@ -77,13 +79,13 @@ export class AuthService {
 
   /**
    * 账号密码与图形验证码统一登录
-   * 
+   *
    * 安全流程：
    * 1. 提取 Redis 缓存比对验证码，校验成功立即 DEL 删除实现单次有效；
    * 2. 查询用户基本信息及密码哈希（排除非活跃/已停用账号）；
    * 3. 使用 bcrypt.compare 慢哈希验证密码安全性；
    * 4. 组装用户角色与权限数组，签发短期 AccessToken 与长期 RefreshToken。
-   * 
+   *
    * @param loginDto 登录请求载荷（账号、密码、验证码及对应 uuid）
    * @returns 认证凭证与用户简要资料
    * @throws BusinessException 当验证码过期/错误、账号不存在、被停用或密码不匹配时抛出
@@ -127,7 +129,7 @@ export class AuthService {
     }
 
     // 4. 获取用户角色与按钮细粒度权限列表
-    const roleKeys = (user.roles || []).map((r) => r.roleKey);
+    const roleKeys = (user.roles || []).filter(r => r.status === 1).map((r) => r.roleKey);
     const permissions = await this.menuService.getPermissionsByUserId(user.id);
 
     // 5. 组装 JWT 载荷并双 Token 签名
@@ -158,6 +160,7 @@ export class AuthService {
         id: user.id,
         username: user.username,
         realName: user.realName,
+        employeeId: user.employeeId,
         avatar: user.avatar,
         phone: user.phone,
         email: user.email,
@@ -168,7 +171,7 @@ export class AuthService {
 
   /**
    * 基于长效 RefreshToken 无感换取新的短期 AccessToken
-   * 
+   *
    * @param dto 包含客户端存储的 refreshToken
    * @returns 签发的最新 AccessToken
    * @throws UnauthorizedException 当刷新凭证失效、过期或对应用户已停用时抛出 401
@@ -194,7 +197,7 @@ export class AuthService {
       }
 
       // 重新拉取最新角色与权限
-      const roleKeys = (user.roles || []).map((r) => r.roleKey);
+      const roleKeys = (user.roles || []).filter(r => r.status === 1).map((r) => r.roleKey);
       const permissions = await this.menuService.getPermissionsByUserId(user.id);
 
       const newPayload = {
@@ -219,7 +222,7 @@ export class AuthService {
 
   /**
    * 依据当前登录用户 ID 获取用户详细档案、部门、角色列表与细粒度按钮权限
-   * 
+   *
    * @param userId 当前操作人主键 ID
    * @returns 用户聚合信息
    * @throws BusinessException 用户不存在时抛出
@@ -233,14 +236,17 @@ export class AuthService {
       throw new BusinessException('用户不存在');
     }
 
-    const roleKeys = (user.roles || []).map((r) => r.roleKey);
+    const roleKeys = (user.roles || []).filter(r => r.status === 1).map((r) => r.roleKey);
     const permissions = await this.menuService.getPermissionsByUserId(user.id);
 
+    const authority=await this.authCacheService.getUserAuthorities(userId);
     return {
+      dataScopes: authority.dataScopes,
       user: {
         id: user.id,
         username: user.username,
         realName: user.realName,
+        employeeId: user.employeeId,
         phone: user.phone,
         email: user.email,
         avatar: user.avatar,

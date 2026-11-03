@@ -109,11 +109,11 @@ export class UserController {
    */
   @Get('list')
   @Permissions('system:user:list')
-  async getPage(
+  async getPage(@CurrentUser() user: CurrentUserPayload,
     @Query() pageParam: PageParamDto,
     @Query('deptId') deptId?: number,
   ) {
-    return this.userService.findUserPage(pageParam, deptId);
+    return this.userService.findUserPage(pageParam, deptId, user);
   }
 
   /**
@@ -125,8 +125,8 @@ export class UserController {
    */
   @Get('detail')
   @Permissions('system:user:list')
-  async getDetailByQuery(@Query('id', ParseIntPipe) id: number) {
-    return this.userService.findById(id, ['roles', 'dept']);
+  async getDetailByQuery(@CurrentUser() user: CurrentUserPayload, @Query('id', ParseIntPipe) id: number) {
+    return this.userService.getUserDetail(id, ['roles', 'dept', 'employee'], user);
   }
 
   /**
@@ -138,8 +138,8 @@ export class UserController {
    */
   @Get(':id')
   @Permissions('system:user:list')
-  async getDetail(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.findById(id, ['roles', 'dept']);
+  async getDetail(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.userService.getUserDetail(id, ['roles', 'dept'], user);
   }
 
   /**
@@ -151,8 +151,8 @@ export class UserController {
   @Post()
   @Permissions('system:user:add')
   @OperLog({ title: '新增用户', businessType: 'INSERT' })
-  async create(@Body() dto: CreateUserDto) {
-    return this.userService.createUser(dto);
+  async create(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateUserDto) {
+    return this.userService.createUser(dto, user);
   }
 
   /**
@@ -164,8 +164,8 @@ export class UserController {
   @Put('reset-password')
   @Permissions('system:user:resetPwd')
   @OperLog({ title: '重置用户密码', businessType: 'UPDATE' })
-  async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.userService.resetPassword(dto.id, dto);
+  async resetPassword(@CurrentUser() user: CurrentUserPayload, @Body() dto: ResetPasswordDto) {
+    return this.userService.resetPassword(dto.id, dto, user);
   }
 
   /**
@@ -177,8 +177,8 @@ export class UserController {
   @Put('status')
   @Permissions('system:user:edit')
   @OperLog({ title: '修改用户状态', businessType: 'UPDATE' })
-  async changeStatus(@Body() dto: ChangeUserStatusDto) {
-    return this.userService.changeStatus(dto.id, dto.status);
+  async changeStatus(@CurrentUser() user: CurrentUserPayload, @Body() dto: ChangeUserStatusDto) {
+    return this.userService.changeStatus(dto.id, dto.status, user);
   }
 
   /**
@@ -191,8 +191,8 @@ export class UserController {
   @Put(':id')
   @Permissions('system:user:edit')
   @OperLog({ title: '编辑用户', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
-    return this.userService.updateUser(id, dto);
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
+    return this.userService.updateUser(id, dto, user);
   }
 
   /**
@@ -204,7 +204,7 @@ export class UserController {
   @Delete(':id')
   @Permissions('system:user:delete')
   @OperLog({ title: '删除用户', businessType: 'DELETE' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.userService.deleteById(id);
+  async delete(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.userService.deleteById(id, user);
   }
 }

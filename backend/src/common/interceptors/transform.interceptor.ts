@@ -4,13 +4,14 @@ import {
   ExecutionContext,
   CallHandler,
 } from '@nestjs/common';
+import { sanitizeResponse } from '../security/sanitize';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { StreamableFile } from '@nestjs/common';
 
 /**
  * 统一标准 API 响应结构格式
- * 
+ *
  * @template T 实际业务数据载荷类型
  */
 export interface ApiResponse<T> {
@@ -24,7 +25,7 @@ export interface ApiResponse<T> {
 
 /**
  * 全局统一 HTTP 响应结构包装拦截器
- * 
+ *
  * 核心功能：
  * 1. 自动将 Controller 返回的普通对象包装为标准格式：`{"code": 200, "msg": "success", "data": ...}`
  * 2. 识别文件流 StreamableFile、二进制 Buffer 与 SSE 长连接事件流，自动绕过包装避免协议损坏
@@ -36,7 +37,7 @@ export class TransformInterceptor<T>
 {
   /**
    * 拦截请求并对响应结果执行管道处理
-   * 
+   *
    * @param context 当前执行上下文
    * @param next 处理器管道
    * @returns 包装后的响应数据流
@@ -47,10 +48,14 @@ export class TransformInterceptor<T>
   ): Observable<ApiResponse<T> | any> {
     return next.handle().pipe(
       map((data) => {
+        const user = context.switchToHttp().getRequest().user;
+
         // 1. 如果控制器直接返回了 StreamableFile 或 Buffer（如 Excel 导出、图片验证码流），直接原样返回
         if (data instanceof StreamableFile || Buffer.isBuffer(data)) {
           return data;
         }
+
+        data = sanitizeResponse(data, user);
 
         // 2. 如果是 SSE 长连接事件流 (含有 data 且无 code 字段的 MessageEvent)，豁免包装以保持 SSE 规范
         if (data && typeof data === 'object' && 'data' in data && !('code' in data)) {

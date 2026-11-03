@@ -34,7 +34,7 @@ export interface RouteItem {
 
 /**
  * 系统菜单与权限路由核心业务服务类
- * 
+ *
  * 核心业务领域：
  * 1. 动态路由驱动：根据用户绑定的角色与权限，动态生成树状路由元数据（供前端 addRoute 挂载）
  * 2. 按钮权限清洗：聚合去重生成用户持有的权限字符集（如 `hr:leave:audit`），超管返回 `['*']`
@@ -44,7 +44,7 @@ export interface RouteItem {
 export class MenuService extends BaseService<Menu> {
   /**
    * 构造函数注入菜单仓储与用户仓储
-   * 
+   *
    * @param menuRepository 菜单实体 Repository
    * @param userRepository 用户实体 Repository
    * @param dataSource TypeORM 数据源
@@ -94,13 +94,13 @@ export class MenuService extends BaseService<Menu> {
   /**
    * 重点特性：根据用户主键 ID 获取当前账号有权访问的动态路由树
    * （前端动态路由 addRoute 与侧边栏菜单的数据源）
-   * 
+   *
    * 权限过滤规则：
    * 1. 若当前用户角色包含 `admin`，直接拉取系统全部正常状态的目录与菜单；
    * 2. 若为普通角色，递归遍历其分配的所有启用角色所包含的菜单，使用 Map 按 ID 去重；
    * 3. 过滤只保留目录(M)和菜单(C)，排除无视图的按钮(F)权限项；
    * 4. 递归组装为标准的 RouteItem 嵌套树形结构。
-   * 
+   *
    * @param userId 操作人用户 ID
    * @returns 动态路由树数组
    */
@@ -113,7 +113,7 @@ export class MenuService extends BaseService<Menu> {
     if (!user) return [];
 
     let menus: Menu[] = [];
-    const isAdmin = user.roles?.some((r) => r.roleKey === 'admin');
+    const isAdmin = user.roles?.some((r) => r.roleKey === 'admin' && r.status === 1);
 
     if (isAdmin) {
       // 超级管理员直接获取所有正常状态的菜单与目录
@@ -145,7 +145,7 @@ export class MenuService extends BaseService<Menu> {
 
   /**
    * 提取当前用户拥有的所有细粒度按钮权限标识字符串清单（供前端 v-hasPerm 指令使用）
-   * 
+   *
    * @param userId 用户主键 ID
    * @returns 权限标识字符串数组（超管直接返回 ['*']）
    */
@@ -157,7 +157,7 @@ export class MenuService extends BaseService<Menu> {
 
     if (!user) return [];
     // 超级管理员拥有全局特权通配符
-    if (user.roles?.some((r) => r.roleKey === 'admin')) {
+    if (user.roles?.some((r) => r.roleKey === 'admin' && r.status === 1)) {
       return ['*'];
     }
 
@@ -166,7 +166,7 @@ export class MenuService extends BaseService<Menu> {
     for (const role of user.roles || []) {
       if (role.status === 1 && role.menus) {
         for (const menu of role.menus) {
-          if (menu.perms && menu.perms.trim()) {
+          if (menu.status === 1 && menu.perms && menu.perms.trim()) {
             permsSet.add(menu.perms.trim());
           }
         }
@@ -177,7 +177,7 @@ export class MenuService extends BaseService<Menu> {
 
   /**
    * 获取全量系统菜单实体树（用于「菜单管理」列表及「角色赋权」弹窗）
-   * 
+   *
    * @returns 全量包含按钮的完整树形结构
    */
   async getMenuTree(): Promise<Menu[]> {
@@ -189,7 +189,7 @@ export class MenuService extends BaseService<Menu> {
 
   /**
    * 递归组装路由节点树
-   * 
+   *
    * @param menus 待转换的菜单实体数组
    * @param parentId 父节点标识
    * @returns 路由项树
@@ -225,7 +225,7 @@ export class MenuService extends BaseService<Menu> {
 
   /**
    * 递归构建标准菜单实体树
-   * 
+   *
    * @param list 扁平菜单实体数组
    * @param parentId 父级主键
    * @returns 嵌套树状数组

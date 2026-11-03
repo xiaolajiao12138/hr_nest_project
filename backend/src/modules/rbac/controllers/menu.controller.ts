@@ -10,8 +10,10 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
+import { CurrentUser, CurrentUserPayload } from '../../../common/decorators/current-user.decorator';
+import { requireAdmin } from '../../../common/security/data-scope';
 import { MenuService } from '../services/menu.service';
-import { CreateMenuDto } from '../dto/rbac.dto';
+import { CreateMenuDto, UpdateMenuDto } from '../dto/rbac.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -69,9 +71,10 @@ export class MenuController {
    * @returns 返回创建成功的菜单记录
    */
   @Post()
-  @Permissions('system:menu:list')
+  @Permissions('system:menu:add')
   @OperLog({ title: '新增菜单路由', businessType: 'INSERT' })
-  async create(@Body() dto: CreateMenuDto) {
+  async create(@CurrentUser() user: CurrentUserPayload, @Body() dto: CreateMenuDto) {
+    requireAdmin(user);
     return this.menuService.create(dto);
   }
 
@@ -83,9 +86,10 @@ export class MenuController {
    * @returns 返回更新后的菜单记录
    */
   @Put(':id')
-  @Permissions('system:menu:list')
+  @Permissions('system:menu:edit')
   @OperLog({ title: '编辑菜单路由', businessType: 'UPDATE' })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: Partial<CreateMenuDto>) {
+  async update(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMenuDto) {
+    requireAdmin(user);
     return this.menuService.update(id, dto);
   }
 
@@ -96,9 +100,10 @@ export class MenuController {
    * @returns 返回删除受影响的结果
    */
   @Delete(':id')
-  @Permissions('system:menu:list')
+  @Permissions('system:menu:delete')
   @OperLog({ title: '删除菜单路由', businessType: 'DELETE' })
-  async delete(@Param('id', ParseIntPipe) id: number) {
+  async delete(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    requireAdmin(user);
     return this.menuService.deleteById(id);
   }
 }
