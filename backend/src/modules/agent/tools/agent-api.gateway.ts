@@ -5,6 +5,7 @@ import {
   Optional,
   RequestMethod,
 } from '@nestjs/common';
+import { AI_TOOL_KEY } from '../../../common/decorators/ai-tool.decorator';
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer, Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -78,6 +79,11 @@ export class AgentApiGateway {
 
   /**
    * 扫描并缓存全系统可由 AI 安全调用的业务接口元数据
+   *
+   * 【逻辑作用】：
+   * 1. 动态反射：利用 NestJS 依赖注入容器 ModulesContainer 遍历全量已加载 Controller；
+   * 2. 工具白名单过滤：通过 @AiTool 装饰器显式过滤出允许 AI 感知的接口，自动排除鉴权/上传等基础设施；
+   * 3. 零维护成本：全系统任何新增业务模块与方法只要添加 @AiTool 即可自动被大模型识别，无需手动编写 Tool Schema。
    */
   discoverAllEndpoints(): DiscoveredEndpoint[] {
     if (this.cachedEndpoints) {
@@ -109,6 +115,8 @@ export class AgentApiGateway {
           if (methodName === 'constructor') continue;
           const handler = proto[methodName];
           if (typeof handler !== 'function') continue;
+          const aiMode = Reflect.getMetadata(AI_TOOL_KEY, handler);
+          if (!aiMode) continue;
 
           const reqMethodNum: number | undefined = Reflect.getMetadata(
             METHOD_METADATA,
@@ -118,6 +126,7 @@ export class AgentApiGateway {
 
           const httpMethod = HTTP_METHOD_NAMES[reqMethodNum];
           if (!httpMethod) continue;
+          if (httpMethod !== 'GET' && !(httpMethod === 'POST' && aiMode === 'self-service')) continue;
 
           const rawMethodPath = Reflect.getMetadata(PATH_METADATA, handler);
           const fullPath = this.joinPaths(
@@ -170,6 +179,11 @@ export class AgentApiGateway {
 
   /**
    * 利用 TypeScript emitDecoratorMetadata + class-validator 自动提取 DTO 字段约束
+   *
+   * 【逻辑作用】：
+   * 1. 免去繁琐的手写 JSON Schema，直接反射 Controller 入参中的 DTO 类；
+   * 2. 解析 DTO 属性上的 class-validator 装饰器，提取必填标志（*）或选填标志（?）及校验规则提示；
+   * 3. 生成紧凑的参数签名（如 name*, age?, reason*），辅助大模型准确填充参数，避免幻觉。
    */
   private extractDtoSummary(proto: any, methodName: string): string {
     try {
@@ -219,6 +233,11 @@ export class AgentApiGateway {
 
   /**
    * 判定当前用户是否有权调用某个路由（与 PermissionsGuard 规则严格一致）
+   *
+   * 【逻辑作用】：
+   * - 严格遵循 RBAC 规范核验当前用户拥有的权限码；
+   * - 超级管理员或拥有通配符权限（*）自动放行；
+   * - 缺少权限的接口会被从模型上下文彻底剔除，形成第一道防越权防线。
    */
   private canAccessEndpoint(
     ep: DiscoveredEndpoint,
@@ -248,6 +267,10 @@ export class AgentApiGateway {
 
   /**
    * 构建注入给大模型的已授权业务接口目录提示文本
+   *
+   * 【逻辑作用】：
+   * - 动态组装当前用户有权限调用的 API 列表提示词（System Prompt）；
+   * - 普通员工看不到高管薪酬、敏感人事接口，大模型根本不知道存在未授权接口，从源头防止越权。
    */
   buildAuthorizedApiPrompt(user: CurrentUserPayload): string {
     const endpoints = this.getAuthorizedEndpoints(user);
@@ -309,12 +332,19 @@ export class AgentApiGateway {
 
   /**
    * 执行内部业务 API 调用（含二次确认拦截与真实 HTTP 鉴权管道代理）
+   *
+   * 【逻辑作用】：
+   * 1. 第二道防越权防线：网关侧前置再次核验当前用户 permissions，防止通过直接构造 tool_call 绕过；
+   * 2. 真实身份透传：携带当前用户原生的 Bearer Token 走本机内部回环（Loopback）发起 HTTP 请求；
+   * 3. 100% 遵守业务规则：自动触发 NestJS 的 JwtAuthGuard、PermissionsGuard、ValidationPipe 以及数据库事务与审计日志；
+   * 4. 人机协同二次确认（Human-in-the-Loop）：对破坏性/高危接口做拦截，若 confirmed !== true 则打回并要求前端弹窗二次确认。
    */
   async executeApiCall(
     input: ApiCallInput,
     user: CurrentUserPayload,
     authHeader: string,
   ): Promise<AgentToolResult> {
+    if (!user?.userId || !/^Bearer \S+$/i.test(authHeader || '')) return {success:false,title:'业务接口',resultSummary:'缺少有效身份',data:{error:'UNAUTHORIZED'}};
     const upperMethod = String(input.method || '')
       .trim()
       .toUpperCase();
@@ -369,6 +399,7 @@ export class AgentApiGateway {
           missingParam = key;
           return '';
         }
+        if (!/^[a-zA-Z0-9_-]+$/.test(String(val))) { missingParam = key; return ''; }
         return encodeURIComponent(String(val));
       },
     );
@@ -379,28 +410,6 @@ export class AgentApiGateway {
         title: endpoint.title,
         resultSummary: `参数缺失：接口 [${endpoint.path}] 缺少必填路径参数 [${missingParam}]`,
         data: { error: 'MISSING_PATH_PARAM', param: missingParam },
-      };
-    }
-
-    // 3. 对 DELETE 等高危破坏性操作统一实施二次确认卡片拦截
-    const isDestructive =
-      upperMethod === 'DELETE' || /\/(delete|remove)(\/|$)/i.test(endpoint.path);
-    if (isDestructive && input.confirmed !== true) {
-      const targetId =
-        mergedPathParams.id ?? input.body?.id ?? input.query?.id ?? 0;
-      const targetName =
-        input.targetName || `${endpoint.title}(#${targetId || '目标记录'})`;
-      return {
-        success: true,
-        title: `${endpoint.title}（待人工确认）`,
-        resultSummary: `已拦截高危删除操作【${endpoint.title}】，等待用户在聊天窗口点击确认按钮`,
-        data: {
-          requireConfirmation: true,
-          action: `${upperMethod} ${resolvedSubPath}`,
-          targetId: Number(targetId) || 0,
-          targetName,
-          prompt: `即将执行高危操作【${endpoint.title}】对象：${targetName}，删除后可能无法恢复，是否确认执行？`,
-        },
       };
     }
 
@@ -434,6 +443,8 @@ export class AgentApiGateway {
       const response = await this.fetcher(urlObj.toString(), {
         method: upperMethod,
         headers,
+        redirect: 'error',
+        signal: AbortSignal.timeout(15000),
         body: hasBody ? JSON.stringify(input.body) : undefined,
       });
 

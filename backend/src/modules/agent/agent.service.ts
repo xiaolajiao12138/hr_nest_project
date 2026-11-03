@@ -16,33 +16,11 @@ import {
   AgentToolResult,
 } from './tools/agent-schema.inspector';
 import { AgentApiGateway } from './tools/agent-api.gateway';
+import { AgentSessionService } from './agent-session.service';
 
 /**
  * 通用工具 1：全系统安全只读 SQL 查询引擎
  */
-const QUERY_SYSTEM_DATA_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
-  type: 'function',
-  function: {
-    name: 'query_system_data',
-    description:
-      '执行 PostgreSQL 只读 SELECT 查询以获取系统任意业务数据（如员工、部门、用户角色与菜单权限、考勤排班、请假、薪资、培训、招聘、绩效、公告等）。支持多表 JOIN 与聚合统计，严禁虚构表名或列名。',
-    parameters: {
-      type: 'object',
-      properties: {
-        sql: {
-          type: 'string',
-          description:
-            '单条标准 PostgreSQL SELECT 查询语句（禁止分号与注释；非管理员查询个人敏感表时必须在 SELECT 与 WHERE 中包含本人 emp_id）',
-        },
-        purpose: {
-          type: 'string',
-          description: '本次查询目的的中文简述（如“查询当前用户菜单权限”、“统计各部门人数”）',
-        },
-      },
-      required: ['sql'],
-    },
-  },
-};
 
 /**
  * 通用工具 2：全系统内部业务 API 网关（增删改审等业务动作）
@@ -112,6 +90,7 @@ export class AgentService {
     private readonly schemaInspector: AgentSchemaInspector,
     private readonly apiGateway: AgentApiGateway,
     @Optional() @Inject('AGENT_OPENAI_CLIENT') customOpenAiClient?: OpenAI,
+    @Optional() private readonly sessionService?: AgentSessionService,
   ) {
     const llmConf = this.configService.get('llm');
     const apiKey = llmConf?.apiKey || process.env.LLM_API_KEY || '';
@@ -134,7 +113,7 @@ export class AgentService {
   }
 
   /**
-   * 标准 JSON 模式对话接口
+   * 标准 JSON 模式对话接口（支持服务端会话数据库持久化）
    */
   async chat(
     chatDto: AgentChatDto,
@@ -142,14 +121,44 @@ export class AgentService {
     authHeader = '',
   ): Promise<AgentChatResponse> {
     const { message, history = [] } = chatDto;
+
+    let activeSessionId: number | undefined;
+    let activeSessionTitle: string | undefined;
+    let effectiveHistory: AgentChatMessageDto[] = history;
+
+    if (this.sessionService) {
+      const { session } = await this.sessionService.ensureSessionForChat(
+        currentUser.userId,
+        message,
+        chatDto.sessionId,
+      );
+      activeSessionId = session.id;
+      activeSessionTitle = session.title;
+
+      const dbHistory = await this.sessionService.getRecentContextMessages(
+        session.id,
+        currentUser.userId,
+        8,
+      );
+      if (dbHistory.length > 0) {
+        effectiveHistory = dbHistory;
+      }
+
+      await this.sessionService.appendUserMessage(
+        session.id,
+        currentUser.userId,
+        message,
+      );
+    }
+
     const { messages, toolsPayload } = await this.prepareConversation(
       message,
-      history,
+      effectiveHistory,
       currentUser,
     );
     const allowDestructiveConfirm = this.hasExplicitUserConfirmation(
       message,
-      history,
+      effectiveHistory,
     );
 
     const executedTools: AgentExecutedToolInfo[] = [];
@@ -221,15 +230,29 @@ export class AgentService {
       finalReply = '操作已执行完毕，具体执行状态可参考上方工具处理摘要。';
     }
 
+    if (this.sessionService && activeSessionId) {
+      await this.sessionService.appendAssistantMessage(
+        activeSessionId,
+        currentUser.userId,
+        {
+          content: finalReply,
+          executedTools,
+          confirmationAction,
+        },
+      );
+    }
+
     return {
       reply: finalReply,
       executedTools,
       confirmationAction,
+      sessionId: activeSessionId,
+      sessionTitle: activeSessionTitle,
     };
   }
 
   /**
-   * SSE 实时流式对话接口
+   * SSE 实时流式对话接口（支持服务端会话数据库持久化与首帧会话同步）
    */
   async chatStream(
     chatDto: AgentChatDto,
@@ -238,18 +261,55 @@ export class AgentService {
     authHeader = '',
   ): Promise<void> {
     const { message, history = [] } = chatDto;
+
+    let activeSessionId: number | undefined;
+    let activeSessionTitle: string | undefined;
+    let effectiveHistory: AgentChatMessageDto[] = history;
+
+    if (this.sessionService) {
+      const { session } = await this.sessionService.ensureSessionForChat(
+        currentUser.userId,
+        message,
+        chatDto.sessionId,
+      );
+      activeSessionId = session.id;
+      activeSessionTitle = session.title;
+
+      const dbHistory = await this.sessionService.getRecentContextMessages(
+        session.id,
+        currentUser.userId,
+        8,
+      );
+      if (dbHistory.length > 0) {
+        effectiveHistory = dbHistory;
+      }
+
+      await this.sessionService.appendUserMessage(
+        session.id,
+        currentUser.userId,
+        message,
+      );
+
+      onEvent({
+        type: 'session',
+        sessionId: activeSessionId,
+        sessionTitle: activeSessionTitle,
+      });
+    }
+
     const { messages, toolsPayload } = await this.prepareConversation(
       message,
-      history,
+      effectiveHistory,
       currentUser,
     );
     const allowDestructiveConfirm = this.hasExplicitUserConfirmation(
       message,
-      history,
+      effectiveHistory,
     );
 
     const executedTools: AgentExecutedToolInfo[] = [];
     let confirmationAction: ConfirmationActionInfo | undefined;
+    let finalReplyText = '';
 
     for (let loop = 0; loop < 5; loop++) {
       const completion = await this.openaiClient.chat.completions.create({
@@ -262,9 +322,11 @@ export class AgentService {
 
       const responseMessage = completion.choices[0]?.message;
       if (!responseMessage) {
+        const fallback = '智能助手未能生成有效回复，请稍后重试。';
+        finalReplyText = fallback;
         onEvent({
           type: 'chunk',
-          content: '智能助手未能生成有效回复，请稍后重试。',
+          content: fallback,
         });
         break;
       }
@@ -326,6 +388,7 @@ export class AgentService {
       }
 
       const textContent = responseMessage.content || '';
+      finalReplyText = textContent;
       if (textContent) {
         const chunkSize = 12;
         for (let i = 0; i < textContent.length; i += chunkSize) {
@@ -338,8 +401,26 @@ export class AgentService {
       break;
     }
 
+    if (this.sessionService && activeSessionId) {
+      await this.sessionService.appendAssistantMessage(
+        activeSessionId,
+        currentUser.userId,
+        {
+          content:
+            finalReplyText ||
+            (executedTools.length > 0
+              ? '操作已执行完毕，具体执行状态可参考上方工具处理摘要。'
+              : ''),
+          executedTools,
+          confirmationAction,
+        },
+      );
+    }
+
     onEvent({
       type: 'done',
+      sessionId: activeSessionId,
+      sessionTitle: activeSessionTitle,
       executedTools,
       confirmationAction,
     });
@@ -356,7 +437,6 @@ export class AgentService {
     const authorizedEndpoints =
       this.apiGateway.getAuthorizedEndpoints(currentUser);
     const allowedTools = [
-      'query_system_data',
       ...authorizedEndpoints.map((ep) => `${ep.method} ${ep.path}`),
     ];
 
@@ -365,7 +445,7 @@ export class AgentService {
           '查询公司有哪些在职员工，并按部门统计人数',
           '查看我的账号拥有哪些角色和菜单权限',
           '查看最近待审核的请假申请记录',
-          '录入一位新员工：工号EMP999，姓名王五，手机号13800138999',
+          '查看我本月的考勤和排班',
           '查一下本月员工薪酬核算汇总报表',
         ]
       : [
@@ -399,9 +479,7 @@ export class AgentService {
     const authorizedEndpoints =
       this.apiGateway.getAuthorizedEndpoints(currentUser);
 
-    const toolsPayload: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-      QUERY_SYSTEM_DATA_TOOL,
-    ];
+    const toolsPayload: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
     if (authorizedEndpoints.length > 0) {
       toolsPayload.push(CALL_BUSINESS_API_TOOL);
     }
@@ -442,11 +520,7 @@ export class AgentService {
     allowDestructiveConfirm: boolean,
   ): Promise<AgentToolResult> {
     if (fnName === 'query_system_data') {
-      return this.schemaInspector.executeReadOnlyQuery(
-        String(args.sql || ''),
-        currentUser,
-        args.purpose ? String(args.purpose) : undefined,
-      );
+      return {success:false,title:'数据查询',resultSummary:'请使用已授权业务 API 查询',data:{error:'RAW_SQL_DISABLED'}};
     }
 
     if (fnName === 'call_business_api') {
@@ -524,41 +598,15 @@ export class AgentService {
   /**
    * 动态构建包含身份映射、全系统数据表结构与授权接口目录的系统提示词
    */
-  private buildSystemPrompt(
-    currentUser: CurrentUserPayload,
-    myEmpId: number | null,
-  ): string {
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const rolesStr = currentUser.roles?.join(', ') || '普通员工';
-    const schemaPrompt =
-      this.schemaInspector.buildAuthorizedSchemaPrompt(currentUser);
-    const apiPrompt = this.apiGateway.buildAuthorizedApiPrompt(currentUser);
-
-    return `
-你是企业级“HR数字化管理系统·智能体助手 (HR AI Agent)”。
-你仅通过两个通用底层引擎完成一切业务需求：
-1. **query_system_data**：用于一切数据查询、统计分析、人员/权限/排班/薪酬/考勤/请假检索。直接依据下方【数据库表结构】编写精准的 PostgreSQL SELECT 语句（若用户未指定查询对象，默认查询当前登录用户自己或按常规列表概览展示）。
-2. **call_business_api**：用于新增、修改、审批、打卡、删除等状态变更操作。严格依据下方【已授权业务接口目录】传递 method、path 与参数。
-
-【当前会话身份】
-- 当前时间：${dateStr}
-- 登录账号：${currentUser.username}（sys_user.id = ${currentUser.userId}）
-- 关联员工档案ID（emp_id）：${myEmpId ?? '未绑定员工档案'}
-- 所属部门ID：${currentUser.deptId ?? '未分配'}
-- 拥有角色：[${rolesStr}]
-
-【数据库表结构（自动感知，敏感列已物理屏蔽）】
-${schemaPrompt}
-
-【已授权业务接口目录（参数后带 * 为必填，带 ? 为选填）】
-${apiPrompt}
-
-【执行准则】
-1. 严禁猜测不存在的表名、列名或接口路径；软删除表（含 deleted_at 列）查询常规数据时请加上 WHERE deleted_at IS NULL。
-2. 若用户要求执行的写操作不在【已授权业务接口目录】中，请礼貌告知当前账号缺少对应操作权限。
-3. 发起任何 DELETE 删除操作时，首次调用必须设置 confirmed: false 并填写清晰的 targetName，提醒用户在下方确认卡片点击核准；仅当用户明确回复确认后才可传 confirmed: true。
-4. 回复请使用清晰专业的简体中文与 Markdown 表格/列表排版。
-`.trim();
+  private buildSystemPrompt(currentUser: CurrentUserPayload, myEmpId: number | null): string {
+    return [
+      '你是人事管理系统助手。仅使用 call_business_api 调用下方显式开放的业务接口，查询和自助申请均受服务器权限与数据范围约束。',
+      '当前时间：'+new Date().toISOString(),
+      '登录账号：'+currentUser.username+'；员工ID：'+(myEmpId ?? '未关联')+'；部门ID：'+(currentUser.deptId ?? '未分配'),
+      '未指定对象时默认查询本人；不得用姓名推断员工身份，不得推测或编造申请人、金额、统计结果。接口返回拒绝时说明权限不足，不得换用 SQL。',
+      '删除、授权、发薪、审批和修改人事档案请引导用户进入业务页面操作。申请缺少必要参数时说明所需信息。',
+      '所有查询必须选下方目录中的 GET 接口，路径参数通过 pathParams 传递，筛选及分页通过 query 传递，表单通过 body 传递。用简体中文回答。',
+      '已授权业务接口目录：', this.apiGateway.buildAuthorizedApiPrompt(currentUser),
+    ].join('\n');
   }
 }
