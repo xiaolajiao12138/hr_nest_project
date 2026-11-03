@@ -1,5 +1,5 @@
 import {
-  Controller,
+  Controller, ForbiddenException,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -7,13 +7,15 @@ import {
   Get,
   Param,
   Res,
+  Query,
   Delete,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { UploadService } from './upload.service';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import * as path from 'path';
 
@@ -35,12 +37,12 @@ export class UploadController {
    */
   @Post('file')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  async uploadSingle(
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, files: 1 } }))
+  async uploadSingle(@CurrentUser() user: CurrentUserPayload,
     @UploadedFile() file: Express.Multer.File,
     @Body('folder') folder?: string,
   ) {
-    return this.uploadService.uploadFile(file, folder || 'common');
+    return this.uploadService.uploadFile(file, folder || 'common', user);
   }
 
   /**
@@ -56,9 +58,13 @@ export class UploadController {
     @Param('folder') folder: string,
     @Param('fileName') fileName: string,
     @Res() res: Response,
+    @Query('fileId', ParseIntPipe) fileId: number,
+    @Query('userId', ParseIntPipe) userId: number,
+    @Query('expires', ParseIntPipe) expires: number,
+    @Query('signature') signature: string,
   ) {
     const filePath = `${folder}/${fileName}`;
-    const stream = await this.uploadService.getFileStream(filePath);
+    const stream = await this.uploadService.verifyPreview(filePath, fileId, userId, expires, signature);
     const ext = (path.extname(fileName) || '').toLowerCase();
     const mimeMap: Record<string, string> = {
       '.png': 'image/png',
@@ -66,12 +72,17 @@ export class UploadController {
       '.jpeg': 'image/jpeg',
       '.gif': 'image/gif',
       '.webp': 'image/webp',
-      '.svg': 'image/svg+xml',
+
       '.pdf': 'application/pdf',
     };
     if (mimeMap[ext]) {
       res.setHeader('Content-Type', mimeMap[ext]);
     }
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    if (!mimeMap[ext]) res.setHeader('Content-Disposition', 'attachment');
+    stream.on('error', () => res.destroy());
     stream.pipe(res);
   }
 
@@ -81,15 +92,24 @@ export class UploadController {
    * @param fileId 文件记录主键 ID
    * @returns 返回短期有效的可直接访问地址 { url: string }
    */
+  /**
+   * 公开只读用户头像静态直链输出（支持浏览器一年期 immutable 永久强缓存，兼容存量数字 fileId）
+   */
+  @Get('avatar/:target')
+  async avatar(@Param('target') target: string, @Res() res: Response) {
+    const { stream, mimeType } = await this.uploadService.resolvePublicAvatarStream(target);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
+  }
+
   @Get('presigned-url/:fileId')
   @UseGuards(JwtAuthGuard)
-  async getPresigned(@Param('fileId', ParseIntPipe) fileId: number) {
-    const file = await this.uploadService['fileRepository'].findOne({
-      where: { id: fileId },
-    });
-    if (!file) return { url: '' };
-    const url = await this.uploadService.getPresignedUrl(file.filePath);
-    return { url };
+  async getPresigned(@CurrentUser() user: CurrentUserPayload, @Param('fileId', ParseIntPipe) fileId: number) {
+    return { url: await this.uploadService.getPresignedUrl(fileId, user) };
   }
 
   /**
@@ -100,7 +120,7 @@ export class UploadController {
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  async deleteFile(@Param('id', ParseIntPipe) id: number) {
-    return this.uploadService.deleteFile(id);
+  async deleteFile(@CurrentUser() user: CurrentUserPayload, @Param('id', ParseIntPipe) id: number) {
+    return this.uploadService.deleteFile(id, user);
   }
 }

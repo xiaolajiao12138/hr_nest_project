@@ -2,6 +2,8 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeor
 
 @Entity('sys_file')
 export class SysFile {
+  @Column({ name: 'owner_user_id', type: 'integer', nullable: true })
+  ownerUserId: number;
   @PrimaryGeneratedColumn({ comment: '文件ID' })
   id: number;
 

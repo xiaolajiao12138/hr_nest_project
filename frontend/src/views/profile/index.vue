@@ -488,6 +488,7 @@
 </template>
 
 <script setup lang="ts">
+import { resolveAvatar } from '@/utils/avatar';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
@@ -732,7 +733,7 @@ const openAvatarDialog = () => {
   }
   previewAvatarUrl.value = '';
   selectedAvatarFile.value = null;
-  selectedPresetUrl.value = profileData.value.avatar || presetAvatars[0];
+  selectedPresetUrl.value = profileData.value.avatar?.startsWith('/avatars/') ? profileData.value.avatar : presetAvatars[0];
   avatarDialogVisible.value = true;
 };
 
@@ -759,6 +760,7 @@ const handleAvatarFileChange = (uploadFile: UploadFile) => {
 
 // 确认更换头像
 const handleConfirmAvatar = async () => {
+  if(uploadingAvatar.value) return;
   let newAvatarUrl = '';
   if (avatarTab.value === 'upload') {
     if (!selectedAvatarFile.value) {
@@ -770,7 +772,7 @@ const handleConfirmAvatar = async () => {
       const res: any = await uploadAvatarApi(selectedAvatarFile.value);
       newAvatarUrl = res.fileUrl || res.filePath;
     } catch (err: any) {
-      ElMessage.error(err.message || '头像上传失败');
+      if (!err?.notified) ElMessage.error(err.message || '头像上传失败');
       uploadingAvatar.value = false;
       return;
     }
@@ -788,7 +790,7 @@ const handleConfirmAvatar = async () => {
     await updateUserProfileApi({ avatar: newAvatarUrl });
 
     // 1. 本地响应式状态即时更新
-    profileData.value.avatar = newAvatarUrl;
+    profileData.value.avatar = resolveAvatar(newAvatarUrl);
 
     // 2. 同步全局 User Store 状态与本地存储
     userStore.updateUserProfile({ avatar: newAvatarUrl });
@@ -808,7 +810,7 @@ const handleConfirmAvatar = async () => {
     selectedAvatarFile.value = null;
     avatarDialogVisible.value = false;
   } catch (err: any) {
-    ElMessage.error(err.message || '更换头像失败');
+    if (!err?.notified) ElMessage.error(err.message || '更换头像失败');
   } finally {
     uploadingAvatar.value = false;
   }
@@ -818,12 +820,12 @@ const handleConfirmAvatar = async () => {
 const fetchProfileData = async () => {
   try {
     const res: any = await getUserProfileApi();
-    profileData.value = res;
+    profileData.value = { ...res, avatar: resolveAvatar(res.avatar) };
     profileForm.realName = res.realName || '';
     profileForm.phone = res.phone || '';
     profileForm.email = res.email || '';
   } catch (err: any) {
-    ElMessage.error(err.message || '获取个人资料失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取个人资料失败');
   }
 };
 
@@ -853,7 +855,7 @@ const handleSaveProfile = async () => {
 
       ElMessage.success('个人基本资料修改成功');
     } catch (err: any) {
-      ElMessage.error(err.message || '更新个人资料失败');
+      if (!err?.notified) ElMessage.error(err.message || '更新个人资料失败');
     } finally {
       savingProfile.value = false;
     }
@@ -894,7 +896,7 @@ const handleSavePassword = async () => {
         },
       );
     } catch (err: any) {
-      ElMessage.error(err.message || '修改密码失败，请核对原密码');
+      if (!err?.notified) ElMessage.error(err.message || '修改密码失败，请核对原密码');
     } finally {
       savingPwd.value = false;
     }
@@ -920,7 +922,7 @@ const fetchUserLogs = async () => {
     logList.value = res.list || [];
     logTotal.value = res.total || 0;
   } catch (err: any) {
-    ElMessage.error(err.message || '获取操作日志失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取操作日志失败');
   } finally {
     loadingLogs.value = false;
   }

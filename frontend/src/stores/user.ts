@@ -1,3 +1,4 @@
+import { resolveAvatar, clearAvatarCache } from '@/utils/avatar';
 import { defineStore } from 'pinia';
 import { loginApi, getUserInfoApi } from '@/api/auth';
 import { encryptRsa } from '@/utils/rsa';
@@ -16,6 +17,7 @@ export const useUserStore = defineStore('user', {
     userInfo: getUserInfo() || null,
     roles: [] as string[],
     permissions: [] as string[],
+    dataScopes: {} as Record<string,{all:boolean;deptIds:number[];self:boolean}>,
   }),
 
   actions: {
@@ -32,8 +34,9 @@ export const useUserStore = defineStore('user', {
       this.token = res.accessToken;
       setToken(res.accessToken);
       setRefreshToken(res.refreshToken);
-      this.userInfo = res.user;
-      setUserInfo(res.user);
+      const normalizedUser = { ...res.user, avatar: resolveAvatar(res.user?.avatar) };
+      this.userInfo = normalizedUser;
+      setUserInfo(normalizedUser);
       this.roles = res.user.roles || [];
       return res;
     },
@@ -41,27 +44,35 @@ export const useUserStore = defineStore('user', {
     // 获取当前登录人信息和权限
     async getInfo() {
       const res: any = await getUserInfoApi();
-      this.userInfo = res.user;
-      setUserInfo(res.user);
+      const normalizedUser = { ...res.user, avatar: resolveAvatar(res.user?.avatar) };
+      this.userInfo = normalizedUser;
+      setUserInfo(normalizedUser);
       this.roles = res.roles || [];
       this.permissions = res.permissions || [];
+      this.dataScopes = res.dataScopes || {};
       return res;
     },
 
     // 局部更新用户信息（例如在个人中心修改姓名、头像、手机号等）
     updateUserProfile(partialInfo: Record<string, any>) {
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, ...partialInfo };
-        setUserInfo(this.userInfo);
+        const nextInfo = { ...this.userInfo, ...partialInfo };
+        if (partialInfo.avatar !== undefined) {
+          nextInfo.avatar = resolveAvatar(partialInfo.avatar);
+        }
+        this.userInfo = nextInfo;
+        setUserInfo(nextInfo);
       }
     },
 
     // 登出
     logout() {
+      clearAvatarCache();
       this.token = '';
       this.userInfo = null;
       this.roles = [];
       this.permissions = [];
+      this.dataScopes = {};
       removeToken();
     },
   },
