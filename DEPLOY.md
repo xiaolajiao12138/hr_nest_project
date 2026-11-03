@@ -63,14 +63,18 @@ free -h
 cd /opt/hr_nest_project
 ```
 
-### 2. 一键构建并启动所有服务
-在项目根目录下直接执行：
+### 2. 配置环境变量并一键构建启动所有服务
+已有数据库升级前，先按下文“已有数据库增量升级”备份数据库；新版后端启动时会执行迁移。
+
+在项目根目录下复制 `.env.example` 为 `.env`（如需启用右下角 AI 智能助手，请在 `.env` 中填入真实的 `LLM_API_KEY`），然后执行：
 ```bash
+cp -n .env.example .env
+# 按需编辑 .env 填写 LLM_API_KEY 及生产数据库/JWT强密码
 docker compose up -d --build
 ```
 > Docker 将会自动完成：
 > 1. 拉取 PostgreSQL 16、Redis 7、MinIO 镜像；
-> 2. 自动执行 `docker/init.sql`，初始化全部 19 张业务表结构、菜单权限与测试演示数据；
+> 2. 首次部署自动执行 `docker/init.sql`（初始化全部 21 张业务表结构、细粒度数据权限与测试演示数据）；若为已有旧库升级，后端启动时会自动执行幂等数据库迁移补齐新表与新字段；
 > 3. 多阶段轻量化编译并构建 NestJS 后端镜像；
 > 4. 自动编译 Vue3 前端并注入生产 Nginx 反向代理网关。
 
@@ -114,6 +118,42 @@ docker compose down
 # 4. 更新代码后平滑重新构建上线
 docker compose up -d --build
 ```
+
+### 启用或更新 AI 配置
+
+后端容器需要 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 三项配置。网关地址、密钥和模型必须属于同一供应商，模型需支持 Chat Completions 的工具调用参数。应用日志中的“AI Agent 初始化完成”只表示本地客户端已初始化，还需通过实际对话验证上游连通性。
+
+使用新版根目录 `docker-compose.yml` 时，在根目录 `.env` 中填写这三项后执行 `docker compose up -d --no-deps --force-recreate backend`，再执行 `docker compose exec -T frontend nginx -s reload`。环境变量在容器创建时注入，单纯 `docker restart` 不会加载修改后的配置。
+
+已部署旧版 Compose 的服务器也可使用独立的私有覆盖文件 `docker/ai.compose.local`，其中只包含 `services.backend.environment` 下的三项 AI 配置，不包含本地数据库、Redis 或 JWT 配置。该文件由 `.gitignore` 的 `*.local` 规则忽略，上传后在服务器项目目录执行：
+
+```bash
+chmod 600 docker/ai.compose.local &&
+docker compose -f docker-compose.yml -f docker/ai.compose.local config --quiet &&
+docker compose -f docker-compose.yml -f docker/ai.compose.local up -d --no-deps --force-recreate backend &&
+docker compose exec -T frontend nginx -s reload
+```
+
+这种部署方式后续更新或重建后端时也需要带上上述两个 `-f` 参数，确保私有 AI 配置继续加载。完成后在系统 AI 助手发送“你好，请告诉我你可以做什么”，验证完整对话链路。配置文件中包含密钥，不要将文件内容或展开后的 Compose 配置粘贴到聊天或日志中。
+
+### 已有数据库增量升级
+
+如果验证码接口正常，但登录返回 500，且 `sys_user` 缺少 `employee_id`、`sys_role` 缺少 `data_scope` / `scope_dept_ids`，需要执行增量迁移。以下命令在**服务器终端**运行，以实际部署目录 `/opt/hr_project` 为例；本机不需要安装 Docker。
+
+```bash
+cd /opt/hr_project &&
+umask 077 &&
+hr_backup="hr-db-before-upgrade-$(date +%Y%m%d-%H%M%S).dump" &&
+docker exec hr_postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > "$hr_backup" &&
+docker exec -w /app hr_backend node node_modules/typeorm/cli.js migration:run -d dist/config/typeorm.config.js --transaction all &&
+docker restart hr_backend
+```
+
+备份保存在服务器项目目录。备份失败会停止后续操作；迁移在事务中执行，失败会回滚，成功才重启后端。正常输出包含 `Migration AccessIsolation1793610000000 has been executed successfully`；已执行过则显示 `No migrations are pending`。生产镜像只包含编译后的 JavaScript，因此使用上述 CLI 命令，不运行依赖 TypeScript 源文件的 `npm run migration:run`。
+
+迁移保留现有业务记录，不会自动扩大普通角色的数据范围。旧角色默认范围为“仅本人”，需要管理员按职责配置；账号与员工仅在用户名和工号完全一致时自动关联，其余由管理员核实绑定。完成后刷新登录页并重新输入验证码登录。
+
+不要在已有业务库上重跑 `docker/init.sql`，其中包含删表语句。迁移若提示业务唯一索引冲突，应核对重复记录后处理，不要删除数据库卷或开启 `DB_SYNCHRONIZE` 绕过迁移。
 
 ---
 

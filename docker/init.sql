@@ -36,6 +36,7 @@ CREATE TABLE sys_user (
     email VARCHAR(50),
     avatar VARCHAR(255) DEFAULT '',
     dept_id INT REFERENCES sys_dept(id) ON DELETE SET NULL,
+    employee_id INT UNIQUE,
     status SMALLINT DEFAULT 1, -- 1: 正常, 0: 停用
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -44,6 +45,7 @@ CREATE TABLE sys_user (
 COMMENT ON TABLE sys_user IS '系统用户表';
 COMMENT ON COLUMN sys_user.username IS '登录账号';
 COMMENT ON COLUMN sys_user.password IS 'BCrypt加密密码';
+COMMENT ON COLUMN sys_user.employee_id IS '可信员工档案身份绑定';
 COMMENT ON COLUMN sys_user.status IS '状态 1正常 0停用';
 
 -- 3. 创建角色表 (sys_role)
@@ -54,6 +56,8 @@ CREATE TABLE sys_role (
     role_key VARCHAR(50) NOT NULL UNIQUE,
     sort INT DEFAULT 0,
     status SMALLINT DEFAULT 1, -- 1: 正常, 0: 停用
+    data_scope VARCHAR(30) NOT NULL DEFAULT 'SELF',
+    scope_dept_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
     remark VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -126,6 +130,7 @@ COMMENT ON TABLE sys_dict IS '字典数据表';
 DROP TABLE IF EXISTS sys_file CASCADE;
 CREATE TABLE sys_file (
     id SERIAL PRIMARY KEY,
+    owner_user_id INT,
     original_name VARCHAR(255) NOT NULL,
     file_name VARCHAR(255) NOT NULL,
     file_size BIGINT NOT NULL,
@@ -163,6 +168,10 @@ CREATE TABLE hr_employee (
 );
 
 COMMENT ON TABLE hr_employee IS '员工档案表';
+
+ALTER TABLE sys_user
+    ADD CONSTRAINT fk_user_employee_binding
+    FOREIGN KEY (employee_id) REFERENCES hr_employee(id) ON DELETE SET NULL;
 
 -- 10. 年假余额表 (hr_annual)
 DROP TABLE IF EXISTS hr_annual CASCADE;
@@ -359,9 +368,42 @@ CREATE TABLE hr_performance_record (
     status VARCHAR(25) DEFAULT 'PENDING_SELF',
     evaluated_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (emp_id, plan_id)
 );
 COMMENT ON TABLE hr_performance_record IS '员工绩效考评明细与闭环评定记录表';
+
+-- 20. AI 智能体会话表 (sys_agent_session)
+DROP TABLE IF EXISTS sys_agent_session CASCADE;
+CREATE TABLE sys_agent_session (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(120) NOT NULL DEFAULT '新对话',
+    last_message_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_agent_session_user_id ON sys_agent_session(user_id);
+CREATE INDEX idx_agent_session_last_msg_at ON sys_agent_session(last_message_at);
+COMMENT ON TABLE sys_agent_session IS 'AI智能体会话表';
+
+-- 21. AI 智能体消息明细表 (sys_agent_message)
+DROP TABLE IF EXISTS sys_agent_message CASCADE;
+CREATE TABLE sys_agent_message (
+    id SERIAL PRIMARY KEY,
+    session_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    content TEXT NOT NULL,
+    executed_tools JSONB,
+    confirmation_action JSONB,
+    is_confirmation_handled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_agent_msg_session_id ON sys_agent_message(session_id);
+CREATE INDEX idx_agent_msg_user_id ON sys_agent_message(user_id);
+COMMENT ON TABLE sys_agent_message IS 'AI智能体消息明细表';
 
 -- ========================================================
 -- 初始化基础演示数据
@@ -380,9 +422,9 @@ INSERT INTO sys_dept (id, parent_id, dept_name, leader, phone, email, sort, stat
 SELECT setval('sys_dept_id_seq', (SELECT MAX(id) FROM sys_dept));
 
 -- 初始化角色
-INSERT INTO sys_role (id, role_name, role_key, sort, status, remark) VALUES
-(1, '超级管理员', 'admin', 1, 1, '系统最高权限拥有者'),
-(2, '人事专员', 'hr', 2, 1, '负责HR人事、员工与请假审批模块');
+INSERT INTO sys_role (id, role_name, role_key, sort, status, data_scope, scope_dept_ids, remark) VALUES
+(1, '超级管理员', 'admin', 1, 1, 'ALL', '[]'::jsonb, '系统最高权限拥有者'),
+(2, '人事专员', 'hr', 2, 1, 'ALL', '[]'::jsonb, '负责HR人事、员工与请假审批模块');
 
 SELECT setval('sys_role_id_seq', (SELECT MAX(id) FROM sys_role));
 
@@ -459,11 +501,32 @@ INSERT INTO sys_menu (id, parent_id, title, name, path, component, icon, sort, m
 (4, 0, '系统运维', 'OpsManage', '/ops', 'Layout', 'Monitor', 4, 'M', '', false, false, 1),
 (401, 4, '系统公告', 'NoticeManage', '/ops/notice', 'views/ops/notice/index.vue', 'Bell', 1, 'C', 'ops:notice:list', false, false, 1),
 (402, 4, '数据字典', 'DictManage', '/ops/dict', 'views/ops/dict/index.vue', 'Notebook', 2, 'C', 'ops:dict:list', false, false, 1),
-(403, 4, '操作日志', 'LogManage', '/ops/log', 'views/ops/log/index.vue', 'Document', 3, 'C', 'ops:log:list', false, false, 1);
+(403, 4, '操作日志', 'LogManage', '/ops/log', 'views/ops/log/index.vue', 'Document', 3, 'C', 'ops:log:list', false, false, 1),
+
+-- 5. 细粒度操作与敏感权限按钮
+(207, 201, '新增', '', '', '', '', 1, 'F', 'hr:dept:add', false, false, 1),
+(208, 201, '编辑', '', '', '', '', 2, 'F', 'hr:dept:edit', false, false, 1),
+(209, 201, '删除', '', '', '', '', 3, 'F', 'hr:dept:delete', false, false, 1),
+(215, 202, '查看敏感档案', '', '', '', '', 6, 'F', 'hr:employee:sensitive', false, false, 1),
+(234, 204, '同步绩效到薪资', '', '', '', '', 5, 'F', 'hr:salary:sync', false, false, 1),
+(244, 205, '修正考勤', '', '', '', '', 5, 'F', 'hr:attendance:approveRepair', false, false, 1),
+(255, 206, '主管评分', '', '', '', '', 6, 'F', 'hr:performance:manager', false, false, 1),
+(314, 301, '账号授权', '', '', '', '', 5, 'F', 'system:user:assign', false, false, 1),
+(330, 303, '新增', '', '', '', '', 1, 'F', 'system:menu:add', false, false, 1),
+(331, 303, '编辑', '', '', '', '', 2, 'F', 'system:menu:edit', false, false, 1),
+(332, 303, '删除', '', '', '', '', 3, 'F', 'system:menu:delete', false, false, 1),
+(410, 401, '新增', '', '', '', '', 1, 'F', 'ops:notice:add', false, false, 1),
+(411, 401, '编辑', '', '', '', '', 2, 'F', 'ops:notice:edit', false, false, 1),
+(412, 401, '删除', '', '', '', '', 3, 'F', 'ops:notice:delete', false, false, 1),
+(413, 401, '发布', '', '', '', '', 4, 'F', 'ops:notice:publish', false, false, 1),
+(420, 402, '新增', '', '', '', '', 1, 'F', 'ops:dict:add', false, false, 1),
+(421, 402, '编辑', '', '', '', '', 2, 'F', 'ops:dict:edit', false, false, 1),
+(422, 402, '删除', '', '', '', '', 3, 'F', 'ops:dict:delete', false, false, 1),
+(430, 403, '清空', '', '', '', '', 1, 'F', 'ops:log:clean', false, false, 1);
 
 SELECT setval('sys_menu_id_seq', (SELECT MAX(id) FROM sys_menu));
 
--- 超级管理员分配全部菜单权限 (1 ~ 403)
+-- 超级管理员分配全部菜单权限
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT 1, id FROM sys_menu;
 
@@ -471,12 +534,13 @@ SELECT 1, id FROM sys_menu;
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT 2, id FROM sys_menu WHERE id IN (
     1, 2, 201, 202, 203, 204, 205, 206,
-    210, 211, 212, 213, 214,
+    207, 208, 209,
+    210, 211, 212, 213, 214, 215,
     220, 221,
-    230, 231, 232, 233,
-    240, 241, 242, 243,
-    250, 251, 252, 253, 254,
-    4, 401
+    230, 231, 232, 233, 234,
+    240, 241, 242, 243, 244,
+    250, 251, 252, 253, 254, 255,
+    4, 401, 410, 411, 412, 413
 );
 
 -- 初始化数据字典

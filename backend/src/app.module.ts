@@ -30,6 +30,8 @@ import { PerformanceModule } from './modules/performance/performance.module';
  * 类似模块参考：EmployeeModule、SalaryModule
  */
 import { AgentModule } from './modules/agent/agent.module';
+import { AccessIsolation1793610000000 } from './migrations/1793610000000-AccessIsolation';
+import { AgentSessionPersistence1793680000000 } from './migrations/1793680000000-AgentSessionPersistence';
 
 const env = process.env.NODE_ENV || 'development';
 
@@ -56,6 +58,11 @@ const env = process.env.NODE_ENV || 'development';
           synchronize: dbConf.synchronize,
           logging: dbConf.logging,
           autoLoadEntities: true,
+          migrations: [
+            AccessIsolation1793610000000,
+            AgentSessionPersistence1793680000000,
+          ],
+          migrationsRun: !dbConf.synchronize,
           extra: {
             timezone: '+08:00',
           },

@@ -105,6 +105,10 @@ services:
       ENABLE_RATE_LIMIT: "true"
       ENABLE_HELMET: "true"
       MASK_STACK_ERROR: "true"
+      # AI 智能体大模型接入配置 (生产部署请在根目录 .env 文件中配置 LLM_API_KEY)
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://sub2api.starysp.top/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-6.1-sol}
     depends_on:
       postgres:
         condition: service_healthy
