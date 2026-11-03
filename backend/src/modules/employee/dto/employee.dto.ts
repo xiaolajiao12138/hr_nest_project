@@ -4,6 +4,7 @@ import {
   IsString,
   IsInt,
   IsNumber,
+  IsIn,
   Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -11,7 +12,7 @@ import { PageParamDto } from '../../../common/dto/page-param.dto';
 
 export class QueryEmployeeDto extends PageParamDto {
   @IsOptional()
-  @IsString()
+  @IsIn(['leave', 'attendance', 'performance', 'user', 'employee'])
   purpose?: string;
   @IsOptional()
   @Type(() => Number)

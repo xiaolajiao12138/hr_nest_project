@@ -35,6 +35,9 @@ import { UploadService } from '../../upload/upload.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SalaryController } from '../../modules/salary/salary.controller';
 import { EmployeeController } from '../../modules/employee/employee.controller';
+import { LeaveController } from '../../modules/leave/leave.controller';
+import { AgentApiGateway } from '../../modules/agent/tools/agent-api.gateway';
+import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { TransformInterceptor } from '../interceptors/transform.interceptor';
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
@@ -149,14 +152,21 @@ it('PostgreSQL 数据隔离、归属、状态与并发回归', { skip: process.e
           assert.equal((await repo(User).findOneBy({id:accounts[1].id})).status,1);
         });
         await t.test('HTTP 层执行动作鉴权、DTO白名单、对象归属与响应脱敏', async () => {
-            const module = await Test.createTestingModule({ controllers: [SalaryController, EmployeeController], providers: [{ provide: SalaryService, useValue: salaryService }, { provide: EmployeeService, useValue: employeeService }] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context: any) { context.switchToHttp().getRequest().user = context.switchToHttp().getRequest().headers['x-test-actor'] === 'restricted' ? { ...self, permissions: [] } : context.switchToHttp().getRequest().headers['x-test-actor'] === 'reader' ? { ...actor, permissions: ['hr:employee:list'] } : actor; return true; } }).compile();
+            const module = await Test.createTestingModule({ controllers: [SalaryController, EmployeeController, LeaveController], providers: [{ provide: SalaryService, useValue: salaryService }, { provide: EmployeeService, useValue: employeeService }, { provide: LeaveService, useValue: leaveService }] }).overrideGuard(JwtAuthGuard).useValue({ canActivate(context: any) {
+                const request = context.switchToHttp().getRequest();
+                request.user = request.headers['x-test-actor'] === 'restricted' ? { ...self, permissions: [] }
+                    : request.headers['x-test-actor'] === 'reader' ? { ...actor, permissions: ['hr:employee:list'] }
+                    : request.headers['x-test-actor'] === 'unbound' ? { ...self, employeeId: undefined } : actor;
+                return true;
+            } }).compile();
             const app = module.createNestApplication({ logger: false });
+            app.setGlobalPrefix('api');
             app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: false }));
             app.useGlobalInterceptors(new TransformInterceptor());
             app.useGlobalFilters(new AllExceptionsFilter());
             try {
                 await app.listen(0, '127.0.0.1');
-                const address = app.getHttpServer().address(), base = 'http://127.0.0.1:' + address.port;
+                const address = app.getHttpServer().address(), base = 'http://127.0.0.1:' + address.port + '/api';
                 assert.equal((await fetch(base + '/salary/list', { headers: { 'x-test-actor': 'restricted' } })).status, 403);
                 assert.equal((await fetch(base + '/salary/detail?id=' + sb.id)).status, 404);
                 const others = await fetch(base + '/salary/my-payslips/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ salaryId: sb.id, password: 'only-test-secret' }) });
@@ -172,6 +182,42 @@ it('PostgreSQL 数据隔离、归属、状态与并发回归', { skip: process.e
                 assert.equal(payload.data.total, 2);
                 assert.equal(payload.data.list[0].salary, undefined);
                 assert.ok(payload.data.list[0].phone.includes('*'));
+                const me = await fetch(base + '/hr/employee/me?empId=' + b.id, { headers: { 'x-test-actor': 'restricted' } });
+                assert.equal(me.status, 200);
+                const identity: any = (await me.json() as any).data;
+                assert.equal(identity.bound, true);
+                assert.equal(identity.employee.id, a.id);
+                assert.equal(identity.employee.phone, undefined);
+                assert.equal(identity.employee.salary, undefined);
+                const unboundIdentity = await fetch(base + '/hr/employee/me', { headers: { 'x-test-actor': 'unbound' } });
+                assert.equal((await unboundIdentity.json() as any).data.bound, false);
+                const body = { leaveType: 'ANNUAL', startDate: '2026-12-09', reason: '家里有事', empId: b.id, days: 99 };
+                const unbound = await fetch(base + '/hr/leave/my/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-test-actor': 'unbound' }, body: JSON.stringify(body) });
+                assert.equal(unbound.status, 403);
+                assert.match(JSON.stringify(await unbound.json()), /关联员工/);
+                assert.equal((await fetch(base + '/hr/leave/my/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-test-actor': 'reader' }, body: JSON.stringify(body) })).status, 403);
+                const invalid = await fetch(base + '/hr/leave/my/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, startDate: '2026-02-30' }) });
+                assert.equal(invalid.status, 400);
+                await repo(AnnualLeave).save({ empId: a.id, year: 2026, totalDays: 5, usedDays: 0, remainDays: 5 });
+                const submit = await fetch(base + '/hr/leave/my/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                assert.equal(submit.status, 201);
+                const application: any = (await submit.json() as any).data;
+                assert.equal(application.empId, a.id);
+                assert.equal(Number(application.days), 1);
+                assert.equal(application.status, 'PENDING');
+                assert.ok(application.leaveNo);
+                assert.equal(Number((await repo(AnnualLeave).findOneBy({ empId: a.id, year: 2026 })).remainDays), 4);
+                const gateway = new AgentApiGateway(new Map([['leave', { controllers: new Map([['leave', { metatype: LeaveController }]]) }]]) as any, new Reflector(), { get: (key: string) => key === 'port' ? address.port : '/api' } as any);
+                const duplicate = await gateway.executeApiCall({ method: 'POST', path: '/hr/leave/my/apply', body }, actor, 'Bearer test');
+                assert.equal(duplicate.success, false);
+                assert.match(duplicate.resultSummary, /已存在请假申请/);
+                assert.equal(Number((await repo(AnnualLeave).findOneBy({ empId: a.id, year: 2026 })).remainDays), 4);
+                const viaTool = await gateway.executeApiCall({ method: 'POST', path: '/hr/leave/my/apply', body: { leaveType: 'CASUAL', startDate: '2026-12-10', reason: '家里有事' } }, actor, 'Bearer test');
+                assert.equal(viaTool.success, true);
+                assert.equal(viaTool.data.empId, a.id);
+                assert.equal(Number(viaTool.data.days), 1);
+                assert.equal(viaTool.data.status, 'PENDING');
+                assert.equal(await repo(Leave).countBy({ empId: b.id }), 0);
             }
             finally {
                 await app.close();

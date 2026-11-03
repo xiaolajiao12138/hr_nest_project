@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { applyScope, assertScope, assertEmployeeScope, requirePermission, isAdmin } from '../../common/security/data-scope';
+import { applyScope, assertScope, assertEmployeeScope, requirePermission, requireEmployeeId, isAdmin } from '../../common/security/data-scope';
 import { AuthCacheService } from '../rbac/services/auth-cache.service';
 import { Leave } from './entities/leave.entity';
 import { AnnualLeave } from './entities/annual.entity';
@@ -9,6 +9,7 @@ import { Employee } from '../employee/entities/employee.entity';
 import { BaseService } from '../../common/base/base.service';
 import {
   CreateLeaveDto,
+  ApplyMyLeaveDto,
   AuditLeaveDto,
   QueryLeaveDto,
   QueryAnnualLeaveDto,
@@ -144,6 +145,19 @@ export class LeaveService extends BaseService<Leave> {
    * @returns 创建完成的请假单实体
    * @throws BusinessException 当员工不存在或年假可用额度不足时抛出异常
    */
+  async applyMyLeave(dto: ApplyMyLeaveDto, user: CurrentUserPayload): Promise<Leave> {
+    requirePermission(user, 'hr:leave:add');
+    const empId = requireEmployeeId(user);
+    // 整日覆盖自然日区间，由既有计假规则计算工作时间，不猜测班次时间。
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    const endDate = dto.endDate ?? dto.startDate;
+    if (!datePattern.test(dto.startDate) || !datePattern.test(endDate)) throw new BusinessException('整日请假日期格式应为 YYYY-MM-DD');
+    return this.applyLeave({
+      empId, leaveType: dto.leaveType, reason: dto.reason,
+      startTime: dto.startDate + 'T00:00:00', endTime: endDate + 'T23:59:59', days: 0,
+    }, user);
+  }
+
   async applyLeave(dto: CreateLeaveDto, user?: CurrentUserPayload): Promise<Leave> {
     requirePermission(user, 'hr:leave:add');
     await assertEmployeeScope(this.dataSource, user, 'leave', dto.empId);

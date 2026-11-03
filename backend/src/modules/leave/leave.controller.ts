@@ -13,6 +13,7 @@ import {
 import { LeaveService } from './leave.service';
 import {
   CreateLeaveDto,
+  ApplyMyLeaveDto,
   AuditLeaveDto,
   QueryLeaveDto,
   QueryAnnualLeaveDto,
@@ -99,7 +100,14 @@ export class LeaveController {
    * @returns 返回创建成功的请假实体
    * @throws {BusinessException} 当年假余额不足或时间区间冲突时抛出异常并自动回滚事务
    */
-  @AiTool('self-service')
+  @AiTool({ mode: 'self-service', description: '为当前登录人提交整日请假，申请人由后端账号绑定确定，不接收员工ID。body: leaveType=ANNUAL年假/SICK病假/CASUAL事假，startDate=YYYY-MM-DD，endDate选填(不填为当天一天)，reason。用户说一天或全天时直接使用日期，无需追问具体上下班时间；按系统现有工作日计假规则核算天数并校验年假余额、重复区间。未绑定时必须由管理员关联，不能提供ID绕过。成功返回请假单号和PENDING(待审批)，不等于审批通过。' })
+  @Post('my/apply')
+  @Permissions('hr:leave:add')
+  @OperLog({ title: '本人整日请假申请', businessType: 'INSERT' })
+  async applyMy(@CurrentUser() user: CurrentUserPayload, @Body() dto: ApplyMyLeaveDto) {
+    return this.leaveService.applyMyLeave(dto, user);
+  }
+
 @Post('apply')
   @Permissions('hr:leave:add')
   @OperLog({ title: '提交请假申请', businessType: 'INSERT' })

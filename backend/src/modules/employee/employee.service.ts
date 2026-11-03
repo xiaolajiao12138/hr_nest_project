@@ -1,6 +1,6 @@
 import { CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { applyScope, assertScope, assertDepartmentScope, requirePermission, isAdmin } from '../../common/security/data-scope';
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Employee } from './entities/employee.entity';
@@ -399,6 +399,17 @@ export class EmployeeService extends BaseService<Employee> {
       const file = await this.dataSource.getRepository(SysFile).findOneBy({ id: dto[key] });
       if (!file || (!isAdmin(user) && file.ownerUserId !== user.userId) || !/^(idcard|cert|employee)\//.test(file.filePath)) throw new BusinessException('附件不存在或不可用于该员工档案');
     }
+  }
+
+  async getMyEmployee(user: CurrentUserPayload) {
+    if (!user?.userId) throw new ForbiddenException('缺少有效身份');
+    const employee = user.employeeId ? await this.empRepo.createQueryBuilder('emp')
+      .leftJoinAndSelect('emp.dept', 'dept')
+      .select(['emp.id', 'emp.empNo', 'emp.name', 'emp.deptId', 'emp.status', 'dept.id', 'dept.deptName'])
+      .where('emp.id = :id', { id: user.employeeId }).getOne() : null;
+    return employee
+      ? { bound: true, employee }
+      : { bound: false, employee: null, message: '账号尚未关联员工档案，请联系管理员完成关联；提供员工ID不能替代账号绑定。' };
   }
 
   async getEmployeeOptions(purpose: string, query: QueryEmployeeDto, user: CurrentUserPayload) {

@@ -44,7 +44,13 @@ export class EmployeeController {
    * @param query 分页与筛选过滤参数
    * @returns 返回包含员工实体及关联部门的统一分页结果对象
    */
-  @AiTool()
+  @AiTool({ description: '查询当前登录账号明确关联的本人员工身份，无需员工ID或员工管理权限。bound=false 表示未绑定，必须由管理员关联；不得让用户提供ID或按姓名搜索替代绑定。' })
+  @Get('me')
+  async me(@CurrentUser() user: CurrentUserPayload) {
+    return this.employeeService.getMyEmployee(user);
+  }
+
+  @AiTool({ description: '按用途查询授权范围内的员工候选，用于管理表单选人，不能用于推断当前登录人身份。query.purpose 必填，只能为 leave、attendance、performance、user、employee。查询本人请使用 GET /hr/employee/me。' })
 @Get('options')
   async options(@CurrentUser() user: CurrentUserPayload, @Query('purpose') purpose: string, @Query() query: QueryEmployeeDto) {
     return this.employeeService.getEmployeeOptions(purpose, query, user);

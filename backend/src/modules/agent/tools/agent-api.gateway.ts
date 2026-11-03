@@ -6,7 +6,8 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { AI_TOOL_KEY } from '../../../common/decorators/ai-tool.decorator';
-import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { PATH_METADATA, METHOD_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
 import { ModulesContainer, Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { getMetadataStorage } from 'class-validator';
@@ -24,6 +25,7 @@ export interface DiscoveredEndpoint {
   title: string;
   requiredPermissions: string[];
   dtoFieldsSummary: string;
+  description?: string;
 }
 
 export interface ApiCallInput {
@@ -115,8 +117,9 @@ export class AgentApiGateway {
           if (methodName === 'constructor') continue;
           const handler = proto[methodName];
           if (typeof handler !== 'function') continue;
-          const aiMode = Reflect.getMetadata(AI_TOOL_KEY, handler);
-          if (!aiMode) continue;
+          const aiTool = Reflect.getMetadata(AI_TOOL_KEY, handler);
+          if (!aiTool) continue;
+          const aiMode = typeof aiTool === 'string' ? aiTool : aiTool.mode;
 
           const reqMethodNum: number | undefined = Reflect.getMetadata(
             METHOD_METADATA,
@@ -168,6 +171,7 @@ export class AgentApiGateway {
             title,
             requiredPermissions,
             dtoFieldsSummary,
+            description: typeof aiTool === 'object' ? aiTool.description : undefined,
           });
         }
       }
@@ -191,8 +195,18 @@ export class AgentApiGateway {
         Reflect.getMetadata('design:paramtypes', proto, methodName) || [];
       const storage = getMetadataStorage();
       const parts: string[] = [];
+      const routeArgs = Reflect.getMetadata(ROUTE_ARGS_METADATA, proto.constructor, methodName) || {};
 
-      for (const paramType of paramTypes) {
+      for (const [index, paramType] of paramTypes.entries()) {
+        const routeArg = Object.entries(routeArgs).find(([, value]: [string, any]) => value.index === index);
+        if (!routeArg) continue;
+        const source = { [RouteParamtypes.BODY]: 'body', [RouteParamtypes.QUERY]: 'query', [RouteParamtypes.PARAM]: 'pathParams' }[Number(routeArg[0].split(':')[0])];
+        if (!source) continue;
+        const paramName = (routeArg[1] as any).data;
+        if (PRIMITIVE_TYPES.has(paramType)) {
+          if (paramName) parts.push(`${source}.${paramName}: ${paramType.name.toLowerCase()}`);
+          continue;
+        }
         if (
           !paramType ||
           typeof paramType !== 'function' ||
@@ -212,17 +226,21 @@ export class AgentApiGateway {
         if (!metas || metas.length === 0) continue;
 
         const grouped = storage.groupByPropertyName(metas);
+        const fields: string[] = [];
         for (const [propName, rules] of Object.entries(grouped)) {
           const isOptional = rules.some(
             (r) => r.type === 'conditionalValidation',
           );
           const msgRule = rules.find(
-            (r) => typeof r.message === 'string' && r.message.length <= 20,
+            (r) => typeof r.message === 'string' && r.message.length <= 80,
           );
           const flag = isOptional ? '?' : '*';
           const hint = msgRule?.message ? `(${msgRule.message})` : '';
-          parts.push(`${propName}${flag}${hint}`);
+          const enumRule = rules.find(r => r.name === 'isIn');
+          const enumHint = enumRule ? ` enum=${JSON.stringify(enumRule.constraints[0])}` : '';
+          fields.push(`${propName}${flag}${enumHint}${hint}`);
         }
+        parts.push(`${source}: { ${fields.join(', ')} }`);
       }
 
       return parts.join(', ');
@@ -275,15 +293,16 @@ export class AgentApiGateway {
   buildAuthorizedApiPrompt(user: CurrentUserPayload): string {
     const endpoints = this.getAuthorizedEndpoints(user);
     if (endpoints.length === 0) {
-      return '当前账号暂无可调用的业务写操作接口。';
+      return '当前账号暂无可调用的业务接口。';
     }
 
     return endpoints
       .map((ep) => {
         const dtoPart = ep.dtoFieldsSummary
-          ? ` | 参数: { ${ep.dtoFieldsSummary} }`
+          ? ` | 参数: ${ep.dtoFieldsSummary}`
           : '';
-        return `- ${ep.method} ${ep.path} [${ep.title}]${dtoPart}`;
+        const description = ep.description ? ` | 用途: ${ep.description}` : '';
+        return `- ${ep.method} ${ep.path} [${ep.title}]${dtoPart}${description}`;
       })
       .join('\n');
   }

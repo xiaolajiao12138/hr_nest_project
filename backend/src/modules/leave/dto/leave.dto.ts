@@ -5,6 +5,8 @@ import {
   IsString,
   IsIn,
   IsOptional,
+  IsDateString,
+  Matches,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -47,6 +49,25 @@ export class CreateLeaveDto {
   @IsNumber()
   @Min(0.5, { message: '请假天数最少0.5天' })
   days: number;
+
+  @IsNotEmpty({ message: '请假事由不能为空' })
+  @IsString()
+  reason: string;
+}
+
+/** 整日自助请假：身份和天数由后端确定，结束日期不填代表一天。 */
+export class ApplyMyLeaveDto {
+  @IsIn(['ANNUAL', 'SICK', 'CASUAL'], { message: '请假类型仅限 ANNUAL(年假)、SICK(病假)、CASUAL(事假)' })
+  leaveType: string;
+
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: '开始日期格式为 YYYY-MM-DD' })
+  startDate: string;
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: '结束日期格式为 YYYY-MM-DD' })
+  endDate?: string;
 
   @IsNotEmpty({ message: '请假事由不能为空' })
   @IsString()
