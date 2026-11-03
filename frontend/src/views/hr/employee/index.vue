@@ -47,7 +47,7 @@
     >
       <template #toolbar>
         <el-button
-          v-hasPerm="['hr:employee:add']"
+          v-if="hasPermission('hr:employee:sensitive')" v-hasPerm="['hr:employee:add']"
           type="primary"
           :icon="Plus"
           @click="handleAdd"
@@ -55,7 +55,7 @@
           新增员工
         </el-button>
         <el-button
-          v-hasPerm="['hr:employee:import']"
+          v-if="hasPermission('hr:employee:sensitive')" v-hasPerm="['hr:employee:import']"
           type="success"
           :icon="Upload"
           @click="importDialogVisible = true"
@@ -125,7 +125,7 @@
     </BaseTable>
 
     <!-- 新增 / 编辑员工档案弹窗 (复用 BaseDialog 与 BaseUpload) -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading || uploadsBusy"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="780px"
@@ -256,7 +256,7 @@
               <BaseUpload
                 v-model="formData.idCardFrontId"
                 v-model:file-url="frontUrl"
-                folder="idcard"
+                folder="idcard" @uploading="uploads.front = $event"
                 tip-text="身份证人像面"
               />
             </el-form-item>
@@ -276,7 +276,7 @@
               <BaseUpload
                 v-model="formData.eduCertId"
                 v-model:file-url="certUrl"
-                folder="cert"
+                folder="cert" @uploading="uploads.cert = $event"
                 tip-text="毕业证书/学籍"
               />
             </el-form-item>
@@ -306,7 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, h } from 'vue';
+import { computed, ref, reactive, onMounted, h } from 'vue';
 import { Plus, Upload, Download } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance, ElTag } from 'element-plus';
 import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
@@ -315,6 +315,8 @@ import BaseDialog from '@/components/BaseDialog.vue';
 import BaseUpload from '@/components/BaseUpload.vue';
 import BaseImportExcel from '@/components/BaseImportExcel.vue';
 import SensitiveText from '@/components/SensitiveText.vue';
+import request from '@/utils/request';
+import { usePermission } from '@/hooks/usePermission';
 import { usePagination } from '@/hooks/usePagination';
 import {
   getEmployeeListApi,
@@ -328,6 +330,7 @@ import {
 } from '@/api/employee';
 import { getDeptTreeApi } from '@/api/dept';
 
+const { hasPermission } = usePermission();
 const loading = ref(false);
 const exportLoading = ref(false);
 const tableData = ref<any[]>([]);
@@ -383,10 +386,11 @@ const actionColumn: ActionColumnConfig = {
       label: '编辑',
       type: 'primary',
       perm: ['hr:employee:edit'],
+      show: hasPermission('hr:employee:sensitive'),
       onClick: () => handleEdit(row),
     },
     {
-      label: '删除',
+      label: '离职归档',
       type: 'danger',
       perm: ['hr:employee:delete'],
       onClick: () => handleDelete(row),
@@ -398,6 +402,8 @@ const dialogVisible = ref(false);
 const dialogTitle = ref('新增员工');
 const submitLoading = ref(false);
 const detailLoading = ref(false);
+const uploads = reactive({front:false,back:false,cert:false});
+const uploadsBusy = computed(() => Object.values(uploads).some(Boolean));
 const currentId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
 const importDialogVisible = ref(false);
@@ -436,7 +442,9 @@ const formRules = {
   entryDate: [{ required: true, message: '入职时间不能为空', trigger: 'change' }],
 };
 
+let listRequestId=0;
 const fetchData = async () => {
+  const requestId=++listRequestId;
   loading.value = true;
   try {
     const params = {
@@ -445,10 +453,12 @@ const fetchData = async () => {
       pageSize: pagination.pageSize,
     };
     const res: any = await getEmployeeListApi(params);
+    if(requestId!==listRequestId)return;
+    if(!res.list?.length && res.total>0 && pagination.page>1){pagination.page=Math.max(1,Math.ceil(res.total/pagination.pageSize));return fetchData();}
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
   } finally {
-    loading.value = false;
+    if(requestId===listRequestId)loading.value = false;
   }
 };
 
@@ -498,10 +508,12 @@ const handleAdd = () => {
 /**
  * 编辑员工档案
  * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据员工 ID 异步请求后端独立详情接口获取最新完整档案数据
- * 
+ *
  * @param row 列表当前点击行（仅取其 id 与姓名作为标题初始提示）
  */
+let detailRequestId=0;
 const handleEdit = async (row: any) => {
+  const requestId=++detailRequestId;
   currentId.value = row.id;
   dialogTitle.value = `编辑员工【${row.name}】档案`;
   // 重置表单状态并开启弹窗加载中遮罩
@@ -514,6 +526,7 @@ const handleEdit = async (row: any) => {
   try {
     // 异步查询数据库中最新的员工详细数据及证件附件
     const detail: any = await getEmployeeDetailApi(row.id);
+    if(requestId!==detailRequestId || !dialogVisible.value || currentId.value!==row.id)return;
     Object.assign(formData, {
       empNo: detail.empNo,
       name: detail.name,
@@ -534,27 +547,29 @@ const handleEdit = async (row: any) => {
     backUrl.value = detail.idCardBack?.fileUrl || '';
     certUrl.value = detail.eduCert?.fileUrl || '';
   } catch (err: any) {
-    ElMessage.error(err.message || '获取员工最新详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取员工最新详情失败');
     dialogVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if(requestId===detailRequestId)detailLoading.value = false;
   }
 };
 
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(`确定删除员工【${row.name} (${row.empNo})】吗？`, '删除警告', {
+  ElMessageBox.confirm(`确定将员工离职归档并停用关联账号【${row.name} (${row.empNo})】吗？`, '离职归档确认', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning',
   }).then(async () => {
     await deleteEmployeeApi(row.id);
-    ElMessage.success('员工档案删除成功');
+    ElMessage.success('员工已离职归档，关联账号已停用');
     fetchData();
-  });
+  }).catch(()=>{});
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (uploadsBusy.value || submitLoading.value || detailLoading.value || !formRef.value) return;
+  submitLoading.value = true;
+  try {
   await formRef.value.validate(async (valid) => {
     if (!valid) return;
     submitLoading.value = true;
@@ -572,6 +587,7 @@ const handleSubmit = async () => {
       submitLoading.value = false;
     }
   });
+} finally { submitLoading.value = false; }
 };
 
 // 导出 Excel
@@ -590,14 +606,17 @@ const handleExport = async () => {
     window.URL.revokeObjectURL(url);
     ElMessage.success('员工档案数据导出完成');
   } catch (e: any) {
-    ElMessage.error(e.message || '导出失败');
+    if (!e?.notified) ElMessage.error(e.message || '导出失败');
   } finally {
     exportLoading.value = false;
   }
 };
 
-const previewFile = (url: string) => {
-  currentPreviewUrl.value = url;
+const previewFile = async (url: string) => {
+  const match = tableData.value.flatMap((row:any) => [row.idCardFront,row.idCardBack,row.eduCert]).find((file:any) => file?.fileUrl === url);
+  if (!match?.id) return;
+  const res: any = await request({url:'/upload/presigned-url/'+match.id,method:'get'});
+  currentPreviewUrl.value = res.url;
   previewVisible.value = true;
 };
 

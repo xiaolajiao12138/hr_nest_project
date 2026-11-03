@@ -22,7 +22,7 @@
     >
       <template #toolbar>
         <el-button
-          v-hasPerm="['system:role:add']"
+          v-if="isAdmin()" v-hasPerm="['system:role:add']"
           type="primary"
           :icon="Plus"
           @click="handleAdd"
@@ -33,7 +33,7 @@
     </BaseTable>
 
     <!-- 新增 / 编辑角色弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="500px"
@@ -54,6 +54,12 @@
           </el-form-item>
           <el-form-item label="显示排序" prop="sort">
             <el-input-number v-model="formData.sort" :min="0" :max="999" />
+          </el-form-item>
+          <el-form-item label="数据范围" prop="dataScope">
+            <el-select v-model="formData.dataScope" style="width:100%"><el-option v-for="item in scopeOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+          </el-form-item>
+          <el-form-item v-if="formData.dataScope === 'CUSTOM'" label="授权部门">
+            <el-tree-select v-model="formData.scopeDeptIds" :data="deptTree" multiple check-strictly node-key="id" :props="{label:'deptName',children:'children'}" style="width:100%" />
           </el-form-item>
           <el-form-item label="备注说明" prop="remark">
             <el-input v-model="formData.remark" type="textarea" :rows="3" />
@@ -90,7 +96,7 @@
       <template #footer>
         <div style="display: flex; justify-content: flex-end; gap: 10px">
           <el-button @click="drawerVisible = false">取消</el-button>
-          <el-button type="primary" :loading="savePermLoading" @click="saveRoleMenus">
+          <el-button type="primary" :loading="savePermLoading" :disabled="drawerLoading || savePermLoading" @click="saveRoleMenus">
             保存权限配置
           </el-button>
         </div>
@@ -101,6 +107,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick } from 'vue';
+import { getDeptTreeApi } from '@/api/dept';
+import { useUserStore } from '@/stores/user';
 import { Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance, ElTree } from 'element-plus';
 import BaseTable, { TableColumn, ActionColumnConfig } from '@/components/BaseTable.vue';
@@ -118,6 +126,10 @@ import {
   getMenuTreeApi,
 } from '@/api/system';
 
+const userStore = useUserStore();
+const isAdmin = () => userStore.roles.includes('admin') || userStore.permissions.includes('*');
+const deptTree = ref<any[]>([]);
+const scopeOptions = [{value:'SELF',label:'仅本人'},{value:'DEPT',label:'本部门'},{value:'DEPT_AND_CHILDREN',label:'本部门及下级'},{value:'CUSTOM',label:'指定部门'},{value:'ALL',label:'全公司'}];
 const loading = ref(false);
 const tableData = ref<any[]>([]);
 
@@ -144,6 +156,7 @@ const actionColumn: ActionColumnConfig = {
       label: '编辑',
       type: 'primary',
       perm: ['system:role:edit'],
+      show: isAdmin() && row.roleKey !== 'admin',
       onClick: () => handleEdit(row),
     },
     {
@@ -156,7 +169,7 @@ const actionColumn: ActionColumnConfig = {
       label: '删除',
       type: 'danger',
       perm: ['system:role:delete'],
-      show: row.roleKey !== 'admin', // 超级管理员角色禁止删除
+      show: isAdmin() && row.roleKey !== 'admin', // 超级管理员角色禁止删除
       onClick: () => handleDelete(row),
     },
   ],
@@ -174,6 +187,8 @@ const formData = reactive({
   roleKey: '',
   sort: 0,
   remark: '',
+  dataScope: 'SELF',
+  scopeDeptIds: [] as number[],
 });
 
 const formRules = {
@@ -216,19 +231,21 @@ const handleReset = () => {
 };
 
 const handleAdd = () => {
+  getDeptTreeApi().then((res: any) => { deptTree.value = res || []; });
   currentId.value = null;
   dialogTitle.value = '新增角色';
-  Object.assign(formData, { roleName: '', roleKey: '', sort: 0, remark: '' });
+  Object.assign(formData, { roleName: '', roleKey: '', sort: 0, remark: '', dataScope: 'DEPT', scopeDeptIds: [] });
   dialogVisible.value = true;
 };
 
 /**
  * 编辑角色
  * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据角色 ID 异步请求后端独立详情接口获取最新完整数据
- * 
+ *
  * @param row 列表当前点击行（仅提取 row.id）
  */
 const handleEdit = async (row: any) => {
+  getDeptTreeApi().then((res: any) => { deptTree.value = res || []; });
   currentId.value = row.id;
   dialogTitle.value = '编辑角色';
   dialogVisible.value = true;
@@ -241,9 +258,11 @@ const handleEdit = async (row: any) => {
       roleKey: detail.roleKey,
       sort: detail.sort,
       remark: detail.remark,
+      dataScope: detail.dataScope || 'SELF',
+      scopeDeptIds: detail.scopeDeptIds || [],
     });
   } catch (err: any) {
-    ElMessage.error(err.message || '获取角色详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取角色详情失败');
     dialogVisible.value = false;
   } finally {
     detailLoading.value = false;
@@ -263,7 +282,9 @@ const handleDelete = (row: any) => {
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (submitLoading.value || detailLoading.value || !formRef.value) return;
+  submitLoading.value = true;
+  try {
   await formRef.value.validate(async (valid) => {
     if (!valid) return;
     submitLoading.value = true;
@@ -281,6 +302,7 @@ const handleSubmit = async () => {
       submitLoading.value = false;
     }
   });
+} finally { submitLoading.value = false; }
 };
 
 /**
@@ -336,6 +358,7 @@ const openPermissionDrawer = async (row: any) => {
 
 // 保存角色菜单权限
 const saveRoleMenus = async () => {
+  if (savePermLoading.value || drawerLoading.value) return;
   if (!currentRole.value || !menuTreeRef.value) return;
   savePermLoading.value = true;
   try {

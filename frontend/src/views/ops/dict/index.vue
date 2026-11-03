@@ -22,7 +22,7 @@
     >
       <template #toolbar>
         <el-button
-          v-hasPerm="['ops:dict:list']"
+          v-hasPerm="['ops:dict:add']"
           type="primary"
           :icon="Plus"
           @click="handleAdd"
@@ -33,7 +33,7 @@
     </BaseTable>
 
     <!-- 新增/编辑字典弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="520px"
@@ -167,12 +167,12 @@ const actionColumn: ActionColumnConfig = {
   fixed: 'right',
   buttons: (row) => [
     {
-      label: '编辑',
+      label: '编辑', perm: 'ops:dict:edit',
       type: 'primary',
       onClick: () => handleEdit(row),
     },
     {
-      label: '删除',
+      label: '删除', perm: 'ops:dict:delete',
       type: 'danger',
       onClick: () => handleDelete(row),
     },
@@ -203,7 +203,9 @@ const formRules = {
   dictValue: [{ required: true, message: '字典键值不能为空', trigger: 'blur' }],
 };
 
+let listRequestId=0;
 const fetchData = async () => {
+  const requestId=++listRequestId;
   loading.value = true;
   try {
     const res: any = await getDictListApi({
@@ -211,10 +213,12 @@ const fetchData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
+    if(requestId!==listRequestId)return;
+    if(!res.list?.length && res.total>0 && pagination.page>1){pagination.page=Math.max(1,Math.ceil(res.total/pagination.pageSize));return fetchData();}
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
   } finally {
-    loading.value = false;
+    if(requestId===listRequestId)loading.value = false;
   }
 };
 
@@ -244,7 +248,9 @@ const handleAdd = () => {
   dialogVisible.value = true;
 };
 
+let detailRequestId=0;
 const handleEdit = async (row: any) => {
+  const requestId=++detailRequestId;
   currentId.value = row.id;
   dialogTitle.value = '编辑字典项';
   dialogVisible.value = true;
@@ -252,6 +258,7 @@ const handleEdit = async (row: any) => {
 
   try {
     const res: any = await getDictDetailApi(row.id);
+    if(requestId!==detailRequestId || !dialogVisible.value || currentId.value!==row.id)return;
     Object.assign(formData, {
       dictName: res.dictName || '',
       dictType: res.dictType || '',
@@ -262,10 +269,10 @@ const handleEdit = async (row: any) => {
       remark: res.remark || '',
     });
   } catch (error: any) {
-    ElMessage.error(error?.message || '获取字典详情失败');
+    if (!error?.notified) ElMessage.error(error?.message || '获取字典详情失败');
     dialogVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if(requestId===detailRequestId)detailLoading.value = false;
   }
 };
 
@@ -278,13 +285,13 @@ const handleDelete = (row: any) => {
     await deleteDictApi(row.id);
     ElMessage.success('字典项删除成功');
     fetchData();
-  });
+  }).catch(()=>{});
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (!formRef.value || submitLoading.value || detailLoading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || submitLoading.value || detailLoading.value) return;
     submitLoading.value = true;
     try {
       if (currentId.value) {

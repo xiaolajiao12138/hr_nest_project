@@ -313,7 +313,7 @@
     </BaseDialog>
 
     <!-- 薪资明细微调与密码设置弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="editDialogVisible"
       :title="`调整员工薪酬明细 - ${currentEditing?.employee?.name || ''}`"
       width="680px"
@@ -449,7 +449,7 @@
 
         <el-form-item label="核算备注">
           <el-input
-            v-model="editForm.remarks"
+            v-model="editForm.remark"
             type="textarea"
             :rows="2"
             placeholder="填写调整事由或核算说明"
@@ -533,8 +533,11 @@ function getCurrentYearMonth(): string {
 }
 
 // 页面基础响应式状态
+let listRequestId = 0;
+let editRequestId = 0;
 const loading = ref(false);
 const exportLoading = ref(false);
+const statusSubmitting = ref(false);
 const tableData = ref<SalaryRecord[]>([]);
 const selectedRows = ref<SalaryRecord[]>([]);
 const deptTree = ref<any[]>([]);
@@ -590,13 +593,15 @@ const columns: TableColumn[] = [
   { label: "实发到手", slot: "netSalarySlot", width: 140, align: "right" },
   { label: "发放状态", slot: "statusSlot", width: 100, align: "center" },
   { label: "安全防护", slot: "securitySlot", width: 120, align: "center" },
-  { label: "备注说明", prop: "remarks", minWidth: 140, align: "left" },
+  { label: "备注说明", prop: "remark", minWidth: 140, align: "left" },
 ];
 
 /**
  * 加载薪酬列表与 KPI 数据
  */
 async function fetchData() {
+  const requestId = ++listRequestId;
+  selectedRows.value = [];
   loading.value = true;
   try {
     const res: any = await getSalaryListApi({
@@ -608,6 +613,7 @@ async function fetchData() {
       keyword: searchForm.keyword.trim() || undefined,
     });
 
+    if (requestId !== listRequestId) return;
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
 
@@ -617,7 +623,7 @@ async function fetchData() {
   } catch (error) {
     console.error("加载薪酬列表失败:", error);
   } finally {
-    loading.value = false;
+    if (requestId === listRequestId) loading.value = false;
   }
 }
 
@@ -665,9 +671,11 @@ function handleSelectionChange(rows: SalaryRecord[]) {
 
 // 批量确认核准或发放
 async function handleBatchConfirm(targetStatus: number) {
+  if (statusSubmitting.value) return;
+  statusSubmitting.value = true;
   const label = targetStatus === 2 ? "核准" : "发放";
   const ids = selectedRows.value.map((r) => r.id);
-  if (!ids.length) return;
+  if (!ids.length) { statusSubmitting.value = false; return; }
 
   try {
     await ElMessageBox.confirm(
@@ -685,11 +693,13 @@ async function handleBatchConfirm(targetStatus: number) {
     fetchData();
   } catch (error) {
     // 用户取消或请求失败
-  }
+  } finally { statusSubmitting.value = false; }
 }
 
 // 单笔快捷流转状态
 async function quickChangeStatus(row: SalaryRecord, targetStatus: number) {
+  if (statusSubmitting.value) return;
+  statusSubmitting.value = true;
   const label = targetStatus === 2 ? "核准" : "发放";
   try {
     await ElMessageBox.confirm(
@@ -704,7 +714,7 @@ async function quickChangeStatus(row: SalaryRecord, targetStatus: number) {
     fetchData();
   } catch {
     // 忽略取消
-  }
+  } finally { statusSubmitting.value = false; }
 }
 
 // 导出当前月份明细 Excel
@@ -712,7 +722,7 @@ async function handleExport() {
   exportLoading.value = true;
   try {
     const month = searchForm.yearMonth || getCurrentYearMonth();
-    const res: any = await exportSalaryApi(month);
+    const res: any = await exportSalaryApi({...searchForm, yearMonth: month});
 
     const blob = new Blob([res], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -739,15 +749,17 @@ const calcDialogVisible = ref(false);
 const calcSubmitting = ref(false);
 const calcForm = reactive({
   yearMonth: getCurrentYearMonth(),
-  overwrite: true,
+  overwrite: false,
 });
 
 function openCalculateDialog() {
   calcForm.yearMonth = searchForm.yearMonth || getCurrentYearMonth();
+  calcForm.overwrite = false;
   calcDialogVisible.value = true;
 }
 
 async function submitCalculate() {
+  if (calcSubmitting.value) return;
   if (!calcForm.yearMonth) {
     ElMessage.warning("请选择核算月份");
     return;
@@ -755,12 +767,12 @@ async function submitCalculate() {
   calcSubmitting.value = true;
   try {
     const res: any = await calculateSalaryApi(calcForm);
-    ElMessage.success(`核算成功，共计算生成 ${res.count || 0} 笔薪酬记录`);
+    ElMessage.success(`核算成功，共计算生成 ${(res.createdCount || 0) + (res.updatedCount || 0)} 笔薪酬记录`);
     calcDialogVisible.value = false;
     searchForm.yearMonth = calcForm.yearMonth;
     fetchData();
   } catch (error: any) {
-    ElMessage.error(error?.message || "智能核算异常");
+    if (!error?.notified) ElMessage.error(error?.message || "智能核算异常");
   } finally {
     calcSubmitting.value = false;
   }
@@ -782,12 +794,14 @@ const editForm = reactive({
   housingFund: 0,
   tax: 0,
   payslipPassword: "",
-  remarks: "",
+  remark: "",
 });
 
 const detailLoading = ref(false);
 
 async function openEditDialog(row: SalaryRecord) {
+  const requestId = ++editRequestId;
+  Object.keys(editForm).forEach(key => { (editForm as any)[key] = typeof (editForm as any)[key] === "number" ? 0 : ""; });
   editDialogVisible.value = true;
   detailLoading.value = true;
   currentEditing.value = row;
@@ -796,6 +810,7 @@ async function openEditDialog(row: SalaryRecord) {
 
   try {
     const detail: any = await getSalaryDetailApi(row.id);
+    if (requestId !== editRequestId || !editDialogVisible.value) return;
     currentEditing.value = detail;
     editForm.id = detail.id;
     editForm.baseSalary = Number(detail.baseSalary || 0);
@@ -808,12 +823,12 @@ async function openEditDialog(row: SalaryRecord) {
     editForm.housingFund = Number(detail.housingFund || 0);
     editForm.tax = Number(detail.tax || 0);
     editForm.payslipPassword = "";
-    editForm.remarks = detail.remarks || "";
+    editForm.remark = detail.remark || "";
   } catch (error: any) {
-    ElMessage.error(error?.message || "获取薪资明细失败");
+    if (!error?.notified) ElMessage.error(error?.message || "获取薪资明细失败");
     editDialogVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if (requestId === editRequestId) detailLoading.value = false;
   }
 }
 
@@ -842,7 +857,8 @@ const calcLiveNet = computed(() => {
 });
 
 async function submitEdit() {
-  if (!editForm.id) return;
+  if (editSubmitting.value || detailLoading.value || !editForm.id || currentEditing.value?.id !== editForm.id) return;
+  if (editForm.payslipPassword && editForm.payslipPassword.length < 6) { ElMessage.warning("工资条密码至少6位"); return; }
   editSubmitting.value = true;
   try {
     await updateSalaryApi(editForm.id, {
@@ -856,13 +872,13 @@ async function submitEdit() {
       housingFund: editForm.housingFund,
       tax: editForm.tax,
       payslipPassword: editForm.payslipPassword || undefined,
-      remarks: editForm.remarks,
+      remark: editForm.remark,
     });
     ElMessage.success("薪酬微调保存成功");
     editDialogVisible.value = false;
     fetchData();
   } catch (error: any) {
-    ElMessage.error(error?.message || "调整失败");
+    if (!error?.notified) ElMessage.error(error?.message || "调整失败");
   } finally {
     editSubmitting.value = false;
   }

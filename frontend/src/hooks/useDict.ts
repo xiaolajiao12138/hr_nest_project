@@ -1,26 +1,14 @@
-import { ref, reactive } from 'vue';
+import { reactive } from 'vue';
 import { getDictDataByTypeApi } from '@/api/ops';
-
-const dictCache = new Map<string, any[]>();
-
+import { getToken } from '@/utils/auth';
+const cache = new Map<string, Promise<any[]>>();
 export function useDict(...types: string[]) {
-  const dictData = reactive<Record<string, any[]>>({});
-
-  types.forEach((type) => {
-    dictData[type] = [];
-    if (dictCache.has(type)) {
-      dictData[type] = dictCache.get(type)!;
-    } else {
-      getDictDataByTypeApi(type)
-        .then((res: any) => {
-          dictData[type] = res || [];
-          dictCache.set(type, res || []);
-        })
-        .catch(() => {
-          dictData[type] = [];
-        });
-    }
-  });
-
-  return dictData;
+  const data = reactive<Record<string, any[]>>({});
+  for (const type of types) {
+    data[type] = [];
+    const key = (getToken() || '') + ':' + type;
+    if (!cache.has(key)) cache.set(key, getDictDataByTypeApi(type).then((r:any)=>r || []).catch(error=>{cache.delete(key);throw error;}));
+    cache.get(key)!.then(value=>{data[type]=value;}).catch(()=>{});
+  }
+  return data;
 }

@@ -283,7 +283,7 @@ const stats = ref<DashboardStats>({
     totalEmployees: 0,
     pendingLeaves: 0,
     deptCount: 0,
-    attendanceRate: 98.5,
+    attendanceRate: 0,
   },
   deptDistribution: [],
   educationDistribution: [],
@@ -335,7 +335,7 @@ const renderDeptChart = () => {
   const list = stats.value.deptDistribution || [];
   const deptNames = list.map((item) => item.deptName);
   const actualCounts = list.map((item) => item.actualCount);
-  const planCounts = list.map((item) => item.planCount);
+
 
   const isDark = isFullscreen.value;
   const textColor = isDark ? '#94a3b8' : '#606266';
@@ -349,7 +349,7 @@ const renderDeptChart = () => {
       },
     },
     legend: {
-      data: [t('dashboard.totalEmployees'), t('dashboard.deptDistTag')],
+      data: [t('dashboard.totalEmployees')],
       top: 0,
       right: 10,
       textStyle: { color: textColor, fontSize: 12 },
@@ -395,19 +395,7 @@ const renderDeptChart = () => {
         },
         data: actualCounts,
       },
-      {
-        name: t('dashboard.deptDistTag'),
-        type: 'bar',
-        barWidth: 16,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#b3e19d' },
-            { offset: 1, color: '#95d475' },
-          ]),
-          borderRadius: [4, 4, 0, 0],
-        },
-        data: planCounts,
-      },
+
     ],
   };
 

@@ -9,16 +9,16 @@
       :before-upload="beforeUpload"
       :on-success="handleSuccess"
       :on-error="handleError"
-      :disabled="disabled"
+      :disabled="disabled || uploading"
     >
       <!-- 已有文件卡片预览 -->
       <div v-if="fileUrl" class="preview-box">
         <template v-if="isImage">
           <el-image
-            :src="fileUrl"
+            :src="previewUrl"
             class="preview-image"
             fit="cover"
-            :preview-src-list="[fileUrl]"
+            :preview-src-list="[previewUrl]"
             preview-teleported
           />
         </template>
@@ -30,9 +30,9 @@
         </template>
 
         <!-- 悬停遮罩操作 -->
-        <div v-if="!disabled" class="preview-mask">
-          <el-icon @click.stop="previewDialogVisible = true"><ZoomIn /></el-icon>
-          <el-icon @click.stop="handleRemove"><Delete /></el-icon>
+        <div class="preview-mask">
+          <el-icon @click.stop="openPreview"><ZoomIn /></el-icon>
+          <el-icon v-if="!disabled" @click.stop="handleRemove"><Delete /></el-icon>
         </div>
       </div>
 
@@ -51,17 +51,18 @@
     <!-- 弹窗大图预览 -->
     <el-dialog v-model="previewDialogVisible" title="文件预览" width="50%" append-to-body>
       <div style="text-align: center">
-        <img v-if="isImage" :src="fileUrl" style="max-width: 100%; max-height: 500px" />
-        <iframe v-else :src="fileUrl" style="width: 100%; height: 500px; border: none" />
+        <img v-if="isImage" :src="previewUrl" style="max-width: 100%; max-height: 500px" />
+        <iframe v-else :src="previewUrl" style="width: 100%; height: 500px; border: none" />
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { Plus, ZoomIn, Delete, Document } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import request from '@/utils/request';
 import { getToken } from '@/utils/auth';
 
 /**
@@ -105,23 +106,44 @@ const emit = defineEmits<{
   (e: 'update:fileUrl', url: string): void;
   /** 文件变更全量实体回调 */
   (e: 'change', fileData: any): void;
+  (e: 'uploading', busy: boolean): void;
 }>();
 
 /** 服务端文件上传接口地址 */
 const uploadUrl = `${import.meta.env.VITE_API_PREFIX || '/api'}/upload/file`;
 
 /** 携带 JWT Bearer Token 的请求头计算属性 */
-const headers = computed(() => ({
+const headers = ref({
   Authorization: `Bearer ${getToken()}`,
-}));
+});
 
 /** 弹窗大图/PDF 预览对话框可见性 */
 const previewDialogVisible = ref(false);
+const previewUrl = ref('');
+async function openPreview(){
+ if(!props.modelValue)return;
+ const id=props.modelValue,requestId=++previewRequestId;
+ const response:any=await request({url:'/upload/presigned-url/'+id,method:'get'});
+ if(alive && requestId===previewRequestId && id===props.modelValue){previewUrl.value=response.url;previewDialogVisible.value=true;}
+}
+const uploading = ref(false);
+const uploadRef = ref<any>();
+let previewRequestId = 0;
+let alive = true;
+const setUploading = (busy: boolean) => { uploading.value = busy; emit('uploading',busy); };
+watch(() => props.modelValue, async id => {
+  const requestId = ++previewRequestId;
+  previewUrl.value = '';
+  uploadRef.value?.clearFiles();
+  if (!id) return;
+  try { const res: any = await request({url:'/upload/presigned-url/'+id,method:'get'}); if(alive && requestId === previewRequestId) previewUrl.value = res.url || ''; } catch {}
+}, {immediate:true});
+onBeforeUnmount(() => { alive=false; ++previewRequestId; uploadRef.value?.abort(); setUploading(false); });
 
 /** 判断当前已上传文件是否为图片类型 */
 const isImage = computed(() => {
   if (!props.fileUrl) return false;
-  return /\.(png|jpg|jpeg|gif|webp)$/i.test(props.fileUrl);
+  return /\.(png|jpg|jpeg|gif|webp)$/i.test(props.fileUrl.split('?')[0]);
 });
 
 /**
@@ -143,6 +165,9 @@ const beforeUpload = (rawFile: File) => {
     return false;
   }
 
+  if (uploading.value) return false;
+  headers.value.Authorization = `Bearer ${getToken()}`;
+  setUploading(true);
   return true;
 };
 
@@ -153,7 +178,10 @@ const beforeUpload = (rawFile: File) => {
  * @param res 服务端响应 JSON
  */
 const handleSuccess = (res: any) => {
+  setUploading(false);
+  if (!alive) return;
   if (res.code === 200) {
+    previewUrl.value = res.data.fileUrl;
     ElMessage.success('上传成功');
     emit('update:modelValue', res.data.id);
     emit('update:fileUrl', res.data.fileUrl);
@@ -167,6 +195,7 @@ const handleSuccess = (res: any) => {
  * 文件上传网络或服务异常回调
  */
 const handleError = () => {
+  setUploading(false);
   ElMessage.error('网络异常，文件上传失败');
 };
 
@@ -174,6 +203,11 @@ const handleError = () => {
  * 移除已上传的文件，清空各绑定值
  */
 const handleRemove = () => {
+  ++previewRequestId;
+  previewUrl.value = '';
+  uploadRef.value?.abort();
+  uploadRef.value?.clearFiles();
+  setUploading(false);
   emit('update:modelValue', null);
   emit('update:fileUrl', '');
   emit('change', null);

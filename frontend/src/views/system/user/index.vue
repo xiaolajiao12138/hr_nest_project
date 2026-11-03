@@ -22,7 +22,7 @@
     >
       <template #toolbar>
         <el-button
-          v-hasPerm="['system:user:add']"
+          v-if="isAdmin" v-hasPerm="['system:user:add']"
           type="primary"
           :icon="Plus"
           @click="handleAdd"
@@ -33,7 +33,7 @@
     </BaseTable>
 
     <!-- 新增 / 编辑用户弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
@@ -78,7 +78,7 @@
               style="width: 100%"
             />
           </el-form-item>
-          <el-form-item label="分配角色" prop="roleIds">
+          <el-form-item v-if="isAdmin" label="分配角色" prop="roleIds">
             <el-select
               v-model="formData.roleIds"
               multiple
@@ -93,6 +93,11 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item v-if="isAdmin" label="员工档案">
+            <el-select v-model="formData.employeeId" filterable remote clearable :remote-method="searchEmployees" placeholder="输入工号或姓名搜索关联档案" style="width:100%">
+              <el-option v-for="emp in employeeOptions" :key="emp.id" :label="emp.empNo+' · '+emp.name" :value="emp.id" />
+            </el-select>
+          </el-form-item>
         </el-form>
       </div>
     </BaseDialog>
@@ -100,7 +105,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, h } from "vue";
+import { ref, reactive, onMounted, h, computed } from "vue";
+import { getEmployeeOptionsApi } from '@/api/employee';
+import { useUserStore } from '@/stores/user';
 import { Plus } from "@element-plus/icons-vue";
 import {
   ElMessage,
@@ -128,6 +135,16 @@ import {
 } from "@/api/system";
 import { getDeptTreeApi } from "@/api/dept";
 
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.roles.includes('admin') || userStore.permissions.includes('*'));
+const employeeOptions = ref<any[]>([]);
+let employeeRequestId = 0;
+const searchEmployees = async (keyword = '') => {
+  if (!isAdmin.value) return;
+  const requestId = ++employeeRequestId;
+  const res: any = await getEmployeeOptionsApi({purpose:'user',keyword,page:1,pageSize:50});
+  if (requestId === employeeRequestId) employeeOptions.value = res.list || [];
+};
 const loading = ref(false);
 const tableData = ref<any[]>([]);
 const allRoles = ref<any[]>([]);
@@ -236,6 +253,7 @@ const formData = reactive({
   phone: "",
   deptId: undefined as number | undefined,
   roleIds: [] as number[],
+  employeeId: null as number | null,
 });
 
 const formRules = {
@@ -244,7 +262,9 @@ const formRules = {
   realName: [{ required: true, message: "真实姓名不能为空", trigger: "blur" }],
 };
 
+let listRequestId=0;
 const fetchData = async () => {
+  const requestId=++listRequestId;
   loading.value = true;
   try {
     const res: any = await getUserListApi({
@@ -252,16 +272,18 @@ const fetchData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
+    if(requestId!==listRequestId)return;
+    if(!res.list?.length && res.total>0 && pagination.page>1){pagination.page=Math.max(1,Math.ceil(res.total/pagination.pageSize));return fetchData();}
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
   } finally {
-    loading.value = false;
+    if(requestId===listRequestId)loading.value = false;
   }
 };
 
 const fetchOptions = async () => {
   const [roleRes, deptRes]: any = await Promise.all([
-    getAllRolesApi(),
+    isAdmin.value ? getAllRolesApi() : Promise.resolve([]),
     getDeptTreeApi(),
   ]);
   allRoles.value = roleRes || [];
@@ -280,15 +302,18 @@ const handleReset = () => {
 };
 
 const handleAdd = () => {
+  fetchOptions();
+  searchEmployees();
   currentId.value = null;
   dialogTitle.value = "新增用户";
   Object.assign(formData, {
     username: "",
-    password: "hr_password_2026",
+    password: "",
     realName: "",
     phone: "",
     deptId: undefined,
     roleIds: [],
+    employeeId: null,
   });
   dialogVisible.value = true;
 };
@@ -296,10 +321,14 @@ const handleAdd = () => {
 /**
  * 编辑用户
  * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据用户 ID 异步请求后端独立详情接口获取最新完整用户与角色关联数据
- * 
+ *
  * @param row 列表当前点击行（仅提取 row.id）
  */
+let detailRequestId=0;
 const handleEdit = async (row: any) => {
+  fetchOptions();
+  searchEmployees();
+  const requestId=++detailRequestId;
   currentId.value = row.id;
   dialogTitle.value = "编辑用户";
   dialogVisible.value = true;
@@ -307,23 +336,27 @@ const handleEdit = async (row: any) => {
 
   try {
     const detail: any = await getUserDetailApi(row.id);
+    if(requestId!==detailRequestId || !dialogVisible.value || currentId.value!==row.id)return;
     Object.assign(formData, {
       username: detail.username,
+      employeeId: detail.employeeId || null,
       realName: detail.realName,
       phone: detail.phone,
       deptId: detail.deptId,
       roleIds: (detail.roles || []).map((r: any) => r.id),
     });
   } catch (err: any) {
-    ElMessage.error(err.message || '获取用户详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取用户详情失败');
     dialogVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if(requestId===detailRequestId)detailLoading.value = false;
   }
 };
 
 // 状态修改前钩子 (仅在用户真实点击切换时触发，支持异步防抖与自动阻止状态切换)
 const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
+  if(row._statusLoading)return false;
+  row._statusLoading=true;
   const targetStatus = row.status === 1 ? 0 : 1;
   try {
     await changeUserStatusApi({ id: row.id, status: targetStatus });
@@ -333,11 +366,11 @@ const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
     row.status = targetStatus;
     // 状态更新成功后，立即调用搜索/列表接口刷新表格数据
     fetchData();
-    return true; // 请求成功，允许开关切换
+    return false; // 请求成功，允许开关切换
   } catch (e: any) {
     // 请求失败 (被超级管理员保护拦截或网络异常)，返回 false 自动阻止切换，保持原状
     return false;
-  }
+  }finally{row._statusLoading=false;}
 };
 
 const handleResetPwd = (row: any) => {
@@ -349,7 +382,7 @@ const handleResetPwd = (row: any) => {
   }).then(async ({ value }) => {
     await resetPasswordApi({ id: row.id, newPassword: value });
     ElMessage.success("密码重置成功");
-  });
+  }).catch(()=>{});
 };
 
 const handleDelete = (row: any) => {
@@ -361,17 +394,20 @@ const handleDelete = (row: any) => {
     await deleteUserApi(row.id);
     ElMessage.success("用户删除成功");
     fetchData();
-  });
+  }).catch(()=>{});
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (submitLoading.value || detailLoading.value || !formRef.value) return;
+  submitLoading.value = true;
+  try {
   await formRef.value.validate(async (valid) => {
     if (!valid) return;
     submitLoading.value = true;
     try {
       if (currentId.value) {
-        await updateUserApi(currentId.value, formData);
+        const { username, password, roleIds, employeeId, ...profile } = formData;
+        await updateUserApi(currentId.value, {...profile, ...(isAdmin.value ? {roleIds, employeeId} : {})});
         ElMessage.success("用户更新成功");
       } else {
         await createUserApi(formData);
@@ -383,11 +419,11 @@ const handleSubmit = async () => {
       submitLoading.value = false;
     }
   });
+} finally { submitLoading.value = false; }
 };
 
 onMounted(() => {
   fetchData();
-  fetchOptions();
 });
 </script>
 

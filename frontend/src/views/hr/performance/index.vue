@@ -185,7 +185,7 @@
               发起本期考评
             </el-button>
             <el-button
-              v-hasPerm="['hr:performance:eval']"
+              v-hasPerm="['hr:salary:sync']"
               type="success"
               plain
               :icon="Money"
@@ -211,7 +211,7 @@
         <div class="plans-tab-content">
           <div class="plans-toolbar">
             <el-button
-              v-hasPerm="['hr:performance:plan']"
+              v-if="isAdmin" v-hasPerm="['hr:performance:plan']"
               type="primary"
               :icon="Plus"
               @click="openCreatePlanDialog"
@@ -310,6 +310,8 @@
 </template>
 
 <script setup lang="ts">
+let fetchRecordListSequence=0;
+import { useUserStore } from '@/stores/user';
 import { ref, reactive, onMounted, computed, h } from 'vue';
 import {
   UserFilled,
@@ -341,6 +343,8 @@ import {
 import EvaluationDrawer from './components/EvaluationDrawer.vue';
 import PlanDialog from './components/PlanDialog.vue';
 
+const userStore=useUserStore();
+const isAdmin=computed(()=>userStore.roles.includes('admin')||userStore.permissions.includes('*'));
 const activeTab = ref('records');
 const evalDrawerRef = ref<InstanceType<typeof EvaluationDrawer>>();
 const planDialogRef = ref<InstanceType<typeof PlanDialog>>();
@@ -395,7 +399,7 @@ const launchForm = reactive({
 const syncSalaryDialogVisible = ref(false);
 const syncSalaryLoading = ref(false);
 const syncSalaryForm = reactive({
-  yearMonth: '2026-03',
+  yearMonth: new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),
 });
 
 // ----------------- 表格列定义 -----------------
@@ -558,16 +562,16 @@ const planActionColumn: ActionColumnConfig = {
   fixed: 'right',
   buttons: (row) => [
     {
-      label: '编辑',
+      label: '编辑', perm:'hr:performance:plan', show:()=>isAdmin.value,
       type: 'primary',
       onClick: () => planDialogRef.value?.open(row),
     },
     {
       label: '归档',
       type: 'warning',
-      show: row.status !== 'COMPLETED',
+      perm:'hr:performance:archive', show: isAdmin.value && row.status !== 'COMPLETED',
       popconfirm: {
-        title: `确定将【${row.title}】归档吗？归档后所有未完结单据将自动完结。`,
+        title: `确定将【${row.title}】归档吗？归档前需要完成全部考评，归档后不可修改。`,
       },
       onClick: async () => {
         await archivePerformancePlanApi(row.id);
@@ -576,7 +580,7 @@ const planActionColumn: ActionColumnConfig = {
       },
     },
     {
-      label: '删除',
+      label: '删除', perm:'hr:performance:plan', show:()=>isAdmin.value,
       type: 'danger',
       onClick: () => handleDeletePlan(row),
     },
@@ -609,6 +613,7 @@ const fetchAnalytics = async () => {
 };
 
 const fetchRecordList = async () => {
+  const requestId=++fetchRecordListSequence;
   recordLoading.value = true;
   try {
     const res: any = await getPerformanceRecordListApi({
@@ -620,10 +625,12 @@ const fetchRecordList = async () => {
       page: recordPagination.page,
       pageSize: recordPagination.pageSize,
     });
+    if(requestId!==fetchRecordListSequence)return;
+    if(!res.list?.length && res.total>0 && recordPagination.page>1){recordPagination.page=Math.max(1,Math.ceil(res.total/recordPagination.pageSize));return fetchRecordList();}
     recordList.value = res.list || [];
     recordPagination.total = res.total || 0;
   } finally {
-    recordLoading.value = false;
+    if(requestId===fetchRecordListSequence)recordLoading.value = false;
   }
 };
 
@@ -697,6 +704,7 @@ const openLaunchDialog = () => {
 };
 
 const handleConfirmLaunch = async () => {
+  if (launchLoading.value) return;
   if (!launchForm.planId) {
     ElMessage.warning('请选择考评方案');
     return;
@@ -719,6 +727,7 @@ const openSyncSalaryDialog = () => {
 };
 
 const handleConfirmSyncSalary = async () => {
+  if (syncSalaryLoading.value) return;
   if (!currentPlan.value) return;
   syncSalaryLoading.value = true;
   try {

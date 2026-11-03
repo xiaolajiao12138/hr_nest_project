@@ -67,3 +67,5 @@ export function exportEmployeeExcelApi(params: any) {
     responseType: 'blob',
   });
 }
+
+export function getEmployeeOptionsApi(params: Record<string, any>) { return request({url:'/hr/employee/options',method:'get',params}); }

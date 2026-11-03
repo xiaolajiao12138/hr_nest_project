@@ -2,7 +2,7 @@
   <div class="dept-page">
     <el-card shadow="never">
       <div class="toolbar">
-        <el-button type="primary" :icon="Plus" @click="handleAddRoot">新增根部门</el-button>
+        <el-button type="primary" :icon="Plus" v-if="isAdmin" v-hasPerm="['hr:dept:add']" @click="handleAddRoot">新增根部门</el-button>
         <el-button :icon="Refresh" @click="fetchTree">刷新</el-button>
       </div>
 
@@ -27,16 +27,16 @@
         </el-table-column>
         <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleAddChild(row)">新增子部门</el-button>
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">事务删除</el-button>
+            <el-button type="primary" link v-if="isAdmin" v-hasPerm="['hr:dept:add']" @click="handleAddChild(row)">新增子部门</el-button>
+            <el-button type="primary" link v-if="isAdmin" v-hasPerm="['hr:dept:edit']" @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" link v-if="isAdmin" v-hasPerm="['hr:dept:delete']" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       :confirm-loading="submitLoading"
@@ -80,6 +80,7 @@
 </template>
 
 <script setup lang="ts">
+import { useUserStore } from '@/stores/user';
 import { ref, reactive, onMounted, computed } from 'vue';
 import { Plus, Refresh } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
@@ -92,6 +93,8 @@ import {
   deleteDeptApi,
 } from '@/api/dept';
 
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.roles.includes('admin') || userStore.permissions.includes('*'));
 const loading = ref(false);
 const deptTree = ref<any[]>([]);
 const dialogVisible = ref(false);
@@ -156,7 +159,7 @@ const handleAddChild = (row: any) => {
 /**
  * 编辑部门
  * 遵循企业级架构规范：点击编辑不从树节点行数据拷贝，而是根据部门 ID 异步请求后端独立详情接口获取最新完整部门信息
- * 
+ *
  * @param row 列表当前点击行（仅提取 row.id）
  */
 const handleEdit = async (row: any) => {
@@ -174,7 +177,7 @@ const handleEdit = async (row: any) => {
     formData.sort = detail.sort;
     formData.status = detail.status;
   } catch (err: any) {
-    ElMessage.error(err.message || '获取部门详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取部门详情失败');
     dialogVisible.value = false;
   } finally {
     detailLoading.value = false;
@@ -202,9 +205,9 @@ const handleDelete = (row: any) => {
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (!formRef.value || submitLoading.value || detailLoading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || submitLoading.value || detailLoading.value) return;
     submitLoading.value = true;
     try {
       if (currentId.value) {

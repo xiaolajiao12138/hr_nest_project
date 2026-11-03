@@ -122,10 +122,10 @@
               :icon="Calendar"
               @click="openInitAnnualDialog"
             >
-              全员年度额度批量开户/初始化
+              授权范围内年度额度初始化
             </el-button>
             <span class="annual-toolbar-tip">
-              数据源自 <code>hr_annual</code> 强事务表：申请年假时悲观排他锁扣减，审批驳回时原路返还
+              申请年假时预扣可用额度，审批驳回后返还
             </span>
           </template>
         </BaseTable>
@@ -135,7 +135,7 @@
     <!-- 请假申请弹窗 -->
     <BaseDialog
       v-model="applyDialogVisible"
-      title="发起请假申请 (强事务控制)"
+      title="发起请假申请"
       width="600px"
       :confirm-loading="submitLoading"
       @confirm="submitApply"
@@ -148,7 +148,7 @@
       >
         <el-form-item label="申请员工" prop="empId">
           <el-select
-            v-model="applyForm.empId"
+            v-model="applyForm.empId" remote :remote-method="fetchEmployees"
             placeholder="请选择员工"
             filterable
             style="width: 100%"
@@ -219,7 +219,7 @@
     </BaseDialog>
 
     <!-- 审批弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="auditDialogVisible"
       title="审批请假单"
       width="500px"
@@ -341,6 +341,8 @@
 </template>
 
 <script setup lang="ts">
+let fetchAnnualDataSequence=0;
+let fetchDataSequence=0;
 import { ref, reactive, onMounted, computed, h } from "vue";
 import { Plus, Calendar } from "@element-plus/icons-vue";
 import { ElMessage, FormInstance, ElTag } from "element-plus";
@@ -359,7 +361,7 @@ import {
   adjustAnnualLeaveApi,
   initAnnualLeaveForYearApi,
 } from "@/api/leave";
-import { getEmployeeListApi } from "@/api/employee";
+import { getEmployeeOptionsApi } from "@/api/employee";
 import { getDeptTreeApi } from "@/api/dept";
 
 const activeTab = ref("leaves");
@@ -461,6 +463,8 @@ const actionColumn: ActionColumnConfig = {
 const applyDialogVisible = ref(false);
 const submitLoading = ref(false);
 const applyFormRef = ref<FormInstance>();
+let balanceRequestId = 0;
+let employeeRequestId = 0;
 const annualInfo = ref<any>(null);
 
 const applyForm = reactive({
@@ -584,6 +588,7 @@ const initYearForm = reactive({
 
 // ------------------- 数据获取与逻辑处理 -------------------
 const fetchData = async () => {
+  const requestId=++fetchDataSequence;
   loading.value = true;
   try {
     const params = {
@@ -592,14 +597,17 @@ const fetchData = async () => {
       pageSize: pagination.pageSize,
     };
     const res: any = await getLeaveListApi(params);
+    if(requestId!==fetchDataSequence)return;
+    if(!res.list?.length && res.total>0 && pagination.page>1){pagination.page=Math.max(1,Math.ceil(res.total/pagination.pageSize));return fetchData();}
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
   } finally {
-    loading.value = false;
+    if(requestId===fetchDataSequence)loading.value = false;
   }
 };
 
 const fetchAnnualData = async () => {
+  const requestId=++fetchAnnualDataSequence;
   annualLoading.value = true;
   try {
     const params = {
@@ -610,10 +618,12 @@ const fetchAnnualData = async () => {
       pageSize: annualPagination.pageSize,
     };
     const res: any = await getAnnualLeaveListApi(params);
+    if(requestId!==fetchAnnualDataSequence)return;
+    if(!res.list?.length && res.total>0 && annualPagination.page>1){annualPagination.page=Math.max(1,Math.ceil(res.total/annualPagination.pageSize));return fetchAnnualData();}
     annualTableData.value = res.list || [];
     annualPagination.total = res.total || 0;
   } finally {
-    annualLoading.value = false;
+    if(requestId===fetchAnnualDataSequence)annualLoading.value = false;
   }
 };
 
@@ -637,12 +647,15 @@ const loadDepts = async () => {
   }
 };
 
-const fetchEmployees = async () => {
-  const res: any = await getEmployeeListApi({
+const fetchEmployees = async (keyword = "") => {
+  const requestId = ++employeeRequestId;
+  const res: any = await getEmployeeOptionsApi({
+    purpose: "leave", keyword,
     page: 1,
     pageSize: 100,
     status: 1,
   });
+  if (requestId !== employeeRequestId) return;
   employeeOptions.value = res.list || [];
 };
 
@@ -708,29 +721,40 @@ const handleEmpChange = async () => {
 };
 
 const checkAnnualBalance = async () => {
+  const requestId = ++balanceRequestId;
+  annualInfo.value = null;
   if (applyForm.leaveType === "ANNUAL" && applyForm.empId) {
     try {
-      const res: any = await getAnnualBalanceApi(applyForm.empId);
-      annualInfo.value = res;
+      const res: any = await getAnnualBalanceApi(applyForm.empId, applyForm.timeRange[0] ? new Date(applyForm.timeRange[0]).getFullYear() : new Date().getFullYear());
+      if (requestId === balanceRequestId) annualInfo.value = res;
     } catch {
-      annualInfo.value = null;
+      if (requestId === balanceRequestId) annualInfo.value = null;
     }
   } else {
     annualInfo.value = null;
   }
 };
 
-const calcDays = () => {
-  if (applyForm.timeRange && applyForm.timeRange.length === 2) {
-    const start = new Date(applyForm.timeRange[0]).getTime();
-    const end = new Date(applyForm.timeRange[1]).getTime();
-    const diff = (end - start) / (1000 * 60 * 60 * 24);
-    applyForm.days = Math.max(0.5, parseFloat(diff.toFixed(1)));
+const calcDays = async () => {
+  applyForm.days = 0;
+  if (applyForm.timeRange?.length === 2) {
+    const start = new Date(applyForm.timeRange[0]), end = new Date(applyForm.timeRange[1]);
+    if (end > start && end.getTime()-start.getTime() <= 366*86400000) {
+      let hours = 0;
+      for (const day = new Date(start.getFullYear(),start.getMonth(),start.getDate()); day <= end; day.setDate(day.getDate()+1)) {
+        if ([0,6].includes(day.getDay())) continue;
+        for (const [from,to] of [[9,12],[13,18]]) { const a=new Date(day),b=new Date(day); a.setHours(from,0,0,0); b.setHours(to,0,0,0); hours+=Math.max(0,Math.min(end.getTime(),b.getTime())-Math.max(start.getTime(),a.getTime()))/3600000; }
+      }
+      applyForm.days = Math.ceil(hours/8*2)/2;
+    }
   }
+  await checkAnnualBalance();
 };
 
 const submitApply = async () => {
-  if (!applyFormRef.value) return;
+  if (submitLoading.value || !applyFormRef.value) return;
+  submitLoading.value = true;
+  try {
   await applyFormRef.value.validate(async (valid) => {
     if (!valid) return;
     submitLoading.value = true;
@@ -753,6 +777,7 @@ const submitApply = async () => {
       submitLoading.value = false;
     }
   });
+} finally { submitLoading.value = false; }
 };
 
 const openAudit = async (row: any) => {
@@ -766,7 +791,7 @@ const openAudit = async (row: any) => {
     const res: any = await getLeaveDetailApi(row.id);
     currentLeave.value = res;
   } catch (error: any) {
-    ElMessage.error(error?.message || "获取请假单详情失败");
+    if (!error?.notified) ElMessage.error(error?.message || "获取请假单详情失败");
     auditDialogVisible.value = false;
   } finally {
     detailLoading.value = false;
@@ -774,6 +799,7 @@ const openAudit = async (row: any) => {
 };
 
 const submitAudit = async () => {
+  if (auditLoading.value || detailLoading.value) return;
   if (!currentLeave.value) return;
   auditLoading.value = true;
   try {
@@ -803,6 +829,7 @@ const openAdjustDialog = (row: any) => {
 };
 
 const handleConfirmAdjust = async () => {
+  if (adjustLoading.value) return;
   if (!currentAdjustRow.value) return;
   adjustLoading.value = true;
   try {
@@ -826,6 +853,7 @@ const openInitAnnualDialog = () => {
 };
 
 const handleConfirmInitYear = async () => {
+  if (initYearLoading.value) return;
   initYearLoading.value = true;
   try {
     const res: any = await initAnnualLeaveForYearApi({

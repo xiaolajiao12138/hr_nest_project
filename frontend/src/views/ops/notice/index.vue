@@ -22,7 +22,7 @@
     >
       <template #toolbar>
         <el-button
-          v-hasPerm="['ops:notice:list']"
+          v-hasPerm="['ops:notice:add']"
           type="primary"
           :icon="Plus"
           @click="handleAdd"
@@ -33,11 +33,11 @@
     </BaseTable>
 
     <!-- 新增 / 编辑公告弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="650px"
-      :confirm-loading="submitLoading"
+      :confirm-loading="submitLoading || attachmentUploading"
       @confirm="handleSubmit"
     >
       <div v-loading="detailLoading">
@@ -60,7 +60,7 @@
             />
           </el-form-item>
           <el-form-item label="相关附件">
-            <BaseUpload
+            <BaseUpload @uploading="attachmentUploading = $event"
               v-model="formData.fileId"
               v-model:file-url="attachmentUrl"
               folder="notice"
@@ -74,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { usePermission } from '@/hooks/usePermission';
 import { ref, reactive, onMounted, h } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance, ElSwitch } from 'element-plus';
@@ -91,6 +92,8 @@ import {
   deleteNoticeApi,
 } from '@/api/ops';
 
+const {hasPermission}=usePermission();
+const attachmentUploading=ref(false);
 const loading = ref(false);
 const tableData = ref<any[]>([]);
 const searchForm = reactive({ keyword: '' });
@@ -117,6 +120,7 @@ const columns: TableColumn[] = [
         'onUpdate:modelValue': (val: any) => {
           row.status = val;
         },
+        disabled: !hasPermission('ops:notice:publish'),
         activeValue: 1,
         inactiveValue: 0,
         beforeChange: () => handleBeforeStatusChange(row),
@@ -137,12 +141,12 @@ const actionColumn: ActionColumnConfig = {
   fixed: 'right',
   buttons: (row) => [
     {
-      label: '编辑',
+      label: '编辑', perm: 'ops:notice:edit',
       type: 'primary',
       onClick: () => handleEdit(row),
     },
     {
-      label: '删除',
+      label: '删除', perm: 'ops:notice:delete',
       type: 'danger',
       onClick: () => handleDelete(row),
     },
@@ -162,7 +166,7 @@ const formData = reactive({
   content: '',
   noticeType: 'NOTICE',
   fileId: null as number | null,
-  status: 1,
+  status: hasPermission('ops:notice:publish') ? 1 : 0,
 });
 
 const formRules = {
@@ -170,7 +174,9 @@ const formRules = {
   content: [{ required: true, message: '公告内容不能为空', trigger: 'blur' }],
 };
 
+let listRequestId=0;
 const fetchData = async () => {
+  const requestId=++listRequestId;
   loading.value = true;
   try {
     const res: any = await getNoticeListApi({
@@ -178,10 +184,12 @@ const fetchData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
+    if(requestId!==listRequestId)return;
+    if(!res.list?.length && res.total>0 && pagination.page>1){pagination.page=Math.max(1,Math.ceil(res.total/pagination.pageSize));return fetchData();}
     tableData.value = res.list || [];
     pagination.total = res.total || 0;
   } finally {
-    loading.value = false;
+    if(requestId===listRequestId)loading.value = false;
   }
 };
 
@@ -213,10 +221,12 @@ const handleAdd = () => {
 /**
  * 编辑系统公告
  * 遵循企业级架构规范：点击编辑不从列表行数据拷贝，而是根据公告 ID 异步请求后端独立详情接口获取最新完整正文与附件
- * 
+ *
  * @param row 列表当前点击行（仅提取 row.id）
  */
+let detailRequestId=0;
 const handleEdit = async (row: any) => {
+  const requestId=++detailRequestId;
   currentId.value = row.id;
   dialogTitle.value = '编辑公告';
   attachmentUrl.value = '';
@@ -225,6 +235,7 @@ const handleEdit = async (row: any) => {
 
   try {
     const detail: any = await getNoticeDetailApi(row.id);
+    if(requestId!==detailRequestId || !dialogVisible.value || currentId.value!==row.id)return;
     Object.assign(formData, {
       title: detail.title,
       content: detail.content,
@@ -234,15 +245,17 @@ const handleEdit = async (row: any) => {
     });
     attachmentUrl.value = detail.file?.fileUrl || '';
   } catch (err: any) {
-    ElMessage.error(err.message || '获取公告详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取公告详情失败');
     dialogVisible.value = false;
   } finally {
-    detailLoading.value = false;
+    if(requestId===detailRequestId)detailLoading.value = false;
   }
 };
 
 // 公告状态修改前钩子 (异步保护，并在更新成功后立即调用搜索/列表接口刷新数据)
 const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
+  if(row._statusLoading || !hasPermission('ops:notice:publish')) return false;
+  row._statusLoading=true;
   const targetStatus = row.status === 1 ? 0 : 1;
   try {
     await changeNoticeStatusApi({ id: row.id, status: targetStatus });
@@ -250,10 +263,10 @@ const handleBeforeStatusChange = async (row: any): Promise<boolean> => {
     row.status = targetStatus;
     // 状态更新成功后，立即调用搜索/列表接口重新拉取最新数据
     fetchData();
-    return true;
+    return false;
   } catch (e: any) {
     return false;
-  }
+  } finally {row._statusLoading=false;}
 };
 
 const handleDelete = (row: any) => {
@@ -265,13 +278,13 @@ const handleDelete = (row: any) => {
     await deleteNoticeApi(row.id);
     ElMessage.success('公告删除成功');
     fetchData();
-  });
+  }).catch(()=>{});
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (!formRef.value || submitLoading.value || detailLoading.value || attachmentUploading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || submitLoading.value || detailLoading.value) return;
     submitLoading.value = true;
     try {
       if (currentId.value) {

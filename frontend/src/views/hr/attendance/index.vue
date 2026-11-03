@@ -241,13 +241,13 @@
             <!-- 操作列插槽 -->
             <template #action="{ row }">
               <el-button
-                v-hasPerm="['hr:attendance:repair']"
+                v-hasPerm="['hr:attendance:approveRepair']"
                 link
                 type="primary"
                 :icon="Edit"
                 @click="openRepairDialog(row)"
               >
-                {{ isAttendanceManager ? '补卡修正' : '申请补卡' }}
+                补卡修正
               </el-button>
             </template>
           </BaseTable>
@@ -332,7 +332,7 @@
         <el-tab-pane :label="t('attendance.tabShifts')" name="shifts">
           <div class="shift-toolbar">
             <el-button
-              v-hasPerm="['hr:attendance:shift']"
+              v-if="userStore.roles.includes('admin') || userStore.permissions.includes('*')" v-hasPerm="['hr:attendance:shift']"
               type="primary"
               :icon="Plus"
               @click="openShiftDialog()"
@@ -403,6 +403,7 @@
             v-model="batchScheduleForm.empIds"
             multiple
             filterable
+            remote :remote-method="searchScheduleEmployees" :loading="employeeOptionsLoading"
             collapse-tags
             placeholder="请选择员工 (支持多选)"
             style="width: 100%"
@@ -453,7 +454,7 @@
     </BaseDialog>
 
     <!-- 班次配置编辑弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="shiftDetailLoading"
       v-model="shiftDialogVisible"
       :title="shiftEditingId ? '编辑班次规则' : '新增班次规则'"
       width="500px"
@@ -510,7 +511,7 @@
     </BaseDialog>
 
     <!-- 补卡修正弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="repairDetailLoading"
       v-model="repairDialogVisible"
       title="人工补卡与考勤状态修正"
       width="480px"
@@ -564,6 +565,7 @@
 </template>
 
 <script setup lang="ts">
+let fetchRecordListSequence=0;
 import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -579,7 +581,7 @@ import BaseSearch from '@/components/BaseSearch.vue';
 import BaseTable, { type TableColumn } from '@/components/BaseTable.vue';
 import BaseDialog from '@/components/BaseDialog.vue';
 import { getDeptTreeApi } from '@/api/dept';
-import { getEmployeeListApi } from '@/api/employee';
+import { getEmployeeOptionsApi } from '@/api/employee';
 import {
   getShiftListApi,
   getShiftDetailApi,
@@ -609,25 +611,12 @@ const userStore = useUserStore();
 
 /** 是否拥有跨员工/全量考勤管理权限（管理员、人事或考勤排班/班次管理者） */
 const isAttendanceManager = computed(() => {
-  const roles = userStore.roles || [];
-  const perms = userStore.permissions || [];
-  return (
-    roles.includes('admin') ||
-    roles.includes('hr') ||
-    perms.includes('*') ||
-    perms.includes('hr:employee:list') ||
-    perms.includes('hr:attendance:schedule') ||
-    perms.includes('hr:attendance:shift') ||
-    perms.includes('hr:attendance:manage')
-  );
+  const scope=userStore.dataScopes.attendance;
+  return userStore.roles.includes('admin') || userStore.permissions.includes('*') || !!scope?.all || !!scope?.deptIds.length;
 });
 
 /** 是否具备员工花名册接口访问权限（避免无 hr:employee:list 的排班角色预请求触发 403） */
-const canLoadEmployeeRoster = computed(() => {
-  const roles = userStore.roles || [];
-  const perms = userStore.permissions || [];
-  return roles.includes('admin') || perms.includes('*') || perms.includes('hr:employee:list');
-});
+const canLoadEmployeeRoster = computed(() => userStore.roles.includes('admin') || userStore.permissions.includes('*') || userStore.permissions.includes('hr:attendance:schedule'));
 
 /** 当前激活的 Tab 页签 */
 const activeTab = ref('records');
@@ -661,6 +650,14 @@ function formatDayKey(day: number) {
 // 部门树与员工列表
 const deptTree = ref<any[]>([]);
 const employeeOptions = ref<any[]>([]);
+const employeeOptionsLoading=ref(false);
+let employeeOptionsRequest=0;
+async function searchScheduleEmployees(keyword:string) {
+ if(!canLoadEmployeeRoster.value) return;
+ const requestId=++employeeOptionsRequest;employeeOptionsLoading.value=true;
+ try {const result:any=await getEmployeeOptionsApi({purpose:'attendance',keyword,page:1,pageSize:50});if(requestId===employeeOptionsRequest){const selected=employeeOptions.value.filter(e=>batchScheduleForm.empIds.includes(e.id));employeeOptions.value=[...new Map([...selected,...result.list].map(e=>[e.id,e])).values()];}}finally{if(requestId===employeeOptionsRequest)employeeOptionsLoading.value=false;}
+}
+
 
 // 打卡相关
 const clockLoading = ref(false);
@@ -685,7 +682,7 @@ async function handleClock(actionType: 'CHECK_IN' | 'CHECK_OUT') {
     loadTodayStatus();
     fetchRecordList();
   } catch (error: any) {
-    ElMessage.error(error?.message || '打卡异常');
+    if (!error?.notified) ElMessage.error(error?.message || '打卡异常');
   } finally {
     clockLoading.value = false;
   }
@@ -741,6 +738,7 @@ const recordColumns: TableColumn[] = [
 ];
 
 async function fetchRecordList() {
+  const requestId=++fetchRecordListSequence;
   recordLoading.value = true;
   try {
     const res: any = await getAttendanceRecordListApi({
@@ -753,6 +751,8 @@ async function fetchRecordList() {
       keyword: searchForm.keyword.trim() || undefined,
     });
 
+    if(requestId!==fetchRecordListSequence)return;
+    if(!res.list?.length && res.total>0 && recordPagination.page>1){recordPagination.page=Math.max(1,Math.ceil(res.total/recordPagination.pageSize));return fetchRecordList();}
     recordList.value = res.list || [];
     recordPagination.total = res.total || 0;
 
@@ -762,7 +762,7 @@ async function fetchRecordList() {
   } catch (error) {
     console.error('加载考勤明细失败:', error);
   } finally {
-    recordLoading.value = false;
+    if(requestId===fetchRecordListSequence)recordLoading.value = false;
   }
 }
 
@@ -821,7 +821,7 @@ async function openRepairDialog(row: AttendanceRecordItem) {
     repairForm.status = res.status || 1;
     repairForm.remark = res.remark || '';
   } catch (error: any) {
-    ElMessage.error(error?.message || '获取考勤详情失败');
+    if (!error?.notified) ElMessage.error(error?.message || '获取考勤详情失败');
     repairDialogVisible.value = false;
   } finally {
     repairDetailLoading.value = false;
@@ -829,7 +829,7 @@ async function openRepairDialog(row: AttendanceRecordItem) {
 }
 
 async function submitRepair() {
-  if (!repairForm.recordId) return;
+  if (repairSubmitting.value || repairDetailLoading.value || !repairForm.recordId) return;
   repairSubmitting.value = true;
   try {
     await repairAttendanceRecordApi(repairForm);
@@ -837,7 +837,7 @@ async function submitRepair() {
     repairDialogVisible.value = false;
     fetchRecordList();
   } catch (error: any) {
-    ElMessage.error(error?.message || '修正失败');
+    if (!error?.notified) ElMessage.error(error?.message || '修正失败');
   } finally {
     repairSubmitting.value = false;
   }
@@ -880,7 +880,7 @@ const batchScheduleForm = reactive({
   includeWeekends: false,
 });
 
-function openBatchScheduleDialog() {
+async function openBatchScheduleDialog() {
   if (!employeeOptions.value.length && scheduleList.value.length) {
     employeeOptions.value = scheduleList.value.map((item: any) => ({
       id: item.empId,
@@ -894,8 +894,9 @@ function openBatchScheduleDialog() {
   batchScheduleForm.includeWeekends = false;
 
   const ym = scheduleMonth.value || getCurrentYearMonth();
-  batchScheduleRange.value = [`${ym}-01`, `${ym}-28`];
+  batchScheduleRange.value = [`${ym}-01`, `${ym}-${new Date(Number(ym.slice(0,4)),Number(ym.slice(5)),0).getDate()}`];
   batchScheduleDialogVisible.value = true;
+  await searchScheduleEmployees('');
 }
 
 async function submitBatchSchedule() {
@@ -922,7 +923,7 @@ async function submitBatchSchedule() {
     batchScheduleDialogVisible.value = false;
     fetchScheduleData();
   } catch (error: any) {
-    ElMessage.error(error?.message || '排班失败');
+    if (!error?.notified) ElMessage.error(error?.message || '排班失败');
   } finally {
     batchScheduleSubmitting.value = false;
   }
@@ -982,7 +983,7 @@ async function openShiftDialog(row?: AttendanceShift) {
       shiftForm.isDefault = Boolean(res.isDefault);
       shiftForm.remark = res.remark || '';
     } catch (error: any) {
-      ElMessage.error(error?.message || '获取班次详情失败');
+      if (!error?.notified) ElMessage.error(error?.message || '获取班次详情失败');
       shiftDialogVisible.value = false;
     } finally {
       shiftDetailLoading.value = false;
@@ -1002,6 +1003,7 @@ async function openShiftDialog(row?: AttendanceShift) {
 }
 
 async function submitShift() {
+  if (shiftSubmitting.value || shiftDetailLoading.value) return;
   if (!shiftForm.name.trim()) {
     ElMessage.warning('请输入班次名称');
     return;
@@ -1018,7 +1020,7 @@ async function submitShift() {
     shiftDialogVisible.value = false;
     fetchShiftList();
   } catch (error: any) {
-    ElMessage.error(error?.message || '保存失败');
+    if (!error?.notified) ElMessage.error(error?.message || '保存失败');
   } finally {
     shiftSubmitting.value = false;
   }
@@ -1040,6 +1042,7 @@ async function handleDeleteShift(row: AttendanceShift) {
 function handleTabChange(tab: any) {
   if (tab === 'schedule') {
     fetchScheduleData();
+    if (!shiftList.value.length) fetchShiftList();
   } else if (tab === 'shifts') {
     fetchShiftList();
   } else {
@@ -1058,19 +1061,8 @@ onMounted(async () => {
     // 忽略
   }
 
-  // 仅具备员工花名册权限的管理员预加载排班员工候选列表（其余排班角色从排班矩阵兜底提取）
-  if (canLoadEmployeeRoster.value) {
-    try {
-      const eRes: any = await getEmployeeListApi({ page: 1, pageSize: 100 });
-      employeeOptions.value = eRes.list || [];
-    } catch (e) {
-      // 忽略
-    }
-  }
-
   loadTodayStatus();
   fetchRecordList();
-  fetchShiftList();
 });
 
 onBeforeUnmount(() => {

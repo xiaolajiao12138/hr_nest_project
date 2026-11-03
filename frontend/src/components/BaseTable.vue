@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineComponent, VNodeChild } from 'vue';
+import { ref, defineComponent, VNodeChild, watch, nextTick } from 'vue';
 import { usePermission } from '@/hooks/usePermission';
 
 /**
@@ -299,6 +299,8 @@ const emit = defineEmits<{
 
 /** 原生 el-table 实例引用 */
 const tableRef = ref();
+watch(()=>props.data,async()=>{if(props.showSelection){await nextTick();tableRef.value?.clearSelection();emit('selection-change',[]);}});
+
 
 /** 获取 RBAC 权限判断钩子 */
 const { hasPermission } = usePermission();

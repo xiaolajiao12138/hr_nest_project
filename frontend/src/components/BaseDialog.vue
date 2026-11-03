@@ -14,8 +14,8 @@
 
     <template #footer>
       <span class="dialog-footer">
-        <el-button @click="handleCancel">取消</el-button>
-        <el-button type="primary" :loading="confirmLoading" @click="handleConfirm">
+        <el-button :disabled="loading || confirmLoading" @click="handleCancel">取消</el-button>
+        <el-button type="primary" :loading="confirmLoading" :disabled="loading || confirmLoading" @click="handleConfirm">
           确定
         </el-button>
       </span>
@@ -54,15 +54,18 @@ const visible = computed({
 });
 
 const handleConfirm = () => {
+  if (props.loading || props.confirmLoading) return;
   emit('confirm');
 };
 
 const handleCancel = () => {
+  if (props.loading || props.confirmLoading) return;
   visible.value = false;
   emit('cancel');
 };
 
 const handleBeforeClose = (done: () => void) => {
+  if (props.loading || props.confirmLoading) return;
   emit('cancel');
   done();
 };

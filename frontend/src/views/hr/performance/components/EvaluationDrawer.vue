@@ -69,14 +69,14 @@
             <el-form-item label="自评分数 (0 - 100 分)">
               <div class="score-input-row">
                 <el-slider
-                  v-model="form.selfScore"
+                  v-model="form.selfScore" :disabled="!canSelf || submitting"
                   :min="0"
                   :max="100"
                   style="flex: 1; margin-right: 16px"
                   @input="recalculateFinalScore"
                 />
                 <el-input-number
-                  v-model="form.selfScore"
+                  v-model="form.selfScore" :disabled="!canSelf || submitting"
                   :min="0"
                   :max="100"
                   :precision="1"
@@ -88,7 +88,7 @@
 
             <el-form-item label="业绩述职与自评总结">
               <el-input
-                v-model="form.selfComment"
+                v-model="form.selfComment" :disabled="!canSelf || submitting"
                 type="textarea"
                 :rows="3"
                 placeholder="总结本周期 KPI/OKR 完成进展、关键成果与自我反思"
@@ -113,14 +113,14 @@
             <el-form-item label="主管考评分数 (0 - 100 分)">
               <div class="score-input-row">
                 <el-slider
-                  v-model="form.managerScore"
+                  v-model="form.managerScore" :disabled="!canManage || submitting"
                   :min="0"
                   :max="100"
                   style="flex: 1; margin-right: 16px"
                   @input="recalculateFinalScore"
                 />
                 <el-input-number
-                  v-model="form.managerScore"
+                  v-model="form.managerScore" :disabled="!canManage || submitting"
                   :min="0"
                   :max="100"
                   :precision="1"
@@ -132,7 +132,7 @@
 
             <el-form-item label="主管综合评语与成长指导建议">
               <el-input
-                v-model="form.managerComment"
+                v-model="form.managerComment" :disabled="!canManage || submitting"
                 type="textarea"
                 :rows="3"
                 placeholder="针对本周期表现给出客观评价、亮点表扬及后续能力提升建议"
@@ -184,10 +184,10 @@
     <template #footer>
       <div class="drawer-footer">
         <el-button @click="visible = false">取 消</el-button>
-        <el-button type="info" plain :loading="submitting" @click="saveSelfEvaluationOnly">
+        <el-button v-if="canSelf" type="info" plain :loading="submitting" @click="saveSelfEvaluationOnly">
           仅保存员工自评
         </el-button>
-        <el-button type="primary" :loading="submitting" @click="confirmCompleteEvaluation">
+        <el-button v-if="canManage" type="primary" :loading="submitting" @click="confirmCompleteEvaluation">
           确认评定并完成考评
         </el-button>
       </div>
@@ -197,6 +197,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { usePermission } from '@/hooks/usePermission';
 import { User, Check, Trophy } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import {
@@ -207,6 +209,10 @@ import {
 
 const emit = defineEmits(['success']);
 
+const userStore = useUserStore();
+const { hasPermission } = usePermission();
+const canSelf = computed(() => record.value?.empId === userStore.userInfo?.employeeId && record.value?.status === 'PENDING_SELF');
+const canManage = computed(() => record.value?.empId !== userStore.userInfo?.employeeId && record.value?.status === 'PENDING_MANAGER' && hasPermission('hr:performance:manager'));
 const visible = ref(false);
 const submitting = ref(false);
 const record = ref<PerformanceRecordItem | null>(null);
@@ -304,7 +310,7 @@ const open = (row: PerformanceRecordItem, currentPlan?: PerformancePlanItem) => 
   if (row.finalScore !== null) {
     form.finalScore = Number(row.finalScore);
     form.rating = row.rating || 'A';
-    form.coefficient = Number(row.coefficient) || 1.2;
+    form.coefficient = Number(row.coefficient ?? 1.2);
   } else {
     recalculateFinalScore();
   }
@@ -314,7 +320,7 @@ const open = (row: PerformanceRecordItem, currentPlan?: PerformancePlanItem) => 
 
 // 仅保存自评
 const saveSelfEvaluationOnly = async () => {
-  if (!record.value) return;
+  if (submitting.value || !canSelf.value || !record.value) return;
   submitting.value = true;
   try {
     await evaluatePerformanceApi({
@@ -323,7 +329,7 @@ const saveSelfEvaluationOnly = async () => {
       selfScore: form.selfScore,
       selfComment: form.selfComment,
     });
-    ElMessage.success('员工自评已成功暂存');
+    ElMessage.success('员工自评已提交');
     visible.value = false;
     emit('success');
   } finally {
@@ -333,12 +339,12 @@ const saveSelfEvaluationOnly = async () => {
 
 // 确认并全流程完成评定
 const confirmCompleteEvaluation = async () => {
-  if (!record.value) return;
+  if (submitting.value || !canManage.value || !record.value) return;
   submitting.value = true;
   try {
     await evaluatePerformanceApi({
       recordId: record.value.id,
-      evalType: 'both',
+      evalType: 'manager',
       selfScore: form.selfScore,
       selfComment: form.selfComment,
       managerScore: form.managerScore,

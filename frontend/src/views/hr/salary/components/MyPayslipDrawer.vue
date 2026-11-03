@@ -181,9 +181,9 @@
         </div>
 
         <!-- 备注与寄语 -->
-        <div v-if="payslipDetail.remarks" class="remarks-box">
+        <div v-if="payslipDetail.remark" class="remark-box">
           <span class="rem-title">核算说明:</span>
-          <span class="rem-content">{{ payslipDetail.remarks }}</span>
+          <span class="rem-content">{{ payslipDetail.remark }}</span>
         </div>
 
         <!-- 底部保密提醒 -->
@@ -227,6 +227,8 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val),
 });
 
+let detailRequestId = 0;
+let listRequestId = 0;
 const loading = ref(false);
 const verifying = ref(false);
 const hideAmount = ref(false);
@@ -237,7 +239,7 @@ const payslipList = ref<
     yearMonth: string;
     status: number;
     hasPassword: boolean;
-    netSalary: number;
+    netSalary?: number;
     createdAt: string;
   }>
 >([]);
@@ -269,14 +271,16 @@ function maskNumber(val?: number | string): string {
  * 加载个人工资条历史列表
  */
 async function loadPayslips() {
+  const requestId = ++listRequestId;
   loading.value = true;
   try {
     const list: any = await getMyPayslipsApi();
+    if (requestId !== listRequestId || !visible.value) return;
     payslipList.value = list || [];
 
     if (payslipList.value.length > 0) {
       currentSalaryId.value = payslipList.value[0].id;
-      handleMonthChange(currentSalaryId.value);
+      await handleMonthChange(currentSalaryId.value);
     } else {
       currentSalaryId.value = undefined;
       payslipDetail.value = null;
@@ -284,7 +288,7 @@ async function loadPayslips() {
   } catch (error) {
     console.error('加载工资条列表失败:', error);
   } finally {
-    loading.value = false;
+    if (requestId === listRequestId) loading.value = false;
   }
 }
 
@@ -292,6 +296,8 @@ async function loadPayslips() {
  * 切换查看月份
  */
 async function handleMonthChange(salaryId?: number) {
+  ++detailRequestId;
+  loading.value = false;
   if (!salaryId) return;
   verifyPassword.value = '';
   isVerified.value = false;
@@ -310,7 +316,7 @@ async function handleMonthChange(salaryId?: number) {
  * 密码验证
  */
 async function handleVerify() {
-  if (!currentSalaryId.value) return;
+  if (verifying.value || !currentSalaryId.value) return;
   if (!verifyPassword.value.trim()) {
     ElMessage.warning('请输入工资条安全密码');
     return;
@@ -318,7 +324,7 @@ async function handleVerify() {
   verifying.value = true;
   try {
     await fetchDetail(currentSalaryId.value, verifyPassword.value.trim());
-    isVerified.value = true;
+
     ElMessage.success(t('salary.verifySuccess'));
   } catch (error: any) {
     ElMessage.error(error?.message || t('salary.verifyFailed'));
@@ -331,13 +337,15 @@ async function handleVerify() {
  * 拉取工资条解密详情
  */
 async function fetchDetail(salaryId: number, password?: string) {
+  const requestId = ++detailRequestId;
   loading.value = true;
   try {
     const detail: any = await verifyPayslipApi({ salaryId, password });
+    if (requestId !== detailRequestId || salaryId !== currentSalaryId.value || !visible.value) return;
     payslipDetail.value = detail;
     isVerified.value = true;
   } finally {
-    loading.value = false;
+    if (requestId === detailRequestId) loading.value = false;
   }
 }
 
@@ -532,7 +540,7 @@ watch(
       }
     }
 
-    .remarks-box {
+    .remark-box {
       background: var(--el-fill-color-light);
       border-radius: 6px;
       padding: 10px 14px;

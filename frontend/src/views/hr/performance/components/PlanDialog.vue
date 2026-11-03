@@ -162,7 +162,7 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="visible = false">取 消</el-button>
+        <el-button :disabled="loading" @click="visible = false">取 消</el-button>
         <el-button type="primary" :loading="loading" @click="handleConfirm">
           提 交 保 存
         </el-button>
@@ -273,8 +273,8 @@ const open = (row?: PerformancePlanItem) => {
     Object.assign(form, {
       title: '',
       cycleType: 'QUARTERLY',
-      startDate: '2026-04-01',
-      endDate: '2026-06-30',
+      startDate: '',
+      endDate: '',
       weightSelf: 30,
       weightManager: 70,
       status: 'IN_PROGRESS',
@@ -290,9 +290,9 @@ const open = (row?: PerformancePlanItem) => {
 };
 
 const handleConfirm = async () => {
-  if (!formRef.value) return;
+  if (!formRef.value || loading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || loading.value) return;
     if (form.weightSelf + form.weightManager !== 100) {
       ElMessage.warning('自评权重与主管权重之和必须等于 100%');
       return;

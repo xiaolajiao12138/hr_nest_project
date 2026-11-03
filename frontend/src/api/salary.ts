@@ -2,7 +2,7 @@ import request from '@/utils/request';
 
 export interface SalaryRecord {
   id: number;
-  employeeId: number;
+  empId: number;
   yearMonth: string;
   baseSalary: number;
   postSalary: number;
@@ -18,13 +18,16 @@ export interface SalaryRecord {
   netSalary: number;
   status: number; // 1: 草稿, 2: 已核准, 3: 已发
   hasPassword?: boolean;
-  remarks?: string;
+  remark?: string;
   createdAt: string;
   updatedAt: string;
   employee?: {
     id: number;
     name: string;
-    employeeNo: string;
+    empNo: string;
+    employeeNo?: string;
+    post?: string;
+    dept?: {id:number;deptName:string};
     department?: {
       id: number;
       name: string;
@@ -88,7 +91,7 @@ export function getSalaryDetailApi(id: number) {
  * 一键智能核算当月全员薪资草稿
  */
 export function calculateSalaryApi(data: { yearMonth: string; overwrite?: boolean }) {
-  return request<{ count: number; yearMonth: string }>({
+  return request<{ createdCount: number; updatedCount: number; yearMonth: string }>({
     url: '/salary/calculate',
     method: 'post',
     data,
@@ -120,11 +123,11 @@ export function batchConfirmSalaryApi(data: { ids: number[]; targetStatus: numbe
 /**
  * 导出月度薪资明细 Excel 报表
  */
-export function exportSalaryApi(yearMonth: string) {
+export function exportSalaryApi(params: QuerySalaryParams) {
   return request({
     url: '/salary/export',
     method: 'get',
-    params: { yearMonth },
+    params,
     responseType: 'blob',
   });
 }
@@ -138,7 +141,6 @@ export function getMyPayslipsApi() {
     yearMonth: string;
     status: number;
     hasPassword: boolean;
-    netSalary: number;
     createdAt: string;
   }>>({
     url: '/salary/my-payslips',

@@ -2,7 +2,7 @@
   <div class="menu-page">
     <el-card shadow="never">
       <div class="toolbar">
-        <el-button type="primary" :icon="Plus" @click="handleAddRoot">新增顶级菜单/目录</el-button>
+        <el-button type="primary" :icon="Plus" v-if="isAdmin" v-hasPerm="['system:menu:add']" @click="handleAddRoot">新增顶级菜单/目录</el-button>
         <el-button :icon="Refresh" @click="fetchMenuTree">刷新路由树</el-button>
       </div>
 
@@ -63,22 +63,22 @@
         <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.menuType !== 'F'"
+              v-if="isAdmin && row.menuType !== 'F'"
               type="primary"
               link
-              @click="handleAddChild(row)"
+              v-hasPerm="['system:menu:add']" @click="handleAddChild(row)"
             >
               新增子项
             </el-button>
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link v-if="isAdmin" v-hasPerm="['system:menu:edit']" @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" link v-if="isAdmin" v-hasPerm="['system:menu:delete']" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
     <!-- 新增 / 编辑菜单路由弹窗 -->
-    <BaseDialog
+    <BaseDialog :loading="detailLoading"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="680px"
@@ -168,6 +168,7 @@
 </template>
 
 <script setup lang="ts">
+import { useUserStore } from '@/stores/user';
 import { ref, reactive, onMounted, computed } from 'vue';
 import { Plus, Refresh } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
@@ -180,6 +181,8 @@ import {
   deleteMenuApi,
 } from '@/api/system';
 
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.roles.includes('admin') || userStore.permissions.includes('*'));
 const loading = ref(false);
 const menuTree = ref<any[]>([]);
 const dialogVisible = ref(false);
@@ -259,7 +262,7 @@ const handleAddChild = (row: any) => {
 /**
  * 编辑菜单路由
  * 遵循企业级架构规范：点击编辑不从树节点行数据拷贝，而是根据菜单 ID 异步请求后端独立详情接口获取最新完整路由属性
- * 
+ *
  * @param row 列表当前点击行（仅提取 row.id 与 title）
  */
 const handleEdit = async (row: any) => {
@@ -283,7 +286,7 @@ const handleEdit = async (row: any) => {
       isHidden: Boolean(detail.isHidden),
     });
   } catch (err: any) {
-    ElMessage.error(err.message || '获取菜单详情失败');
+    if (!err?.notified) ElMessage.error(err.message || '获取菜单详情失败');
     dialogVisible.value = false;
   } finally {
     detailLoading.value = false;
@@ -303,9 +306,9 @@ const handleDelete = (row: any) => {
 };
 
 const handleSubmit = async () => {
-  if (!formRef.value) return;
+  if (!formRef.value || submitLoading.value || detailLoading.value) return;
   await formRef.value.validate(async (valid) => {
-    if (!valid) return;
+    if (!valid || submitLoading.value || detailLoading.value) return;
     submitLoading.value = true;
     try {
       if (currentId.value) {
